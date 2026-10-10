@@ -7,7 +7,7 @@ bold "AssessMatrix — e2e"
 ensure_deps
 
 if ! (cd "$APP" && bunx playwright --version >/dev/null 2>&1); then
-  die "playwright is not installed. Run: cd app && bun add -d playwright && bunx playwright install chromium"
+  die "playwright is not installed. Run: bun install && bunx playwright install chromium (or set CHROMIUM_PATH)"
 fi
 
 started=""

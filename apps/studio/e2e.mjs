@@ -11,7 +11,10 @@ const fails = []
 const ok = (m) => console.log(`  \x1b[32m✓\x1b[0m ${m}`)
 const bad = (m) => { fails.push(m); console.log(`  \x1b[31m✗\x1b[0m ${m}`) }
 
-const browser = await chromium.launch()
+// CHROMIUM_PATH reuses an installed Chromium instead of Playwright's own download.
+const browser = await chromium.launch(
+  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+)
 // One context: a second tab shares the store, the way a second device would share a server.
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await ctx.newPage()
