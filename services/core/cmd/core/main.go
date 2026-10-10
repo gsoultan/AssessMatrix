@@ -36,6 +36,9 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
+// version is set at build time (deploy/Dockerfile).
+var version = "dev"
+
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -223,7 +226,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		defer ms.Close()
 	}
 	go func() {
-		log.Info("listening", "addr", cfg.Listen, "mailer", cfg.Mailer)
+		log.Info("listening", "addr", cfg.Listen, "mailer", cfg.Mailer, "version", version)
 		errc <- server.ListenAndServe()
 	}()
 	select {

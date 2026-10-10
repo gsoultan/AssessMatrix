@@ -1,6 +1,8 @@
 # One compose file for local development and small self-hosted installs
 # (docs/03 §3: self-host is a first-class artifact). Put secrets in .env;
-# see .env.example.
+# see .env.example. Production on one machine (docs/13):
+#
+#   docker compose --profile tls up -d     # with Caddy and HTTPS on AM_DOMAIN
 services:
   postgres:
     image: postgres:17
@@ -8,8 +10,21 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       AM_OWNER_PASSWORD: ${AM_OWNER_PASSWORD:?set AM_OWNER_PASSWORD in .env}
       AM_APP_PASSWORD: ${AM_APP_PASSWORD:?set AM_APP_PASSWORD in .env}
+    # Every WAL segment is copied to the archive volume as it fills (or each
+    # minute), so with a base backup the database can be restored to any
+    # moment (docs/13 §3, scripts/restore-drill.sh). Copy that volume off
+    # the machine: a backup on the same disk is not a backup.
+    command:
+      - bash
+      - -c
+      - >-
+        mkdir -p /archive/wal && chown -R postgres /archive &&
+        exec docker-entrypoint.sh postgres
+        -c wal_level=replica -c archive_mode=on -c archive_timeout=60
+        -c archive_command='test ! -f /archive/wal/%f && cp %p /archive/wal/%f'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - walarchive:/archive
       - ./deploy/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     ports: ["127.0.0.1:5432:5432"]
     healthcheck:
@@ -18,7 +33,10 @@ services:
       retries: 20
 
   migrate:
-    build: ./services/core
+    build: &image
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: assessmatrix:local
     command: ["migrate"]
     environment:
       AM_MIGRATE_DATABASE_URL: postgres://am_owner:${AM_OWNER_PASSWORD}@postgres:5432/assessmatrix
@@ -27,7 +45,8 @@ services:
     restart: "no"
 
   core:
-    build: ./services/core
+    build: *image
+    image: assessmatrix:local
     command: ["serve"]
     environment:
       AM_DATABASE_URL: postgres://am_app:${AM_APP_PASSWORD}@postgres:5432/assessmatrix
@@ -37,6 +56,8 @@ services:
       # service to give the runner its own origin; unset, it is AM_PUBLIC_URL.
       AM_RUNNER_URL: ${AM_RUNNER_URL:-}
       AM_MAILER: ${AM_MAILER:-log}
+      # 1 behind the tls profile's Caddy, so rate limits see the real client.
+      AM_TRUST_PROXY: ${AM_TRUST_PROXY:-0}
       AM_DEV: ${AM_DEV:-0}
       AM_SMTP_ADDR: ${AM_SMTP_ADDR:-}
       AM_SMTP_FROM: ${AM_SMTP_FROM:-}
@@ -59,6 +80,20 @@ services:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped
 
+  caddy:
+    image: caddy:2.10
+    profiles: [tls]
+    environment:
+      # Set AM_DOMAIN in .env; "localhost" gets a local, untrusted certificate.
+      AM_DOMAIN: ${AM_DOMAIN:-localhost}
+      AM_RUNNER_DOMAIN: ${AM_RUNNER_DOMAIN:-}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on: [core]
+    restart: unless-stopped
+
   psychometrics:
     build: ./services/psychometrics
     environment:
@@ -69,4 +104,6 @@ services:
 
 volumes:
   pgdata:
+  walarchive:
   media:
+  caddy:

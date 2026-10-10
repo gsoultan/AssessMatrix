@@ -1,0 +1,33 @@
+# Item statistics. One replica is plenty; more are safe (SKIP LOCKED).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: psychometrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: psychometrics }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: psychometrics }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: psychometrics
+          image: assessmatrix-psychometrics
+          env:
+            - { name: PYTHONDONTWRITEBYTECODE, value: "1" }
+            - name: AM_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: assessmatrix, key: AM_DATABASE_URL } }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }

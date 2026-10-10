@@ -1,0 +1,25 @@
+# ingress-nginx and cert-manager; adjust the class and issuer to the cluster.
+# The live monitor is a server stream: no buffering, long reads.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: assessmatrix
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1200"
+    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [exam.example.id, ujian.example.id]
+      secretName: assessmatrix-tls
+  rules:
+    - host: exam.example.id
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: core, port: { name: http } } } }
+    - host: ujian.example.id
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: core, port: { name: http } } } }

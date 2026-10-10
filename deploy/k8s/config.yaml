@@ -1,0 +1,15 @@
+# Non-secret settings. Secrets (database URLs, AM_SECRET, SMTP, S3 keys) are
+# in the Secret "assessmatrix", made outside git: see secret.example.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assessmatrix
+data:
+  AM_PUBLIC_URL: https://exam.example.id
+  AM_RUNNER_URL: https://ujian.example.id
+  AM_MAILER: smtp
+  # Behind the ingress controller, which sets X-Forwarded-For.
+  AM_TRUST_PROXY: "1"
+  # More than one replica: images must be in object storage, not on a disk.
+  AM_MEDIA_STORE: s3
+  AM_MEDIA_REGION: id

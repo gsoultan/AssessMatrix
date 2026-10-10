@@ -1,0 +1,24 @@
+# A base for a Kubernetes cluster in the tenants' region (docs/13 §2).
+#   kubectl apply -k deploy/k8s            (after creating the Secret, see secret.example.yaml)
+# Release order: the migrate Job first, then the Deployments (docs/13 §4).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: assessmatrix
+labels:
+  - pairs: { app.kubernetes.io/part-of: assessmatrix }
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - config.yaml
+  - migrate-job.yaml
+  - core.yaml
+  - psychometrics.yaml
+  - ingress.yaml
+  - network-policy.yaml
+images:
+  - name: assessmatrix
+    newName: ghcr.io/gsoultan/assessmatrix
+    newTag: v0.0.0 # set by the release: kustomize edit set image assessmatrix=…:vX.Y.Z
+  - name: assessmatrix-psychometrics
+    newName: ghcr.io/gsoultan/assessmatrix-psychometrics
+    newTag: v0.0.0
