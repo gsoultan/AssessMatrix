@@ -205,8 +205,14 @@ func tanggal(t time.Time) string {
 	return fmt.Sprintf("%d %s %d %02d.%02d WIB", t.Day(), monthsID[t.Month()-1], t.Year(), t.Hour(), t.Minute())
 }
 
+// inviteURL opens the candidate runner, never the studio: a candidate's
+// browser loads only the runner's code.
 func (s *Server) inviteURL(token string) string {
-	return strings.TrimRight(s.PublicURL, "/") + "/#/i/" + token
+	base := s.RunnerURL
+	if base == "" {
+		base = s.PublicURL
+	}
+	return strings.TrimRight(base, "/") + "/take/#/i/" + token
 }
 
 // mintAndMail issues a fresh link for a, retiring the old one and its

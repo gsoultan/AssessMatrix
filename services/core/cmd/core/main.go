@@ -149,7 +149,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL,
+	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
 		Media: media.Regional{Store: store, Region: cfg.Media.Region}}
 
 	mux := http.NewServeMux()
@@ -188,7 +188,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           logRequests(log, sameOrigin(cfg.PublicURL, root)),
+		Handler:           logRequests(log, sameOrigin(root, cfg.PublicURL, cfg.RunnerURL)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -231,10 +231,13 @@ func openMedia(ctx context.Context, m mediaConfig) (media.Store, error) {
 // sameOrigin refuses a browser POST from another origin. SameSite=Strict
 // cookies already stop cross-site requests carrying a session; this is the
 // second lock on the same door.
-func sameOrigin(publicURL string, next http.Handler) http.Handler {
-	want := strings.TrimRight(publicURL, "/")
+func sameOrigin(next http.Handler, origins ...string) http.Handler {
+	ok := map[string]bool{}
+	for _, o := range origins {
+		ok[strings.TrimRight(o, "/")] = true
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if o := r.Header.Get("Origin"); o != "" && r.Method != http.MethodGet && o != want {
+		if o := r.Header.Get("Origin"); o != "" && r.Method != http.MethodGet && !ok[o] {
 			http.Error(w, "cross-origin request refused", http.StatusForbidden)
 			return
 		}
@@ -264,14 +267,29 @@ func logRequests(log *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-// spa serves the built web app, falling back to index.html.
+// spa serves the built web app: the studio, and the candidate runner under
+// /take/. A path that is not a file falls back to its app's index. Hashed
+// assets are cached for good; everything else is revalidated, so a deploy
+// reaches the next page load (and the runner's service worker sees a new
+// sw.js and replaces its shell).
 func spa(dir string) http.Handler {
 	files := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p := filepath.Join(dir, filepath.Clean("/"+r.URL.Path))
+		clean := filepath.Clean("/" + r.URL.Path)
+		p := filepath.Join(dir, clean)
 		if st, err := os.Stat(p); err != nil || st.IsDir() {
-			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
+			index := "index.html"
+			if clean == "/take" || strings.HasPrefix(clean, "/take/") {
+				index = "take/index.html"
+			}
+			w.Header().Set("Cache-Control", "no-cache")
+			http.ServeFile(w, r, filepath.Join(dir, index))
 			return
+		}
+		if strings.HasPrefix(clean, "/assets/") || strings.HasPrefix(clean, "/take/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		files.ServeHTTP(w, r)
 	})

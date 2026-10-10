@@ -60,7 +60,8 @@ Without those variables the database tests skip locally and fail in CI.
 | `AM_MIGRATE_DATABASE_URL` | The schema owner, for `migrate` and `tenant` only |
 | `AM_APP_ROLE` | Role `migrate` grants to (default `am_app`) |
 | `AM_SECRET` | 32+ random bytes, hex or base64. Rotating it invalidates every link, code and session |
-| `AM_PUBLIC_URL` | The origin links point at. Must be https outside development |
+| `AM_PUBLIC_URL` | The studio's origin. Must be https outside development |
+| `AM_RUNNER_URL` | Where invitation links open the candidate runner (`/take/`). Defaults to `AM_PUBLIC_URL`; set a second hostname for this service to keep candidate and staff cookies apart |
 | `AM_MAILER` | `smtp`, `log`, or `mailbox` (development only) |
 | `AM_SMTP_ADDR`, `AM_SMTP_FROM`, `AM_SMTP_USER`, `AM_SMTP_PASS` | SMTP relay |
 | `AM_STATIC_DIR` | Serve the built web app from here, on the same origin |

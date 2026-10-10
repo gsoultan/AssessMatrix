@@ -7,12 +7,81 @@
  * Mail is read from the core's development mailbox (AM_MAILER=mailbox), which
  * is the only thing here a production deployment does not have.
  *
- *   URL         where the core serves the built studio (default http://localhost:8090)
- *   STAFF_EMAIL a staff member of a fresh tenant (scripts/e2e-core.sh makes one)
+ * Then the phase 4 gate: a sitting survives its browser being killed during a
+ * network outage, with nothing lost.
+ *
+ *   URL          where the core serves the built studio (default http://localhost:8090)
+ *   RUNNER_PORT  the runner's own origin; this test forwards it to the core so
+ *                it can cut the candidate's network (default 8091)
+ *   STAFF_EMAIL  a staff member of a fresh tenant (scripts/e2e-core.sh makes one)
+ *   OUTAGE_SECONDS  how long the candidate's network is down (default 300)
  */
 import { chromium } from 'playwright'
+import net from 'node:net'
+import { spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const URL = process.env.URL ?? 'http://localhost:8090'
+const RUNNER_PORT = Number(process.env.RUNNER_PORT ?? 8091)
+const RUNNER = `http://localhost:${RUNNER_PORT}`
+const OUTAGE = Number(process.env.OUTAGE_SECONDS ?? 300)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * The candidate's network: a TCP forwarder from the runner's origin to the
+ * core. Cutting it refuses new connections and drops open ones, which is what
+ * a phone losing signal looks like to the browser.
+ */
+const wire = (() => {
+  const [host, port] = new globalThis.URL(URL).host.split(':')
+  const open = new Set()
+  let server = null
+  const up = () =>
+    new Promise((resolve) => {
+      server = net.createServer((c) => {
+        const u = net.connect(Number(port), host)
+        open.add(c).add(u)
+        const drop = () => { c.destroy(); u.destroy(); open.delete(c); open.delete(u) }
+        c.on('error', drop).on('close', drop)
+        u.on('error', drop).on('close', drop)
+        c.pipe(u).pipe(c)
+      })
+      server.listen(RUNNER_PORT, '127.0.0.1', resolve)
+    })
+  const down = () =>
+    new Promise((resolve) => {
+      for (const s of open) s.destroy()
+      open.clear()
+      server.close(() => resolve())
+    })
+  return { up, down }
+})()
+await wire.up()
+
+/** A browser as a process of its own, so it can be killed like one. */
+async function realBrowser(profile) {
+  const exe = process.env.CHROMIUM_PATH ?? chromium.executablePath()
+  const proc = spawn(exe, ['--headless=new', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0',
+    `--user-data-dir=${profile}`, '--window-size=420,900',
+    // Chromium refuses to sandbox as root (CI containers, this one); Playwright does the same.
+    ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
+  const ws = await new Promise((resolve, reject) => {
+    let err = ''
+    proc.stderr.on('data', (d) => {
+      err += d
+      const m = err.match(/DevTools listening on (ws:\/\/\S+)/)
+      if (m) resolve(m[1])
+    })
+    proc.on('exit', (c) => reject(new Error(`chromium exited ${c}: ${err.slice(-400)}`)))
+  })
+  const b = await chromium.connectOverCDP(ws)
+  const ctx = b.contexts()[0]
+  const p = ctx.pages()[0] ?? (await ctx.newPage())
+  p.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
+  return { proc, b, p }
+}
 const STAFF = process.env.STAFF_EMAIL
 if (!STAFF) throw new Error('STAFF_EMAIL is required')
 const run = Date.now().toString(36)
@@ -167,6 +236,9 @@ try {
   const invite = await mail(CANDIDATE, 'invite')
   const link = invite.Body.match(/https?:\/\/\S+#\/i\/[A-Za-z0-9_-]{43}/)?.[0]
   link ? ok('the invitation email carries a personal link') : bad('no link in the invitation email')
+  link?.startsWith(`${RUNNER}/take/#/i/`)
+    ? ok('the link opens the candidate runner, on its own origin')
+    : bad(`the link does not open the runner: ${link}`)
 
   /* ---------------- the candidate, on their own device ---------------- */
   await cand.goto(link, { waitUntil: 'networkidle' })
@@ -194,6 +266,22 @@ try {
     ? ok('the right code opens the invitation')
     : bad('verifying the code did not open the invitation')
 
+  const loaded = await cand.evaluate(() => performance.getEntriesByType('resource').map((r) => new globalThis.URL(r.name).pathname))
+  loaded.some((p) => p.startsWith('/take/assets/')) && !loaded.some((p) => p.startsWith('/assets/'))
+    ? ok('the candidate downloads the runner only, none of the studio')
+    : bad(`the candidate loaded studio files: ${loaded.filter((p) => p.startsWith('/assets/')).join(' ')}`)
+  ;(await cand.evaluate(() => navigator.serviceWorker.getRegistration('/take/').then((r) => !!r)))
+    ? ok('the runner installs its service worker')
+    : bad('no service worker for the runner')
+
+  const twin = await candCtx.newPage()
+  await twin.goto(`${RUNNER}/take/#/session`, { waitUntil: 'networkidle' })
+  await twin.waitForTimeout(800)
+  ;(await twin.getByText('Sedang dibuka di tab lain').count())
+    ? ok('a second tab on the same sitting is refused')
+    : bad(`a second tab opened the sitting: ${(await twin.locator('main').innerText()).slice(0, 80)}`)
+  await twin.close()
+
   const reuse = await browser.newContext()
   const thief = await reuse.newPage()
   await thief.goto(link, { waitUntil: 'networkidle' })
@@ -217,7 +305,7 @@ try {
   // Pick the right answer, then let the browser die before submitting.
   await cand.locator('main button[aria-pressed]', { hasText: '0' }).first().click()
   await cand.waitForTimeout(1500)
-  ;(await cand.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('am.pending')).length)) === 0
+  ;(await cand.getByText(/menunggu sinkron/).count()) === 0
     ? ok('the answer reached the server; nothing is left waiting on the device')
     : bad('the answer was still queued on the device')
   await cand.reload({ waitUntil: 'networkidle' })
@@ -273,6 +361,94 @@ try {
     ? ok('a submitted invitation cannot be revoked')
     : bad('a submitted invitation can still be revoked')
 
+  /* ---------------- the gate: a browser kill during a network outage ---------------- */
+  const SECOND = `kandidat2.${run}@example.id`
+  await nav(/People/)
+  await page.getByRole('button', { name: /^Import$/ }).click()
+  await page.waitForTimeout(300)
+  await page.getByPlaceholder(/Budi Santoso, budi@example.id/).fill(`Kandidat Dua, ${SECOND}, QA`)
+  await page.getByRole('button', { name: /Import roster/ }).click()
+  await page.waitForTimeout(600)
+  await nav(/Library/)
+  await page.getByRole('button', { name: new RegExp(`Actions for E2E Core ${run}`) }).click()
+  await page.waitForTimeout(250)
+  await page.getByRole('menuitem', { name: /Assign people/ }).click()
+  await page.waitForTimeout(500)
+  await page.getByRole('button', { name: /^Select Kandidat Dua$/ }).click()
+  await page.getByRole('button', { name: /^Invite 1 person$/ }).click()
+  await page.waitForTimeout(800)
+  const link2 = (await mail(SECOND, 'invite')).Body.match(/https?:\/\/\S+#\/i\/[A-Za-z0-9_-]{43}/)[0]
+
+  const profile = mkdtempSync(join(tmpdir(), 'am-gate-'))
+  let real = await realBrowser(profile)
+  try {
+    const p = real.p
+    await p.goto(link2, { waitUntil: 'networkidle' })
+    await p.getByRole('button', { name: /Kirim kode/ }).click()
+    await p.getByLabel('Kode verifikasi').fill(codeIn(await mail(SECOND, 'code')))
+    await p.getByRole('button', { name: /^Verifikasi/ }).click()
+    await p.waitForTimeout(800)
+    const verifiedAt = Date.now()
+    await p.getByRole('button', { name: /^Mulai$/ }).click()
+    await p.waitForTimeout(300)
+    if (await p.getByRole('button', { name: /Setuju dan lanjut/ }).count()) await p.getByRole('button', { name: /Setuju dan lanjut/ }).click()
+    await p.waitForTimeout(300)
+    await p.getByRole('button', { name: /Mulai sekarang/ }).click()
+    await p.waitForTimeout(600)
+    // A wrong answer reaches the server while the network is up...
+    await p.locator('main button[aria-pressed]', { hasText: 'panic' }).first().click()
+    await p.waitForTimeout(1500)
+
+    // ...then the network goes. Well into the outage (and at least 30 s after
+    // sign-in, since the browser writes cookies back every 30 s) the candidate
+    // changes it to the right one, and a second later the browser is killed:
+    // too soon for anything written lazily to have reached the disk.
+    await wire.down()
+    const downAt = Date.now()
+    await sleep(Math.max(OUTAGE * 500 - (Date.now() - downAt), 35_000 - (Date.now() - verifiedAt), 0))
+    await p.locator('main button[aria-pressed]', { hasText: '0' }).first().click()
+    await p.waitForTimeout(1000)
+    ;(await p.getByText(/menunggu sinkron/).count())
+      ? ok('in the outage, the changed answer waits on the device')
+      : bad('in the outage, nothing said the answer was waiting')
+    const onDisk = await p.evaluate(async () => {
+      const names = []
+      for await (const k of (await navigator.storage.getDirectory()).keys()) names.push(k)
+      return names.filter((n) => n.startsWith('am.pending.v1.'))
+    })
+    onDisk.length
+      ? ok('the queue is in the origin-private file system, flushed to disk')
+      : bad('the queue is not in OPFS')
+
+    real.proc.kill('SIGKILL')
+    await new Promise((r) => real.proc.once('exit', r))
+    await sleep(Math.max(OUTAGE * 1000 - (Date.now() - downAt), 0))
+    await wire.up()
+    ok(`the network was down ${Math.round((Date.now() - downAt) / 1000)} s, and the browser was killed during it`)
+
+    real = await realBrowser(profile)
+    const q = real.p
+    await q.goto(`${RUNNER}/take/#/session`, { waitUntil: 'networkidle' })
+    await q.waitForTimeout(1200)
+    await q.getByRole('button', { name: /Lanjutkan/ }).click()
+    await q.waitForTimeout(2500)
+    ;(await q.getByText(/menunggu sinkron/).count()) === 0
+      ? ok('reopened, the answer made offline before the kill is sent')
+      : bad('reopened, the answer is still waiting')
+    await q.getByRole('button', { name: /^Selesai/ }).click()
+    await q.waitForTimeout(300)
+    await q.getByRole('button', { name: /^Kumpulkan$/ }).click()
+    await q.waitForTimeout(300)
+    await q.getByRole('button', { name: /Ya, kumpulkan/ }).click()
+    await q.waitForTimeout(1200)
+    ;(await q.getByText(/^100%$/).count())
+      ? ok('GATE: killed during a network outage, the sitting lost nothing (100%)')
+      : bad(`GATE: the answer made in the outage was lost: ${(await q.locator('main').innerText()).slice(0, 200)}`)
+  } finally {
+    real.proc.kill('SIGKILL')
+    rmSync(profile, { recursive: true, force: true })
+  }
+
   await page.getByRole('button', { name: /Sign out/ }).first().click()
   await page.waitForTimeout(500)
   ;(await page.getByRole('heading', { name: 'Sign in' }).count())
@@ -284,6 +460,7 @@ try {
   if (errors.length) bad(`console/page errors: ${JSON.stringify(errors.slice(0, 3))}`)
   else ok('no console or page errors')
   await browser.close()
+  await wire.down().catch(() => {})
 }
 
 if (fails.length) {

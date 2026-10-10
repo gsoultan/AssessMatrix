@@ -33,6 +33,9 @@ services:
       AM_DATABASE_URL: postgres://am_app:${AM_APP_PASSWORD}@postgres:5432/assessmatrix
       AM_SECRET: ${AM_SECRET:?set AM_SECRET in .env (openssl rand -hex 32)}
       AM_PUBLIC_URL: ${AM_PUBLIC_URL:-http://localhost:5180}
+      # Where candidates open their links. Point a second hostname at this
+      # service to give the runner its own origin; unset, it is AM_PUBLIC_URL.
+      AM_RUNNER_URL: ${AM_RUNNER_URL:-}
       AM_MAILER: ${AM_MAILER:-log}
       AM_DEV: ${AM_DEV:-0}
       AM_SMTP_ADDR: ${AM_SMTP_ADDR:-}
