@@ -21,7 +21,7 @@ RUN bunx vite build --outDir /web --emptyOutDir \
  && bunx vite build -c vite.runner.config.ts --outDir /web \
  && bunx vite build -c ../verify/vite.config.ts --outDir /web/verify
 
-FROM golang:1.27.1 AS core
+FROM golang:1.27.2 AS core
 WORKDIR /src
 COPY services/core/go.mod services/core/go.sum ./
 RUN go mod download
