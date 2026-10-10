@@ -114,6 +114,38 @@ jobs:
           python-version: '3.13'
       - run: python -m unittest -v
 
+  supply-chain:
+    name: Supply chain · known vulnerabilities, committed secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: services/core/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Web dependencies
+        run: bun audit
+      - name: Go dependencies and standard library (reachable code only)
+        working-directory: services/core
+        env:
+          GOTOOLCHAIN: go1.27.1
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - name: Python dependencies
+        run: pip install pip-audit==2.10.1 && pip-audit -r services/psychometrics/requirements.txt
+      - name: No secrets in the history
+        env:
+          GOTOOLCHAIN: go1.27.1
+        run: go run github.com/zricethezav/gitleaks/v8@v8.28.0 git --no-banner --redact .
+
   stack:
     name: Stack · studio against the core and Postgres
     runs-on: ubuntu-latest

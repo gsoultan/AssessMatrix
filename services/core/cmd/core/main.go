@@ -199,7 +199,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           logRequests(log, sameOrigin(root, cfg.PublicURL, cfg.RunnerURL)),
+		Handler:           logRequests(log, securityHeaders(sameOrigin(root, cfg.PublicURL, cfg.RunnerURL), strings.HasPrefix(cfg.PublicURL, "https://"))),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
