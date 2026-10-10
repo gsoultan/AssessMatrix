@@ -38,15 +38,15 @@ AssessMatrix's bet: **make assessments AI-immune by construction, not by surveil
 | `docs/04-roadmap.md` | Phased plan, 12-week MVP scope, risk register |
 | `docs/05-integration.md` | How other applications integrate — the Four Doors, schema fabric, events |
 | `docs/06-frontend-architecture.md` | Stack, worker topology, PWA/offline, Mantine+Tailwind, monorepo |
-| `docs/07-mockups.md` | Wireframes — integration surfaces, candidate runner, proctor monitor |
 | `docs/08-invite-links.md` | Candidate invitations — roster import, the secured link, what moves to the backend |
+| `docs/09-production-plan.md` | Phased plan from prototype to the first live exam, with exit gates |
 | `AGENTS.md` | Developer profile roster (Driver/Challenger) |
-| `app/` | **Running prototype** — React 19 · Mantine 9.6 · Tailwind 4 · Vite 8 · Bun |
+| `apps/studio/` | **Running prototype** — React 19 · Mantine 9.6 · Tailwind 4 · Vite 8 · Bun |
 | `scripts/` · `Makefile` | Dev scripts — `make dev`, `make check`, `make build`, `make e2e` |
 
 ## Status
 
-Strategy and architecture defined. `app/` runs eleven screens; the exam authoring and
+Strategy and architecture defined. `apps/studio/` runs thirteen screens, six of them functional; the exam authoring and
 delivery loop, and candidate invitations by emailed link, are functional against local storage. No backend exists yet.
 
 ```bash

@@ -1,0 +1,5 @@
+{
+  "name": "assessmatrix",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"]
+}

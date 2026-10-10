@@ -1,8 +1,8 @@
 # Candidate Invitations
 
 How a candidate gets from an administrator's roster to an exam, and what has to move to a
-server before any of it is real. The prototype in `app/` runs the whole flow in the browser
-against `localStorage`; `app/src/invite.ts` is written as the server it stands in for.
+server before any of it is real. The prototype in `apps/studio/` runs the whole flow in the browser
+against `localStorage`; `apps/studio/src/invite.ts` is written as the server it stands in for.
 
 ## 1. Getting people in
 
@@ -16,7 +16,7 @@ An administrator invites people from **Assignments** (or adds them to **People**
 
 Every file is previewed before anything is written: new, already on the roster, repeated in
 the file, and each unusable row with its row number. Only name, email and group are kept —
-any other column (a national id, a date of birth) is dropped in `app/src/roster.ts` and never
+any other column (a national id, a date of birth) is dropped in `apps/studio/src/roster.ts` and never
 stored. Caps: 5 MB per file, 5,000 rows, 30 MB inflated per workbook entry (zip bombs).
 
 ## 2. The link

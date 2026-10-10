@@ -16,7 +16,7 @@ dev: ## Start the UI on http://localhost:5180
 check: ## Type-check only (fast)
 	@./scripts/check.sh
 
-build: ## Type-check and build to app/dist
+build: ## Type-check and build to apps/studio/dist
 	@./scripts/build.sh
 
 preview: ## Build, then serve the production bundle
@@ -25,5 +25,5 @@ preview: ## Build, then serve the production bundle
 e2e: ## Smoke-test the create → take → score loop in a browser
 	@./scripts/e2e.sh
 
-clean: ## Remove app/dist and app/node_modules
+clean: ## Remove build output and node_modules
 	@./scripts/clean.sh
