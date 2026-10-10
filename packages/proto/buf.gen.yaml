@@ -1,0 +1,19 @@
+# Generated code is committed. CI runs `buf generate` and fails on any diff,
+# so the checked-in clients can never drift from the schema.
+version: v2
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/gsoultan/assessmatrix/services/core/gen
+plugins:
+  - local: protoc-gen-go
+    out: ../../services/core/gen
+    opt: paths=source_relative
+  - local: protoc-gen-connect-go
+    out: ../../services/core/gen
+    opt: paths=source_relative
+  - local: protoc-gen-es
+    out: gen
+    opt: target=ts,import_extension=none
