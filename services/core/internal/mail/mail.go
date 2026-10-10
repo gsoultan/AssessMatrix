@@ -102,26 +102,38 @@ func redact(s string) string {
 // which needs to read the link and code a candidate would receive. Never
 // enabled in production: the config refuses it unless AM_DEV is set.
 type Mailbox struct {
+	// Keep is how many messages are kept (0: 200). The load simulator
+	// raises it (AM_DEV_MAILBOX_KEEP) to read a whole cohort's mail.
+	Keep int
 	mu   sync.Mutex
-	msgs []Message
+	msgs []Message // oldest first
 }
-
-const mailboxKept = 200
 
 func (b *Mailbox) Send(_ context.Context, m Message) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.msgs = append([]Message{m}, b.msgs...)
-	if len(b.msgs) > mailboxKept {
-		b.msgs = b.msgs[:mailboxKept]
+	keep := b.Keep
+	if keep <= 0 {
+		keep = 200
+	}
+	b.msgs = append(b.msgs, m)
+	if len(b.msgs) > keep {
+		b.msgs = append(b.msgs[:0:0], b.msgs[len(b.msgs)-keep:]...)
 	}
 	return nil
 }
 
-func (b *Mailbox) List() []Message {
+// List returns the messages to one address (all, if to is empty), newest first.
+func (b *Mailbox) List(to string) []Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return append([]Message{}, b.msgs...)
+	out := []Message{}
+	for i := len(b.msgs) - 1; i >= 0; i-- {
+		if to == "" || strings.EqualFold(b.msgs[i].To, to) {
+			out = append(out, b.msgs[i])
+		}
+	}
+	return out
 }
 
 // SMTP sends through a relay with STARTTLS required.

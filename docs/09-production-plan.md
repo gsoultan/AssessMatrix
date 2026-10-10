@@ -172,9 +172,20 @@ These are not a final phase. Leaving them until the end is how a pilot slips.
 | **Psychometrics** | A psychometrician engaged before the first Certify conversation (`04` risk #2) | psychometrics |
 | **Load** | Simulate the partner's cohort (all candidates starting in the same minute, autosaving) against staging, with headroom | perf/cost |
 
+Where the tracks stand:
+
+| Track | State |
+| :--- | :--- |
+| Deploy | Built. One image with the core and all three web apps (`deploy/Dockerfile`); compose with Caddy for TLS (`--profile tls`); a kustomize base for Kubernetes (`deploy/k8s`, validated in CI); images publish only from a version tag (`release.yml`). Runbook: `13-operations.md`. Not done: a staging environment (needs an account and a region) |
+| Data safety | Built. WAL archived every minute; `scripts/restore-drill.sh` restores to a moment and checks the writes either side of it and the core on the result, in CI on every PR. Not done: the drill on a production-sized database (go-live checklist) |
+| Observability | Built. Prometheus metrics per procedure (rate, code, duration), events stored, sync lag, signals dropped, records purged; alert rules with tests (`deploy/prometheus`). Not done: traces; sync lag stands in for sync-queue age, which only the device knows |
+| Privacy | Built. Hourly retention job (at most the year the consent text promises, by a database check) and erasure on request from the studio, both audited by id (`13-operations.md` §5). Changed from the plan: erasure deletes rows outright instead of crypto-shredding, and backups age out in 35 days. Not done: PII in a store separate from responses |
+| Security | Built. Content policy per app, HSTS, no framing; `bun audit`, `govulncheck`, `pip-audit` and a gitleaks history scan in CI (the first run found and fixed ten reachable Go vulnerabilities). Test scope: `12-security.md`. Not done: the external test itself |
+| Load | Built. `make load` (`cmd/loadsim`): a cohort starts within a minute, autosaves every ~10 s through the runner's procedures, hands in, and every acknowledged answer is looked for in its log. Local run, one core on a laptop-class container: 500 candidates, 12,704 calls, AppendEvents p99 12 ms, 0 errors, 0 answers lost. A 40-candidate run is in CI. Not done: the partner's cohort size against staging |
+
 ## 4. Go-live checklist
 
-- [ ] Tenant-isolation test covers every RPC and is green.
+- [x] Tenant-isolation test covers every RPC and is green.
 - [ ] Kill-the-browser and network-partition tests pass against production-like infrastructure.
 - [ ] Invite tests from `08` §4 pass, and the kill-the-browser test runs with the real session cookie.
 - [ ] Tampered-attempt replay is detected.
