@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -397,7 +398,7 @@ func isNotFound(err error) bool {
 	return errors.As(err, &ce) && ce.Code() == connect.CodeNotFound
 }
 
-func (s *candidateService) StartAttempt(ctx context.Context, _ *connect.Request[v1.StartAttemptRequest]) (*connect.Response[v1.StartAttemptResponse], error) {
+func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Request[v1.StartAttemptRequest]) (*connect.Response[v1.StartAttemptResponse], error) {
 	var out *v1.Attempt
 	err := s.tx(ctx, func(tx pgx.Tx) error {
 		a, e, err := s.session(ctx, tx, true)
@@ -419,6 +420,22 @@ func (s *candidateService) StartAttempt(ctx context.Context, _ *connect.Request[
 		if a.Status == v1.AssignStatus_ASSIGN_STATUS_SUBMITTED {
 			return failedPrecondition("this invitation has already been submitted")
 		}
+		// Each purpose the tier collects under is agreed to separately, before
+		// the start; nothing is collected under a purpose not agreed to.
+		given := map[string]bool{}
+		for _, c := range req.Msg.GetConsents() {
+			given[c] = true
+		}
+		required := domain.RequiredConsents(e.GetTier())
+		var missing []string
+		for _, p := range required {
+			if !given[p] {
+				missing = append(missing, p)
+			}
+		}
+		if len(missing) > 0 {
+			return failedPrecondition("this assessment needs your consent first: " + strings.Join(missing, ", "))
+		}
 		now := s.now()
 		var deadline *time.Time
 		if mins := domain.TotalMinutes(e); e.GetTimed() && mins > 0 {
@@ -438,6 +455,14 @@ func (s *candidateService) StartAttempt(ctx context.Context, _ *connect.Request[
 			// The evidence should say how we came to believe who this is.
 			{Kind: domain.KindIdentityVerified, ClientTime: now.UnixMilli(), Detail: "personal link + code sent to the address on file"},
 		}); err != nil {
+			return err
+		}
+		consents := make([]*v1.AttemptEvent, 0, len(required))
+		for _, p := range required {
+			consents = append(consents, &v1.AttemptEvent{Kind: domain.KindConsentPrefix + p, ClientTime: now.UnixMilli(),
+				Detail: "agreed on the consent screen before starting"})
+		}
+		if err := s.appendEvents(ctx, tx, att, consents); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `UPDATE assignments SET status = $2, started_at = coalesce(started_at, $3) WHERE id = $1`,
@@ -529,8 +554,15 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 		if att.LastSeq+int64(len(m.GetEvents())) > MaxEventsPerTry {
 			return connect.NewError(connect.CodeResourceExhausted, errors.New("this attempt has reached its event limit"))
 		}
+		keep, err := s.consented(ctx, tx, att.ID, m.GetEvents())
+		if err != nil {
+			return err
+		}
 		evs := make([]*v1.AttemptEvent, 0, len(m.GetEvents()))
 		for _, ev := range m.GetEvents() {
+			if !keep(ev) {
+				continue
+			}
 			evs = append(evs, &v1.AttemptEvent{
 				ClientTime: ev.GetClientTime(), Kind: ev.GetKind(), ItemId: ev.GetItemId(),
 				Values: ev.GetValues(), Text: ev.GetText(), File: ev.GetFile(), Detail: ev.GetDetail(),
@@ -549,6 +581,30 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 	}
 	out.ServerNow = s.now().UnixMilli()
 	return connect.NewResponse(out), nil
+}
+
+// consented decides which events of a batch may be stored: a signal collected
+// under a purpose the candidate did not agree to (or that the tier does not
+// collect) is dropped, never stored. It is dropped rather than refused because
+// the batch also carries answers, and a refused batch would block them in the
+// candidate's queue for good. Only a batch with signals costs the lookup.
+func (s *candidateService) consented(ctx context.Context, tx pgx.Tx, attemptID string, evs []*v1.AttemptEvent) (func(*v1.AttemptEvent) bool, error) {
+	all := func(*v1.AttemptEvent) bool { return true }
+	if !slices.ContainsFunc(evs, func(ev *v1.AttemptEvent) bool { return domain.PurposeOf(ev.GetKind()) != "" }) {
+		return all, nil
+	}
+	rows, err := tx.Query(ctx, `SELECT DISTINCT kind FROM attempt_events WHERE attempt_id = $1 AND kind LIKE 'consent.%'`, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	kinds, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, err
+	}
+	return func(ev *v1.AttemptEvent) bool {
+		p := domain.PurposeOf(ev.GetKind())
+		return p == "" || slices.Contains(kinds, domain.KindConsentPrefix+p)
+	}, nil
 }
 
 // ExpirySkew is how early a forced submit is honoured, for clock drift.

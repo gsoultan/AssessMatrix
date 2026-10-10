@@ -14,6 +14,7 @@
         "@connectrpc/connect-web": "2.2.0",
         "@mantine/core": "9.6.2",
         "@mantine/hooks": "9.6.2",
+        "@mediapipe/tasks-vision": "1.1.0",
         "@tabler/icons-react": "3.47.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
@@ -96,6 +97,8 @@
     "@mantine/core": ["@mantine/core@9.6.2", "", { "dependencies": { "@floating-ui/react": "^0.27.20", "clsx": "^2.1.1", "react-number-format": "^5.4.5", "react-remove-scroll": "^2.7.2", "type-fest": "^5.8.0" }, "peerDependencies": { "@mantine/hooks": "9.6.2", "react": "^19.2.0", "react-dom": "^19.2.0" } }, "sha512-6W7xA3FRlGMclVDCY5U6rqhgzc+x+7G3nR9rntcjtF/Slnkp79Em8yjAB01F0wBSnrBUMK1TqKENf5o5WHiPOA=="],
 
     "@mantine/hooks": ["@mantine/hooks@9.6.2", "", { "peerDependencies": { "react": "^19.2.0" } }, "sha512-SfNY0FvYi8vMytZbioQVx5JyX0dmLUQEmbgbQQXqe4iOto0QZ896XwhgMQ6g/FCWkvc9JHeHp7iPu4msqQFIEw=="],
+
+    "@mediapipe/tasks-vision": ["@mediapipe/tasks-vision@1.1.0", "", {}, "sha512-ZJqh0wMKOINorfSffvDAxzyO1//c+FiG3IkzOdNDnLqvBB3DbMfj0bB/tys2SNf9S914sgoIbIpF4HTOi336cg=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.150.0", "", {}, "sha512-rDS5/31E9HfPl/CIzGrn0DOlvBbXFseQ5URJ9sYMfstbKLD/c6Gm9vmRzRGDdAXyOIL4zmO37lc9RIwYqVruZw=="],
 

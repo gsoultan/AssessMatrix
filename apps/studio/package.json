@@ -16,6 +16,7 @@
     "@connectrpc/connect-web": "2.2.0",
     "@mantine/core": "9.6.2",
     "@mantine/hooks": "9.6.2",
+    "@mediapipe/tasks-vision": "1.1.0",
     "@tabler/icons-react": "3.47.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

@@ -66,32 +66,61 @@ type Authenticator struct {
 var errUnauthenticated = connect.NewError(connect.CodeUnauthenticated, errors.New("sign in required"))
 
 // Interceptor enforces the policy on every unary call.
-func (a *Authenticator) Interceptor() connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			access, ok := a.Policy[req.Spec().Procedure]
-			if !ok {
-				return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("no access policy for %s", req.Spec().Procedure))
-			}
-			switch access {
-			case Public:
-				return next(ctx, req)
-			case Staff:
-				p, err := a.staff(ctx, req.Header())
-				if err != nil {
-					return nil, err
-				}
-				return next(with(ctx, p), req)
-			case Candidate:
-				p, err := a.candidate(ctx, req.Header())
-				if err != nil {
-					return nil, err
-				}
-				return next(with(ctx, p), req)
-			}
-			return nil, connect.NewError(connect.CodeInternal, errors.New("unhandled access level"))
+func (a *Authenticator) Interceptor() connect.Interceptor { return interceptor{a} }
+
+// interceptor guards unary and server-streaming procedures alike. A
+// UnaryInterceptorFunc alone would let every streaming procedure through
+// unchecked.
+type interceptor struct{ a *Authenticator }
+
+func (i interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
+	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+		ctx, err := i.a.authorize(ctx, req.Spec().Procedure, req.Header())
+		if err != nil {
+			return nil, err
 		}
+		return next(ctx, req)
 	}
+}
+
+func (i interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		ctx, err := i.a.authorize(ctx, conn.Spec().Procedure, conn.RequestHeader())
+		if err != nil {
+			return err
+		}
+		return next(ctx, conn)
+	}
+}
+
+func (i interceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
+	return next
+}
+
+// authorize resolves the caller for a procedure's access policy, refusing
+// any procedure that has none.
+func (a *Authenticator) authorize(ctx context.Context, procedure string, h http.Header) (context.Context, error) {
+	access, ok := a.Policy[procedure]
+	if !ok {
+		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("no access policy for %s", procedure))
+	}
+	switch access {
+	case Public:
+		return ctx, nil
+	case Staff:
+		p, err := a.staff(ctx, h)
+		if err != nil {
+			return nil, err
+		}
+		return with(ctx, p), nil
+	case Candidate:
+		p, err := a.candidate(ctx, h)
+		if err != nil {
+			return nil, err
+		}
+		return with(ctx, p), nil
+	}
+	return nil, connect.NewError(connect.CodeInternal, errors.New("unhandled access level"))
 }
 
 func cookie(h http.Header, name string) string {

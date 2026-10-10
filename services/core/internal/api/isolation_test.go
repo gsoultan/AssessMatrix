@@ -61,7 +61,7 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 	a := h.tenant("Alpha")
 	fa := h.publishedFixture(a)
 	candA := h.redeem(fa)
-	attA := get(candA.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
+	attA := get(candA.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
 	get(candA.candidate.AppendEvents(ctx, connect.NewRequest(&v1.AppendEventsRequest{AttemptId: attA.GetId(), BatchId: "x",
 		Events: []*v1.AttemptEvent{{Kind: "response.changed", ItemId: "q1", Values: []string{"b"}}}})))
 	get(candA.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: attA.GetId()})))
@@ -177,6 +177,17 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			_, err := b.results.GetAttemptLog(ctx, connect.NewRequest(&v1.GetAttemptLogRequest{AttemptId: attA.GetId()}))
 			denied("GetAttemptLog", err)
 		},
+		"/assessmatrix.v1.ProctorService/WatchExam": func() {
+			st, err := b.proctor.WatchExam(ctx, connect.NewRequest(&v1.WatchExamRequest{ExamId: fa.exam.GetId()}))
+			if err == nil {
+				if st.Receive() {
+					t.Error("WatchExam: B watched A's exam")
+				}
+				err = st.Err()
+				st.Close()
+			}
+			denied("WatchExam", err)
+		},
 		"/assessmatrix.v1.AuthService/WhoAmI": func() {
 			r := get(b.auth.WhoAmI(ctx, connect.NewRequest(&v1.WhoAmIRequest{})))
 			if r.Msg.GetStaff().GetTenantName() != "Beta" {
@@ -191,7 +202,7 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			}
 		},
 		"/assessmatrix.v1.CandidateService/StartAttempt": func() {
-			r := get(candB.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{})))
+			r := get(candB.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents})))
 			if r.Msg.GetAttempt().GetId() == attA.GetId() {
 				t.Error("StartAttempt: B resumed A's attempt")
 			}

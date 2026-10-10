@@ -28,6 +28,7 @@ import { ExamBuilder } from './screens/ExamBuilder'
 import { IntegrationHub } from './screens/IntegrationHub'
 import { EmbedStudio } from './screens/EmbedStudio'
 import { ProctorMonitor } from './screens/ProctorMonitor'
+import { LiveMonitor } from './screens/LiveMonitor'
 import { EventInspector } from './screens/EventInspector'
 import { AuthorStudio } from './screens/AuthorStudio'
 import { EvidenceProfile } from './screens/EvidenceProfile'
@@ -41,7 +42,8 @@ import { useApp } from './state'
 import { CORE, SHOW_MOCKS } from './backend/mode'
 
 /** Design mock-ups with canned data. Shown in a local build; hidden against the core unless asked for. */
-const MOCKS = new Set(['author', 'aitask', 'profile', 'hub', 'embed', 'events', 'monitor'])
+// The monitor is real against the core (LiveMonitor); only the local build's is a mock.
+const MOCKS = new Set(['author', 'aitask', 'profile', 'hub', 'embed', 'events', ...(CORE ? [] : ['monitor'])])
 
 const ALL_SCREENS = [
   { key: 'library', group: 'Build', name: 'Library', sub: 'All exams, quizzes, surveys', Icon: IconLibrary, El: Library },
@@ -56,7 +58,7 @@ const ALL_SCREENS = [
   { key: 'hub', group: 'Integrate', name: 'Integration hub', sub: 'The four doors', Icon: IconPlugConnected, El: IntegrationHub },
   { key: 'embed', group: 'Integrate', name: 'Embed studio', sub: 'Preview + preflight', Icon: IconCode, El: EmbedStudio },
   { key: 'events', group: 'Integrate', name: 'Event inspector', sub: 'Webhooks · replay', Icon: IconWebhook, El: EventInspector },
-  { key: 'monitor', group: 'Operate', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: ProctorMonitor },
+  { key: 'monitor', group: 'Operate', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
 ] as const
 
 type Key = (typeof ALL_SCREENS)[number]['key']

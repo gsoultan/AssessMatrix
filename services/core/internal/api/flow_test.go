@@ -2,12 +2,15 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
 )
 
 // The loop that must never break, end to end against the real schema:
@@ -28,11 +31,11 @@ func TestAuthorInviteSitScore(t *testing.T) {
 		}
 	}
 
-	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
+	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
 	if att.GetDeadlineAt() == 0 {
 		t.Fatal("a timed exam needs a server-side deadline")
 	}
-	again := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
+	again := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
 	if again.GetId() != att.GetId() {
 		t.Fatal("starting twice must resume the same attempt, never a blank paper")
 	}
@@ -87,7 +90,8 @@ func TestAuthorInviteSitScore(t *testing.T) {
 	for _, ev := range log.Msg.GetEvents() {
 		kinds = append(kinds, ev.GetKind())
 	}
-	want := []string{"attempt.started", "identity.verified", "response.changed", "response.changed", "response.typed", "focus.lost", "attempt.submitted"}
+	want := []string{"attempt.started", "identity.verified", "consent.signals", "consent.fullscreen", "consent.camera",
+		"response.changed", "response.changed", "response.typed", "focus.lost", "attempt.submitted"}
 	if len(kinds) != len(want) {
 		t.Fatalf("log = %v, want %v", kinds, want)
 	}
@@ -106,16 +110,17 @@ func TestTamperedAttemptIsDetected(t *testing.T) {
 	staff := h.tenant("Tamper")
 	f := h.publishedFixture(staff)
 	cand := h.redeem(f)
-	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
-	get(cand.candidate.AppendEvents(ctx, connect.NewRequest(&v1.AppendEventsRequest{AttemptId: att.GetId(), BatchId: "b",
-		Events: []*v1.AttemptEvent{{Kind: "response.changed", ItemId: "q1", Values: []string{"a"}}}})))
+	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
+	answer := get(cand.candidate.AppendEvents(ctx, connect.NewRequest(&v1.AppendEventsRequest{AttemptId: att.GetId(), BatchId: "b",
+		Events: []*v1.AttemptEvent{{Kind: "response.changed", ItemId: "q1", Values: []string{"a"}}}}))).Msg.GetLastSeq()
 
 	// The append-only trigger stops even the owner, so the attacker has to
 	// switch it off first; that is what we simulate.
 	if _, err := h.owner.Exec(ctx, `UPDATE attempt_events SET body = body WHERE attempt_id = $1`, att.GetId()); err == nil {
 		t.Fatal("attempt_events must refuse updates")
 	}
-	forged := (&v1.AttemptEvent{Seq: 3, Kind: "response.changed", ItemId: "q1", Values: []string{"b"}})
+	// The wrong answer becomes the right one.
+	forged := (&v1.AttemptEvent{Seq: answer, Kind: "response.changed", ItemId: "q1", Values: []string{"b"}})
 	body, _ := eventBody(forged)
 	tx, err := h.owner.Begin(ctx)
 	if err != nil {
@@ -126,7 +131,7 @@ func TestTamperedAttemptIsDetected(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE attempt_events SET body = $2 WHERE attempt_id = $1 AND seq = 3`, att.GetId(), body); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE attempt_events SET body = $2 WHERE attempt_id = $1 AND seq = $3`, att.GetId(), body, answer); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, `ALTER TABLE attempt_events ENABLE TRIGGER attempt_events_append_only`); err != nil {
@@ -137,8 +142,18 @@ func TestTamperedAttemptIsDetected(t *testing.T) {
 	}
 
 	log := get(staff.results.GetAttemptLog(ctx, connect.NewRequest(&v1.GetAttemptLogRequest{AttemptId: att.GetId()})))
-	if log.Msg.GetChainIntact() || log.Msg.GetBrokenAtSeq() != 3 {
-		t.Fatalf("tampering at seq 3 must be detected, got intact=%v broken_at=%d", log.Msg.GetChainIntact(), log.Msg.GetBrokenAtSeq())
+	if log.Msg.GetChainIntact() || log.Msg.GetBrokenAtSeq() != answer {
+		t.Fatalf("tampering at seq %d must be detected, got intact=%v broken_at=%d", answer, log.Msg.GetChainIntact(), log.Msg.GetBrokenAtSeq())
+	}
+	// And it is a flag a reviewer cannot miss, saying where the record breaks.
+	var altered *v1.Flag
+	for _, f := range log.Msg.GetFlags() {
+		if f.GetType() == domain.FlagRecordAltered {
+			altered = f
+		}
+	}
+	if altered == nil || altered.GetSeverity() != domain.SeveritySerious || !strings.Contains(altered.GetReason(), fmt.Sprint(answer)) {
+		t.Fatalf("a tampered record must raise a serious record_altered flag naming event %d, got %+v", answer, log.Msg.GetFlags())
 	}
 }
 
@@ -150,7 +165,7 @@ func TestDeadlineIsServerTime(t *testing.T) {
 	staff := h.tenant("Clock")
 	f := h.publishedFixture(staff)
 	cand := h.redeem(f)
-	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
+	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
 	deadline := time.UnixMilli(att.GetDeadlineAt())
 
 	// Early forcing is ignored: required q1 is blank, so submit is refused.

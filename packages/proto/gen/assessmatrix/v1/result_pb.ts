@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/result.proto.
  */
 export const file_assessmatrix_v1_result: GenFile = /*@__PURE__*/
-  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcmVzdWx0LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEioQIKCFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSFQoNYXNzaWdubWVudF9pZBgCIAEoCRIRCglwZXJzb25faWQYAyABKAkSFAoMZXhhbV92ZXJzaW9uGAQgASgFEhQKDHN1Ym1pdHRlZF9hdBgFIAEoAxI3CgdhbnN3ZXJzGAYgAygLMiYuYXNzZXNzbWF0cml4LnYxLlJlc3BvbnNlLkFuc3dlcnNFbnRyeRIlCgVzY29yZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIicKFExpc3RSZXNwb25zZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiRQoVTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEiwKCXJlc3BvbnNlcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5SZXNwb25zZSIqChRHZXRBdHRlbXB0TG9nUmVxdWVzdBISCgphdHRlbXB0X2lkGAEgASgJInMKFUdldEF0dGVtcHRMb2dSZXNwb25zZRItCgZldmVudHMYASADKAsyHS5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdEV2ZW50EhQKDGNoYWluX2ludGFjdBgCIAEoCBIVCg1icm9rZW5fYXRfc2VxGAMgASgDMs8BCg1SZXN1bHRTZXJ2aWNlEl4KDUxpc3RSZXNwb25zZXMSJS5hc3Nlc3NtYXRyaXgudjEuTGlzdFJlc3BvbnNlc1JlcXVlc3QaJi5hc3Nlc3NtYXRyaXgudjEuTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEl4KDUdldEF0dGVtcHRMb2cSJS5hc3Nlc3NtYXRyaXgudjEuR2V0QXR0ZW1wdExvZ1JlcXVlc3QaJi5hc3Nlc3NtYXRyaXgudjEuR2V0QXR0ZW1wdExvZ1Jlc3BvbnNlQtIBChNjb20uYXNzZXNzbWF0cml4LnYxQgtSZXN1bHRQcm90b1ABWlFnaXRodWIuY29tL2dzb3VsdGFuL2Fzc2Vzc21hdHJpeC9zZXJ2aWNlcy9jb3JlL2dlbi9hc3Nlc3NtYXRyaXgvdjE7YXNzZXNzbWF0cml4djGiAgNBWFiqAg9Bc3Nlc3NtYXRyaXguVjHKAg9Bc3Nlc3NtYXRyaXhcVjHiAhtBc3Nlc3NtYXRyaXhcVjFcR1BCTWV0YWRhdGHqAhBBc3Nlc3NtYXRyaXg6OlYxYgZwcm90bzM", [file_assessmatrix_v1_candidate]);
+  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcmVzdWx0LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEioQIKCFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSFQoNYXNzaWdubWVudF9pZBgCIAEoCRIRCglwZXJzb25faWQYAyABKAkSFAoMZXhhbV92ZXJzaW9uGAQgASgFEhQKDHN1Ym1pdHRlZF9hdBgFIAEoAxI3CgdhbnN3ZXJzGAYgAygLMiYuYXNzZXNzbWF0cml4LnYxLlJlc3BvbnNlLkFuc3dlcnNFbnRyeRIlCgVzY29yZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIicKFExpc3RSZXNwb25zZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiRQoVTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEiwKCXJlc3BvbnNlcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5SZXNwb25zZSIqChRHZXRBdHRlbXB0TG9nUmVxdWVzdBISCgphdHRlbXB0X2lkGAEgASgJIpkBChVHZXRBdHRlbXB0TG9nUmVzcG9uc2USLQoGZXZlbnRzGAEgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudBIUCgxjaGFpbl9pbnRhY3QYAiABKAgSFQoNYnJva2VuX2F0X3NlcRgDIAEoAxIkCgVmbGFncxgEIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnIloKBEZsYWcSDAoEdHlwZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoCRIOCgZyZWFzb24YAyABKAkSEQoJcmVhc29uX2lkGAQgASgJEg8KB2l0ZW1faWQYBSABKAkyzwEKDVJlc3VsdFNlcnZpY2USXgoNTGlzdFJlc3BvbnNlcxIlLmFzc2Vzc21hdHJpeC52MS5MaXN0UmVzcG9uc2VzUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5MaXN0UmVzcG9uc2VzUmVzcG9uc2USXgoNR2V0QXR0ZW1wdExvZxIlLmFzc2Vzc21hdHJpeC52MS5HZXRBdHRlbXB0TG9nUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5HZXRBdHRlbXB0TG9nUmVzcG9uc2VC0gEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCC1Jlc3VsdFByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw", [file_assessmatrix_v1_candidate]);
 
 /**
  * @generated from message assessmatrix.v1.Response
@@ -136,6 +136,13 @@ export type GetAttemptLogResponse = Message<"assessmatrix.v1.GetAttemptLogRespon
    * @generated from field: int64 broken_at_seq = 3;
    */
   brokenAtSeq: bigint;
+
+  /**
+   * What the integrity rules found in this log.
+   *
+   * @generated from field: repeated assessmatrix.v1.Flag flags = 4;
+   */
+  flags: Flag[];
 };
 
 /**
@@ -144,6 +151,58 @@ export type GetAttemptLogResponse = Message<"assessmatrix.v1.GetAttemptLogRespon
  */
 export const GetAttemptLogResponseSchema: GenMessage<GetAttemptLogResponse> = /*@__PURE__*/
   messageDesc(file_assessmatrix_v1_result, 4);
+
+/**
+ * One reason a reviewer should look at an attempt, derived deterministically
+ * from its event log. The reason states what was observed, so the candidate
+ * can check and contest it.
+ *
+ * @generated from message assessmatrix.v1.Flag
+ */
+export type Flag = Message<"assessmatrix.v1.Flag"> & {
+  /**
+   * record_altered, focus_away, paste, rapid_answers, device_changed,
+   * second_tab, fullscreen_exit, face_missing, multiple_faces, camera_stopped.
+   *
+   * @generated from field: string type = 1;
+   */
+  type: string;
+
+  /**
+   * info, review or serious.
+   *
+   * @generated from field: string severity = 2;
+   */
+  severity: string;
+
+  /**
+   * For staff, in English.
+   *
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+
+  /**
+   * The same, for the candidate, in Indonesian.
+   *
+   * @generated from field: string reason_id = 4;
+   */
+  reasonId: string;
+
+  /**
+   * The question it concerns, when it concerns one.
+   *
+   * @generated from field: string item_id = 5;
+   */
+  itemId: string;
+};
+
+/**
+ * Describes the message assessmatrix.v1.Flag.
+ * Use `create(FlagSchema)` to create a new message.
+ */
+export const FlagSchema: GenMessage<Flag> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 5);
 
 /**
  * @generated from service assessmatrix.v1.ResultService

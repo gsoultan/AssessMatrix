@@ -21,6 +21,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1/assessmatrixv1connect"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
 	"github.com/gsoultan/assessmatrix/services/core/internal/limit"
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
@@ -124,6 +125,7 @@ type client struct {
 	assign    assessmatrixv1connect.AssignmentServiceClient
 	candidate assessmatrixv1connect.CandidateServiceClient
 	results   assessmatrixv1connect.ResultServiceClient
+	proctor   assessmatrixv1connect.ProctorServiceClient
 }
 
 func (h *harness) browser() *client {
@@ -139,6 +141,7 @@ func (h *harness) browser() *client {
 		assign:    assessmatrixv1connect.NewAssignmentServiceClient(hc, u),
 		candidate: assessmatrixv1connect.NewCandidateServiceClient(hc, u),
 		results:   assessmatrixv1connect.NewResultServiceClient(hc, u),
+		proctor:   assessmatrixv1connect.NewProctorServiceClient(hc, u),
 	}
 }
 
@@ -221,6 +224,9 @@ type fixture struct {
 	assign *v1.Assignment
 	email  string
 }
+
+// allConsents is every purpose a tier can ask for, as a candidate who agreed to all.
+var allConsents = []string{domain.PurposeSignals, domain.PurposeFullscreen, domain.PurposeCamera}
 
 // sampleExam has one item of each auto-scored kind, plus an essay.
 func sampleExam(e *v1.Exam) *v1.Exam {

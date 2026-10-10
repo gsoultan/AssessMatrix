@@ -36,6 +36,8 @@ import { type Seat, gate } from './backend/gate'
 import { type Pending, enqueue, flush, forget, open as openQueue, pendingCount, pendingEvents, replay } from './backend/sync'
 import { type Staff, staffAuth } from './backend/staff'
 import { whenRefused } from './backend/onetab'
+import type { Signal } from './backend/signals'
+import { type Purpose, collects } from './integrity'
 import { api } from './api/client'
 import { attemptIn } from './backend/convert'
 
@@ -159,7 +161,10 @@ type AppState = {
   /** Set while answers are waiting for a connection. */
   offline: boolean
   attempt: Attempt | null
-  beginAttempt: (exam: Exam, assignment?: Assignment) => Promise<void>
+  /** Start the attempt with the purposes the candidate agreed to (see integrity.ts). */
+  beginAttempt: (exam: Exam, assignment?: Assignment, consents?: Purpose[]) => Promise<void>
+  /** Record an integrity signal (already filtered by tier; see backend/signals.ts). */
+  signal: (s: Signal) => void
   resumeAttempt: (exam: Exam, assignmentId?: string) => boolean
   discardAttempt: (examId: string, assignmentId?: string) => void
   setChoice: (item: Item, choiceId: string, n: number) => void
@@ -205,6 +210,7 @@ export const arrivedAsCandidate = () => !!bootToken || location.hash === SESSION
 /* ── the remote attempt's outbound queue ─────────────────────────────────── */
 
 let flushTimer: number | undefined
+let signalTimer = 0
 let retryTimer: number | undefined
 
 export const useApp = create<AppState>((set, get) => {
@@ -273,6 +279,7 @@ export const useApp = create<AppState>((set, get) => {
   whenRefused(() => {
     const a = get().attempt
     if (a?.id && !a.submittedAt) {
+      if (!collects(get().seat?.exam.tier ?? 0, 'session.second_tab')) return
       record(a, { kind: 'session.second_tab', detail: 'another tab tried to open this sitting and was refused' })
       set({ attempt: { ...a, queued: queuedFor(a) } })
     }
@@ -517,11 +524,11 @@ export const useApp = create<AppState>((set, get) => {
             if (m?.url.startsWith('/media/')) void fetch(m.url, { credentials: 'same-origin' }).catch(() => {})
     },
 
-    beginAttempt: async (exam, given) => {
+    beginAttempt: async (exam, given, consents = []) => {
       const seat = get().seat
       if (CORE && seat) {
         try {
-          const r = await api.candidate.startAttempt({})
+          const r = await api.candidate.startAttempt({ consents })
           const serverNow = Number(r.serverNow)
           const a = attemptIn(r.attempt!, serverNow)
           if (a.id) await openQueue(a.id)
@@ -624,6 +631,22 @@ export const useApp = create<AppState>((set, get) => {
         queued: queuedFor(a),
         events: append(a, media ? 'answer.attached' : 'answer.detached'),
       })
+    },
+
+    signal: (sig) => {
+      const a = get().attempt
+      if (!a || a.submittedAt) return
+      if (a.id) {
+        // Signals ride along with the next answers rather than forcing a send;
+        // a quiet candidate's signals still go within a few seconds.
+        enqueue(a.id, { ...sig, clientTime: Date.now() })
+        if (!signalTimer) signalTimer = window.setTimeout(() => {
+          signalTimer = 0
+          void drain(a.id!)
+        }, 5000)
+        return
+      }
+      commit({ ...a, events: append(a, sig.kind, sig.detail ?? sig.values?.join(' ')) })
     },
 
     toggleFlag: (item, n) => {

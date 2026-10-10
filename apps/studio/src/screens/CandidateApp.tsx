@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Switch, Collapse } from '@mantine/core'
+import { Collapse } from '@mantine/core'
 import {
   IconArrowRight,
   IconArrowLeft,
@@ -10,7 +10,6 @@ import {
   IconWifi,
   IconWifiOff,
   IconCamera,
-  IconMicrophone,
   IconDatabase,
   IconAlertTriangle,
   IconMail,
@@ -35,6 +34,9 @@ import { type Refusal, OTP_TRIES, listOutbox } from '../invite'
 import { type Seat, gate as door } from '../backend/gate'
 import { CORE } from '../backend/mode'
 import { claim } from '../backend/onetab'
+import { enterFullscreen, viewer, watch } from '../backend/signals'
+import type { Camera, VisionState } from '../backend/vision'
+import { PURPOSES, requiredConsents } from '../integrity'
 import {
   type Assignment,
   type Exam,
@@ -114,29 +116,55 @@ const REFUSED: Record<Refusal | 'session' | 'offline' | 'elsewhere', { title: st
   },
 }
 
-const CONSENTS = [
-  {
-    id: 'proctor',
-    title: 'Pemantauan kamera',
-    purpose: 'Mendeteksi bantuan tidak sah selama ujian.',
-    retention: 'Peristiwa disimpan 90 hari. Video tidak diunggah.',
-    required: true,
-  },
-  {
-    id: 'biometric',
-    title: 'Pencocokan identitas',
-    purpose: 'Memastikan orang yang mengerjakan adalah Anda.',
-    retention: 'Data biometrik sensitif. Dihapus 90 hari setelah sertifikasi.',
-    required: true,
-  },
-  {
-    id: 'ai',
-    title: 'Penilaian dibantu AI',
-    purpose: 'Menilai jawaban terbuka. Keputusan akhir ditinjau manusia.',
-    retention: 'Alasan penilaian dapat Anda minta kapan saja.',
-    required: false,
-  },
-]
+/* ── readiness ───────────────────────────────────────────────────────────── */
+
+type Check = { Icon: typeof IconWifi; label: string; v: string; ok: boolean }
+
+/**
+ * What this device can actually do, measured rather than assumed: free
+ * storage for the offline copy, the network as the browser reports it, and
+ * for tier 2 whether the camera opens. Only the camera can stop a start, and
+ * even then the candidate is told what will happen rather than turned away.
+ */
+async function readiness(tier: number): Promise<Check[]> {
+  const out: Check[] = []
+  if (tier >= 2) {
+    const cam = CORE ? await import('../backend/vision').then((v) => v.cameraReady()).catch(() => 'none' as const) : 'ok'
+    out.push({
+      Icon: IconCamera,
+      label: 'Kamera depan',
+      v:
+        cam === 'ok'
+          ? 'Dapat dibuka. Diperiksa di perangkat ini saja.'
+          : cam === 'denied'
+            ? 'Izin kamera ditolak. Ujian tetap bisa dimulai, tetapi ketiadaan kamera dicatat dan ditinjau.'
+            : 'Tidak ada kamera. Ujian tetap bisa dimulai, tetapi ketiadaan kamera dicatat dan ditinjau.',
+      ok: cam === 'ok',
+    })
+  }
+  try {
+    const est = await navigator.storage?.estimate?.()
+    const free = est?.quota != null ? Math.floor((est.quota - (est.usage ?? 0)) / 1e6) : null
+    out.push({
+      Icon: IconDatabase,
+      label: 'Penyimpanan luring',
+      v: free == null ? 'Tidak dapat diperiksa' : free >= 50 ? `${free.toLocaleString('id-ID')} MB tersedia` : `Hanya ${free} MB tersisa`,
+      ok: free == null || free >= 50,
+    })
+  } catch {
+    out.push({ Icon: IconDatabase, label: 'Penyimpanan luring', v: 'Tidak dapat diperiksa', ok: true })
+  }
+  const link = (navigator as Navigator & { connection?: { downlink?: number } }).connection
+  const mbps = link?.downlink
+  out.push(
+    !navigator.onLine
+      ? { Icon: IconWifiOff, label: 'Jaringan', v: 'Luring', ok: false }
+      : mbps != null && mbps < 1.5
+        ? { Icon: IconWifi, label: 'Jaringan', v: `Lambat — ${mbps.toLocaleString('id-ID')} Mbps`, ok: false }
+        : { Icon: IconWifi, label: 'Jaringan', v: mbps != null ? `${mbps.toLocaleString('id-ID')} Mbps` : 'Tersambung', ok: true },
+  )
+  return out
+}
 
 /* ── small pieces ─────────────────────────────────────────────────────────── */
 
@@ -233,6 +261,11 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const [showLog, setShowLog] = useState(false)
   const [exited, setExited] = useState(false)
   const timer = useRef<number | null>(null)
+  /** What the readiness screen found on this device. */
+  const [checks, setChecks] = useState<Check[] | null>(null)
+  const [declined, setDeclined] = useState(false)
+  const [camera, setCamera] = useState<VisionState | null>(null)
+  const signal = useApp((s) => s.signal)
 
   /** Past the gate: this tab now acts for one assignment and nothing else. */
   const admit = useCallback(
@@ -370,6 +403,50 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const item = items[idx]
   const running = !!attempt && !attempt.submittedAt
   const survey = !!exam && isSurvey(exam)
+  const tier = sitting?.tier ?? 0
+  const consents = requiredConsents(tier)
+
+  // Integrity signals while the attempt is on screen, as far as the tier
+  // collects them (integrity.ts). A preview on this device collects nothing.
+  const onScreen = useRef<string | undefined>(undefined)
+  onScreen.current = stage === 'attempt' ? item?.id : undefined
+  const live = running && !!attempt?.id && (stage === 'attempt' || stage === 'review')
+  useEffect(() => {
+    if (!live || tier < 1) return
+    return watch(tier, signal, () => onScreen.current)
+  }, [live, tier, signal])
+  const view = useMemo(() => viewer(tier, signal), [tier, signal])
+  useEffect(() => {
+    view(live ? onScreen.current : undefined)
+  }, [live, view, idx, stage])
+  useEffect(() => () => view(undefined), [view])
+
+  // Tier 2: the face check, on this device, for as long as the attempt runs.
+  const cam = useRef<Camera | null>(null)
+  useEffect(() => {
+    if (!live || tier < 2) return
+    let gone = false
+    void import('../backend/vision').then((v) => {
+      if (!gone) cam.current = v.watchCamera(signal, setCamera)
+    })
+    return () => {
+      gone = true
+      cam.current?.stop()
+      cam.current = null
+    }
+  }, [live, tier, signal])
+
+  // The readiness screen checks this device for real, and warms the face check up.
+  useEffect(() => {
+    if (stage !== 'ready') return
+    let stale = false
+    setChecks(null)
+    void readiness(tier).then((c) => !stale && setChecks(c))
+    if (tier >= 2 && CORE) void import('../backend/vision').then((v) => v.preload()).catch(() => {})
+    return () => {
+      stale = true
+    }
+  }, [stage, tier])
 
   /** A revoked or replaced invitation ends here, with the work still on the device. */
   const endedView = useCallback(() => {
@@ -398,6 +475,9 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       finalizing.current = true
       try {
         if (await sessionEnded()) return
+        // What the camera and the clock on this question measured so far goes in before the attempt closes.
+        cam.current?.flush()
+        view(undefined)
         const r = await finalizeAttempt(exam, force)
         if (r.ok) {
           setBlocked([])
@@ -419,7 +499,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
         finalizing.current = false
       }
     },
-    [exam, items, finalizeAttempt, sessionEnded, endedView],
+    [exam, items, finalizeAttempt, sessionEnded, endedView, view],
   )
 
   useEffect(() => {
@@ -444,8 +524,10 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   }
 
   const begin = async () => {
+    // Full screen needs this click, before anything is awaited.
+    if (tier >= 2 && CORE) void enterFullscreen()
     if (!exam || (await sessionEnded())) return
-    await beginAttempt(exam, assignment ?? undefined)
+    await beginAttempt(exam, assignment ?? undefined, consents)
     if (!useApp.getState().attempt) return
     setIdx(0)
     setStage('attempt')
@@ -755,8 +837,9 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           </p>
           <ul className="mt-2 flex flex-col gap-1.5 text-[12.5px] leading-snug text-ink-2">
             <li>• Jawaban Anda dan waktu pengerjaan.</li>
-            {exam.tier >= 2 && <li>• Peristiwa dari kamera — diproses di perangkat, video tidak diunggah.</li>}
-            {exam.tier >= 3 && <li>• Pencocokan identitas sekali di awal.</li>}
+            {consents.map((p) => (
+              <li key={p}>• {PURPOSES[p].title}.</li>
+            ))}
             {exam.anonymous && <li>• Tidak ada nama yang disimpan bersama jawaban.</li>}
           </ul>
         </div>
@@ -765,7 +848,12 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
             clock, so with work in progress the only way forward is to continue it. */}
         {!(assignment && resumable) && (
           <div className="mt-6">
-            <Primary onClick={() => setStage(exam.tier >= 2 ? 'consent' : 'ready')}>
+            <Primary
+              onClick={() => {
+                setDeclined(false)
+                setStage(consents.length ? 'consent' : 'ready')
+              }}
+            >
               {resumable ? 'Mulai ulang dari awal' : survey ? 'Mulai mengisi' : 'Mulai'}
               <IconArrowRight size={17} stroke={2.2} />
             </Primary>
@@ -778,27 +866,36 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       <Screen>
         <Title>Persetujuan pemrosesan data</Title>
         <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
-          UU PDP No. 27/2022. Setiap tujuan disetujui terpisah dan dapat Anda tarik kapan saja.
+          Sesuai UU PDP No. 27/2022, berikut setiap hal yang dicatat selama ujian ini, untuk apa, dan berapa banyak.
+          Penyelenggara mewajibkan semuanya untuk ujian ini.
         </p>
         <div className="mt-5 flex flex-col gap-2.5">
-          {CONSENTS.filter((c) => exam.tier >= 3 || c.id !== 'biometric').map((c) => (
-            <div key={c.id} className="hair rounded-xl bg-surface p-4">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-[14px] font-medium text-ink">{c.title}</p>
-                <Switch size="sm" defaultChecked disabled={c.required} aria-label={c.title} />
-              </div>
-              <p className="mt-1.5 text-[12.5px] leading-snug text-ink-2">{c.purpose}</p>
-              <p className="mt-1 text-[12px] leading-snug text-ink-muted">{c.retention}</p>
-              {c.required && <p className="mt-1.5 text-[11.5px] text-ink-muted">Wajib untuk tingkat ini.</p>}
+          {consents.map((p) => (
+            <div key={p} className="hair rounded-xl bg-surface p-4">
+              <p className="text-[14px] font-medium text-ink">{PURPOSES[p].title}</p>
+              <p className="mt-1.5 text-[12.5px] leading-snug text-ink-2">{PURPOSES[p].what}</p>
+              <p className="mt-1 text-[12px] leading-snug text-ink-muted">{PURPOSES[p].keep}</p>
             </div>
           ))}
         </div>
+        <p className="mt-3 text-[12px] leading-snug text-ink-muted">
+          Setiap catatan menjadi bagian dari berkas pengerjaan Anda. Jika ada yang ditandai, alasannya ditulis apa
+          adanya dan Anda berhak meminta serta menyanggahnya.
+        </p>
+        {declined && (
+          <p role="status" className="mt-4 rounded-xl p-4 text-[13px] leading-snug text-ink" style={{ background: 'var(--color-wash)' }}>
+            Tanpa persetujuan ini, ujian ini tidak dapat dikerjakan di sini. Tidak ada yang dicatat. Hubungi penyelenggara
+            jika Anda memerlukan cara lain untuk mengikutinya.
+          </p>
+        )}
         <div className="mt-6">
           <Primary onClick={() => setStage('ready')}>
             Setuju dan lanjut <IconArrowRight size={17} stroke={2.2} />
           </Primary>
         </div>
-        <p className="mt-2.5 text-center text-[12px] text-ink-muted">Salinan dikirim ke email Anda.</p>
+        <button onClick={() => setDeclined(true)} className="mt-3 w-full text-center text-[13px] text-ink-2 underline">
+          Tidak setuju
+        </button>
       </Screen>
     )
   else if (stage === 'ready')
@@ -809,16 +906,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           Kami periksa sekarang supaya tidak ada kejutan saat pengerjaan berjalan.
         </p>
         <div className="mt-5 flex flex-col gap-2">
-          {[
-            ...(exam.tier >= 2
-              ? [
-                  { Icon: IconCamera, label: 'Kamera depan', v: 'Terdeteksi', ok: true },
-                  { Icon: IconMicrophone, label: 'Mikrofon', v: 'Terdeteksi', ok: true },
-                ]
-              : []),
-            { Icon: IconDatabase, label: 'Penyimpanan luring', v: '412 MB tersedia', ok: true },
-            { Icon: IconWifi, label: 'Jaringan', v: 'Lambat — 0,9 Mbps', ok: false },
-          ].map((r) => (
+          {(checks ?? [{ Icon: IconDatabase, label: 'Memeriksa perangkat…', v: '', ok: true }]).map((r) => (
             <div key={r.label} className="hair flex items-center gap-3 rounded-xl bg-surface px-4 py-3.5">
               <r.Icon size={18} stroke={1.7} className="shrink-0 text-ink-muted" />
               <div className="min-w-0 flex-1">
@@ -835,7 +923,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
         </div>
 
         <div className="mt-4 rounded-xl p-4" style={{ background: 'var(--color-wash)' }}>
-          <p className="text-[13px] font-semibold text-ink">Jaringan lambat bukan masalah</p>
+          <p className="text-[13px] font-semibold text-ink">Jaringan lambat atau terputus bukan masalah</p>
           <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
             Seluruh bagian diunduh lebih dulu. Pengerjaan berjalan luring dan tersinkron otomatis
             saat koneksi kembali.
@@ -862,6 +950,15 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           Pertanyaan {idx + 1} dari {items.length}
           {item.skill ? ` · ${item.skill}` : ''}
         </p>
+        {tier >= 2 && camera && (
+          <p role="status" className="mt-1 text-[12px] text-ink-muted">
+            {camera === 'on'
+              ? 'Kamera aktif · diperiksa di perangkat ini, tidak direkam'
+              : camera === 'starting'
+                ? 'Menyalakan kamera…'
+                : 'Kamera tidak aktif · ini dicatat untuk ditinjau'}
+          </p>
+        )}
         <p className="mt-2 text-[18px] font-semibold leading-snug text-ink">
           {item.stem}
           {item.required && <span style={{ color: 'var(--color-critical)' }}> *</span>}

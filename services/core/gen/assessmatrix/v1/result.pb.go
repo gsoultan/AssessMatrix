@@ -252,7 +252,9 @@ type GetAttemptLogResponse struct {
 	// False if any stored event no longer matches its hash chain.
 	ChainIntact bool `protobuf:"varint,2,opt,name=chain_intact,json=chainIntact,proto3" json:"chain_intact,omitempty"`
 	// The first seq at which the chain breaks, when it does.
-	BrokenAtSeq   int64 `protobuf:"varint,3,opt,name=broken_at_seq,json=brokenAtSeq,proto3" json:"broken_at_seq,omitempty"`
+	BrokenAtSeq int64 `protobuf:"varint,3,opt,name=broken_at_seq,json=brokenAtSeq,proto3" json:"broken_at_seq,omitempty"`
+	// What the integrity rules found in this log.
+	Flags         []*Flag `protobuf:"bytes,4,rep,name=flags,proto3" json:"flags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -308,6 +310,98 @@ func (x *GetAttemptLogResponse) GetBrokenAtSeq() int64 {
 	return 0
 }
 
+func (x *GetAttemptLogResponse) GetFlags() []*Flag {
+	if x != nil {
+		return x.Flags
+	}
+	return nil
+}
+
+// One reason a reviewer should look at an attempt, derived deterministically
+// from its event log. The reason states what was observed, so the candidate
+// can check and contest it.
+type Flag struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// record_altered, focus_away, paste, rapid_answers, device_changed,
+	// second_tab, fullscreen_exit, face_missing, multiple_faces, camera_stopped.
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// info, review or serious.
+	Severity string `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"`
+	// For staff, in English.
+	Reason string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The same, for the candidate, in Indonesian.
+	ReasonId string `protobuf:"bytes,4,opt,name=reason_id,json=reasonId,proto3" json:"reason_id,omitempty"`
+	// The question it concerns, when it concerns one.
+	ItemId        string `protobuf:"bytes,5,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Flag) Reset() {
+	*x = Flag{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Flag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Flag) ProtoMessage() {}
+
+func (x *Flag) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Flag.ProtoReflect.Descriptor instead.
+func (*Flag) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Flag) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Flag) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *Flag) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Flag) GetReasonId() string {
+	if x != nil {
+		return x.ReasonId
+	}
+	return ""
+}
+
+func (x *Flag) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
 var File_assessmatrix_v1_result_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_result_proto_rawDesc = "" +
@@ -331,11 +425,18 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\tresponses\x18\x01 \x03(\v2\x19.assessmatrix.v1.ResponseR\tresponses\"5\n" +
 	"\x14GetAttemptLogRequest\x12\x1d\n" +
 	"\n" +
-	"attempt_id\x18\x01 \x01(\tR\tattemptId\"\x95\x01\n" +
+	"attempt_id\x18\x01 \x01(\tR\tattemptId\"\xc2\x01\n" +
 	"\x15GetAttemptLogResponse\x125\n" +
 	"\x06events\x18\x01 \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x12!\n" +
 	"\fchain_intact\x18\x02 \x01(\bR\vchainIntact\x12\"\n" +
-	"\rbroken_at_seq\x18\x03 \x01(\x03R\vbrokenAtSeq2\xcf\x01\n" +
+	"\rbroken_at_seq\x18\x03 \x01(\x03R\vbrokenAtSeq\x12+\n" +
+	"\x05flags\x18\x04 \x03(\v2\x15.assessmatrix.v1.FlagR\x05flags\"\x84\x01\n" +
+	"\x04Flag\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1a\n" +
+	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x1b\n" +
+	"\treason_id\x18\x04 \x01(\tR\breasonId\x12\x17\n" +
+	"\aitem_id\x18\x05 \x01(\tR\x06itemId2\xcf\x01\n" +
 	"\rResultService\x12^\n" +
 	"\rListResponses\x12%.assessmatrix.v1.ListResponsesRequest\x1a&.assessmatrix.v1.ListResponsesResponse\x12^\n" +
 	"\rGetAttemptLog\x12%.assessmatrix.v1.GetAttemptLogRequest\x1a&.assessmatrix.v1.GetAttemptLogResponseB\xd2\x01\n" +
@@ -353,33 +454,35 @@ func file_assessmatrix_v1_result_proto_rawDescGZIP() []byte {
 	return file_assessmatrix_v1_result_proto_rawDescData
 }
 
-var file_assessmatrix_v1_result_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_assessmatrix_v1_result_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_assessmatrix_v1_result_proto_goTypes = []any{
 	(*Response)(nil),              // 0: assessmatrix.v1.Response
 	(*ListResponsesRequest)(nil),  // 1: assessmatrix.v1.ListResponsesRequest
 	(*ListResponsesResponse)(nil), // 2: assessmatrix.v1.ListResponsesResponse
 	(*GetAttemptLogRequest)(nil),  // 3: assessmatrix.v1.GetAttemptLogRequest
 	(*GetAttemptLogResponse)(nil), // 4: assessmatrix.v1.GetAttemptLogResponse
-	nil,                           // 5: assessmatrix.v1.Response.AnswersEntry
-	(*Score)(nil),                 // 6: assessmatrix.v1.Score
-	(*AttemptEvent)(nil),          // 7: assessmatrix.v1.AttemptEvent
-	(*ItemAnswer)(nil),            // 8: assessmatrix.v1.ItemAnswer
+	(*Flag)(nil),                  // 5: assessmatrix.v1.Flag
+	nil,                           // 6: assessmatrix.v1.Response.AnswersEntry
+	(*Score)(nil),                 // 7: assessmatrix.v1.Score
+	(*AttemptEvent)(nil),          // 8: assessmatrix.v1.AttemptEvent
+	(*ItemAnswer)(nil),            // 9: assessmatrix.v1.ItemAnswer
 }
 var file_assessmatrix_v1_result_proto_depIdxs = []int32{
-	5, // 0: assessmatrix.v1.Response.answers:type_name -> assessmatrix.v1.Response.AnswersEntry
-	6, // 1: assessmatrix.v1.Response.score:type_name -> assessmatrix.v1.Score
+	6, // 0: assessmatrix.v1.Response.answers:type_name -> assessmatrix.v1.Response.AnswersEntry
+	7, // 1: assessmatrix.v1.Response.score:type_name -> assessmatrix.v1.Score
 	0, // 2: assessmatrix.v1.ListResponsesResponse.responses:type_name -> assessmatrix.v1.Response
-	7, // 3: assessmatrix.v1.GetAttemptLogResponse.events:type_name -> assessmatrix.v1.AttemptEvent
-	8, // 4: assessmatrix.v1.Response.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
-	1, // 5: assessmatrix.v1.ResultService.ListResponses:input_type -> assessmatrix.v1.ListResponsesRequest
-	3, // 6: assessmatrix.v1.ResultService.GetAttemptLog:input_type -> assessmatrix.v1.GetAttemptLogRequest
-	2, // 7: assessmatrix.v1.ResultService.ListResponses:output_type -> assessmatrix.v1.ListResponsesResponse
-	4, // 8: assessmatrix.v1.ResultService.GetAttemptLog:output_type -> assessmatrix.v1.GetAttemptLogResponse
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8, // 3: assessmatrix.v1.GetAttemptLogResponse.events:type_name -> assessmatrix.v1.AttemptEvent
+	5, // 4: assessmatrix.v1.GetAttemptLogResponse.flags:type_name -> assessmatrix.v1.Flag
+	9, // 5: assessmatrix.v1.Response.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
+	1, // 6: assessmatrix.v1.ResultService.ListResponses:input_type -> assessmatrix.v1.ListResponsesRequest
+	3, // 7: assessmatrix.v1.ResultService.GetAttemptLog:input_type -> assessmatrix.v1.GetAttemptLogRequest
+	2, // 8: assessmatrix.v1.ResultService.ListResponses:output_type -> assessmatrix.v1.ListResponsesResponse
+	4, // 9: assessmatrix.v1.ResultService.GetAttemptLog:output_type -> assessmatrix.v1.GetAttemptLogResponse
+	8, // [8:10] is the sub-list for method output_type
+	6, // [6:8] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_result_proto_init() }
@@ -394,7 +497,7 @@ func file_assessmatrix_v1_result_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_result_proto_rawDesc), len(file_assessmatrix_v1_result_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -41,4 +41,23 @@ message GetAttemptLogResponse {
   bool chain_intact = 2;
   // The first seq at which the chain breaks, when it does.
   int64 broken_at_seq = 3;
+  // What the integrity rules found in this log.
+  repeated Flag flags = 4;
+}
+
+// One reason a reviewer should look at an attempt, derived deterministically
+// from its event log. The reason states what was observed, so the candidate
+// can check and contest it.
+message Flag {
+  // record_altered, focus_away, paste, rapid_answers, device_changed,
+  // second_tab, fullscreen_exit, face_missing, multiple_faces, camera_stopped.
+  string type = 1;
+  // info, review or serious.
+  string severity = 2;
+  // For staff, in English.
+  string reason = 3;
+  // The same, for the candidate, in Indonesian.
+  string reason_id = 4;
+  // The question it concerns, when it concerns one.
+  string item_id = 5;
 }

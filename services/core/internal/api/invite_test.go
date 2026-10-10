@@ -18,11 +18,11 @@ func TestRevokedLinkCannotStartOrSubmit(t *testing.T) {
 	f := h.publishedFixture(staff)
 	token := h.lastLink(f.email)
 	cand := h.redeem(f)
-	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
+	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
 
 	get(staff.assign.RevokeInvite(ctx, connect.NewRequest(&v1.RevokeInviteRequest{AssignmentId: f.assign.GetId()})))
 
-	if _, err := cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{})); code(err) != connect.CodeUnauthenticated {
+	if _, err := cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents})); code(err) != connect.CodeUnauthenticated {
 		t.Fatalf("a revoked session must not start, got %v", err)
 	}
 	if _, err := cand.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: att.GetId()})); code(err) != connect.CodeUnauthenticated {
@@ -44,7 +44,7 @@ func TestResendRetiresTheOldLinkAndSession(t *testing.T) {
 	h.clock.add(2 * time.Minute)
 
 	get(staff.assign.SendInvites(ctx, connect.NewRequest(&v1.SendInvitesRequest{AssignmentIds: []string{f.assign.GetId()}})))
-	if _, err := cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{})); code(err) != connect.CodeUnauthenticated {
+	if _, err := cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents})); code(err) != connect.CodeUnauthenticated {
 		t.Fatalf("resending must end the old session, got %v", err)
 	}
 	open := get(h.browser().candidate.OpenLink(ctx, connect.NewRequest(&v1.OpenLinkRequest{Token: old})))
