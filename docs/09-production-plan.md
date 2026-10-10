@@ -24,7 +24,8 @@ it adds is **order**, **exit gates**, and the list of things that are not produc
 | 1 · Proto contract | Done. `packages/proto`, lint and breaking checks in CI |
 | 2 · Go core | Done. Postgres with row-level security, hash-chained attempts, outbox mail; tenant isolation proven per RPC |
 | 3 · Studio on the core | Done. Every functional screen runs on the core (`VITE_BACKEND=core`), staff sign in by emailed code, candidates by link, mock-ups hidden. Images go to object storage in the tenant's region. QTI 3.0 packages export and import (2.1 too), and our own round-trip without loss. `make e2e-core` proves the loop against Postgres |
-| 4–6 | Not started |
+| 4 · Runner that cannot lose work | Done. The runner is its own build at `/take/` (165 KB gzipped, budget 180, checked by `make build`) and can have its own origin (`AM_RUNNER_URL`); invitation links open it. Answers are flushed to OPFS by a worker before a batch is sent; a service worker keeps the shell and the exam's figures; the server holds the clock. One tab per sitting by Web Lock (not SharedWorker, which Android Chrome lacks); a refused tab is recorded on the attempt. `a11y.mjs` scans every candidate screen with axe (WCAG 2.2 AA) and answers every item type by keyboard alone; `e2e-core` fails on any long task over 50 ms while answering. **Gate:** in `make e2e-core` the candidate's browser is SIGKILLed during a 5-minute outage just after changing an answer, and the reopened sitting scores 100%; with the queue in localStorage the same test scores 0%. Not done: Background Sync (drains on reopen instead; Safari and Firefox have none) |
+| 5–6 | Not started |
 
 **Nothing in the prototype is a security boundary.** Whoever holds the device can edit
 `localStorage`: invite tokens, OTP checks, scores and the attempt log are all forgeable today.

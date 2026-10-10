@@ -12,7 +12,7 @@ const brand: MantineColorsTuple = [
   '#9ec5f4',
   '#9ec5f4',
   '#6da7ec',
-  '#2a78d6', // primary shade
+  '#2470cc', // primary shade (styles.css --color-s1): white on it passes AA
   '#256abf',
   '#1c5cab',
   '#1c5cab',

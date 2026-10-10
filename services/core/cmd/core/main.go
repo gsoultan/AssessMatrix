@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -273,6 +274,8 @@ func logRequests(log *slog.Logger, next http.Handler) http.Handler {
 // reaches the next page load (and the runner's service worker sees a new
 // sw.js and replaces its shell).
 func spa(dir string) http.Handler {
+	// The runner's install manifest; Go's table does not know the extension.
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 	files := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		clean := filepath.Clean("/" + r.URL.Path)

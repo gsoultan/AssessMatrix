@@ -156,7 +156,7 @@ function Primary({
       onClick={onClick}
       disabled={disabled}
       className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-semibold text-on-brand disabled:opacity-40"
-      style={{ background: tone === 'good' ? 'var(--color-good)' : 'var(--color-s1)' }}
+      style={{ background: tone === 'good' ? 'var(--color-good-fill)' : 'var(--color-s1)' }}
     >
       {children}
     </button>
@@ -873,7 +873,9 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           </p>
         )}
         <div className="mt-5">
-          <ItemView item={item} attempt={attempt} onChoice={choose} onText={typeAnswer} onFile={attachFile} />
+          <div data-item-type={item.type}>
+            <ItemView item={item} attempt={attempt} onChoice={choose} onText={typeAnswer} onFile={attachFile} />
+          </div>
         </div>
         <button
           onClick={toggleFlag}
@@ -1154,7 +1156,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
               <button
                 onClick={() => setStage('review')}
                 className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-[15px] font-semibold text-on-brand"
-                style={{ background: 'var(--color-good)' }}
+                style={{ background: 'var(--color-good-fill)' }}
               >
                 Selesai <IconCheck size={17} stroke={2.4} />
               </button>
@@ -1187,7 +1189,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
               <button
                 onClick={() => finalize(false)}
                 className="flex h-12 items-center justify-center gap-2 rounded-xl text-[15px] font-semibold text-on-brand"
-                style={{ background: 'var(--color-good)' }}
+                style={{ background: 'var(--color-good-fill)' }}
               >
                 <IconCheck size={17} stroke={2.4} /> Ya, kumpulkan
               </button>

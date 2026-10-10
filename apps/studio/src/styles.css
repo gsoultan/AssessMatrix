@@ -41,14 +41,16 @@
   --color-sunken: #f0efec;
   --color-ink: #0b0b0b;
   --color-ink-2: #52514e;
-  --color-ink-muted: #898781;
+  /* 4.9:1 on the plane: WCAG AA for the small print it is used for. */
+  --color-ink-muted: #6f6d67;
   --color-hair: #e1e0d9;
   --color-rule: #c3c2b7;
   --color-on-brand: #ffffff;
   --color-brand-text: #1c5cab;
 
   /* categorical series — fixed order, never cycled */
-  --color-s1: #2a78d6;
+  /* Also the primary button: white on it is 4.9:1 (AA). */
+  --color-s1: #2470cc;
   --color-s2: #eb6834;
   --color-s3: #1baf7a;
 
@@ -62,6 +64,8 @@
   --color-serious: #ec835a;
   --color-critical: #d03b3b;
   --color-good-text: #006300;
+  /* A green button: white on it is 5:1 in both modes. --color-good is a signal, not a fill. */
+  --color-good-fill: #0b7d0b;
   --color-track-warn: #fdecc4;
   --color-track-serious: #f9ddd1;
   --color-track-critical: #f4d3d3;
@@ -89,12 +93,13 @@
   --color-sunken: #242423;
   --color-ink: #ffffff;
   --color-ink-2: #c3c2b7;
-  --color-ink-muted: #898781;
+  --color-ink-muted: #9a988f;
   --color-hair: #2c2c2a;
   --color-rule: #383835;
   --color-brand-text: #86b6ef;
 
-  --color-s1: #3987e5;
+  /* White on it is 4.7:1; against the dark surface it still reads as a series at 3.7:1. */
+  --color-s1: #2c74cc;
   --color-s2: #d95926;
   --color-s3: #199e70;
 

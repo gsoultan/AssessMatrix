@@ -6,6 +6,7 @@
  */
 import { defineConfig, type Plugin } from 'vite'
 import { createHash } from 'node:crypto'
+import { deflateSync } from 'node:zlib'
 import { base } from './vite.config'
 
 /**
@@ -25,6 +26,7 @@ function shell(): Plugin {
       const sw = SW.replace('__VERSION__', version).replace('__FILES__', JSON.stringify(['/take/', ...files]))
       this.emitFile({ type: 'asset', fileName: 'take/sw.js', source: sw })
       this.emitFile({ type: 'asset', fileName: 'take/manifest.webmanifest', source: MANIFEST })
+      for (const n of [192, 512]) this.emitFile({ type: 'asset', fileName: `take/icon-${n}.png`, source: icon(n) })
     },
   }
 }
@@ -47,8 +49,8 @@ const MANIFEST = JSON.stringify(
     scope: '/take/',
     display: 'standalone',
     background_color: '#ffffff',
-    theme_color: '#2a78d6',
-    icons: [],
+    theme_color: '#2470cc',
+    icons: [192, 512].map((n) => ({ src: `/take/icon-${n}.png`, sizes: `${n}x${n}`, type: 'image/png', purpose: 'any maskable' })),
   },
   null,
   2,
@@ -116,3 +118,57 @@ self.addEventListener('fetch', (e) => {
   }
 })
 `
+
+/** The install icon: a brand-blue tile with a white check, drawn here so no binary lives in the repo. */
+function icon(n: number): Uint8Array {
+  const blue = [0x24, 0x70, 0xcc]
+  const raw = Buffer.alloc((n * 3 + 1) * n)
+  // A check mark: two strokes, in tile-relative coordinates.
+  const near = (x: number, y: number, [ax, ay]: number[], [bx, by]: number[], w: number) => {
+    const dx = bx! - ax!
+    const dy = by! - ay!
+    const t = Math.max(0, Math.min(1, ((x - ax!) * dx + (y - ay!) * dy) / (dx * dx + dy * dy)))
+    return Math.hypot(x - (ax! + t * dx), y - (ay! + t * dy)) < w
+  }
+  for (let y = 0; y < n; y++) {
+    raw[y * (n * 3 + 1)] = 0
+    for (let x = 0; x < n; x++) {
+      const u = x / n
+      const v = y / n
+      const white = near(u, v, [0.3, 0.52], [0.44, 0.66], 0.05) || near(u, v, [0.44, 0.66], [0.72, 0.36], 0.05)
+      const o = y * (n * 3 + 1) + 1 + x * 3
+      raw[o] = white ? 255 : blue[0]!
+      raw[o + 1] = white ? 255 : blue[1]!
+      raw[o + 2] = white ? 255 : blue[2]!
+    }
+  }
+  const crcTable = Array.from({ length: 256 }, (_, k) => {
+    let c = k
+    for (let i = 0; i < 8; i++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    return c >>> 0
+  })
+  const crc = (b: Buffer) => {
+    let c = ~0
+    for (const x of b) c = crcTable[(c ^ x) & 0xff]! ^ (c >>> 8)
+    return ~c >>> 0
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4)
+    len.writeUInt32BE(data.length)
+    const body = Buffer.concat([Buffer.from(type), data])
+    const sum = Buffer.alloc(4)
+    sum.writeUInt32BE(crc(body))
+    return Buffer.concat([len, body, sum])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(n, 0)
+  ihdr.writeUInt32BE(n, 4)
+  ihdr[8] = 8 // bit depth
+  ihdr[9] = 2 // truecolour
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}

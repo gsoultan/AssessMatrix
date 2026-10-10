@@ -65,8 +65,8 @@ async function realBrowser(profile) {
   const exe = process.env.CHROMIUM_PATH ?? chromium.executablePath()
   const proc = spawn(exe, ['--headless=new', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0',
     `--user-data-dir=${profile}`, '--window-size=420,900',
-    // Chromium refuses to sandbox as root (CI containers, this one); Playwright does the same.
-    ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
+    // As Playwright launches it: CI runners and containers often cannot sandbox.
+    '--no-sandbox', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
   const ws = await new Promise((resolve, reject) => {
     let err = ''
     proc.stderr.on('data', (d) => {
@@ -319,6 +319,13 @@ try {
     ? ok('the saved answer is still selected')
     : bad('the saved answer was not restored')
 
+  // From here to the end of the attempt, no task may hold the main thread
+  // past 50 ms (docs/09 phase 4): a frozen tap reads as a lost answer.
+  await cand.evaluate(() => {
+    window.__long = []
+    new PerformanceObserver((l) => window.__long.push(...l.getEntries().map((e) => Math.round(e.duration)))).observe({ type: 'longtask' })
+  })
+
   // The connection drops: work carries on, is kept on the device, and goes when it is back.
   await candCtx.setOffline(true)
   await cand.getByRole('button', { name: /Tandai untuk ditinjau/ }).click()
@@ -332,6 +339,10 @@ try {
     ? ok('back online, the waiting change is sent')
     : bad('back online, the change was still waiting')
 
+  const long = await cand.evaluate(() => window.__long)
+  long.length === 0
+    ? ok('no long task (over 50 ms) while answering')
+    : bad(`long tasks while answering: ${long.join(', ')} ms`)
   await cand.getByRole('button', { name: /^Selesai/ }).click()
   await cand.waitForTimeout(300)
   await cand.getByRole('button', { name: /^Kumpulkan$/ }).click()
