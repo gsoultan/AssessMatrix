@@ -17,6 +17,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
+	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
@@ -532,6 +533,7 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 		}
 	}
 	out := &v1.AppendEventsResponse{}
+	stored := 0
 	err := s.tx(ctx, func(tx pgx.Tx) error {
 		att, err := s.ownAttempt(ctx, tx, m.GetAttemptId())
 		if err != nil {
@@ -560,8 +562,10 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 		evs := make([]*v1.AttemptEvent, 0, len(m.GetEvents()))
 		for _, ev := range m.GetEvents() {
 			if !keep(ev) {
+				metrics.SignalsDropped.Inc()
 				continue
 			}
+			metrics.Lag(ev.GetClientTime(), s.now())
 			evs = append(evs, &v1.AttemptEvent{
 				ClientTime: ev.GetClientTime(), Kind: ev.GetKind(), ItemId: ev.GetItemId(),
 				Values: ev.GetValues(), Text: ev.GetText(), File: ev.GetFile(), Detail: ev.GetDetail(),
@@ -570,6 +574,7 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 		if err := s.appendEvents(ctx, tx, att, evs); err != nil {
 			return err
 		}
+		stored = len(evs)
 		out.LastSeq = att.LastSeq
 		_, err = tx.Exec(ctx, `INSERT INTO attempt_batches (tenant_id, attempt_id, batch_id, last_seq) VALUES (am_tenant(), $1, $2, $3)`,
 			att.ID, m.GetBatchId(), att.LastSeq)
@@ -578,6 +583,8 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, s.internal(ctx, "AppendEvents", err)
 	}
+	// Counted once committed: a rolled-back batch stored nothing.
+	metrics.EventsStored.Add(float64(stored))
 	out.ServerNow = s.now().UnixMilli()
 	return connect.NewResponse(out), nil
 }

@@ -17,6 +17,7 @@ URL="http://localhost:${CORE_PORT}"
 # The runner on its own origin, as production may put it. The test forwards
 # this port to the core, so it can cut the candidate's network.
 RUNNER_PORT="${RUNNER_PORT:-8091}"
+METRICS_PORT="${METRICS_PORT:-8092}"
 # The phase 4 gate is a 5-minute outage; set it shorter for a quick local run.
 OUTAGE_SECONDS="${OUTAGE_SECONDS:-300}"
 WORK="$(mktemp -d)"
@@ -38,7 +39,7 @@ unset AM_MIGRATE_DATABASE_URL
 for p in "$CORE_PORT" "$RUNNER_PORT"; do lsof -ti tcp:"$p" 2>/dev/null | xargs kill -9 2>/dev/null || true; done
 AM_DATABASE_URL="$AM_E2E_DATABASE_URL" \
 AM_SECRET="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
-AM_LISTEN=":${CORE_PORT}" AM_PUBLIC_URL="$URL" AM_RUNNER_URL="http://localhost:${RUNNER_PORT}" AM_STATIC_DIR="$WORK/web" \
+AM_LISTEN=":${CORE_PORT}" AM_METRICS_LISTEN=":${METRICS_PORT}" AM_PUBLIC_URL="$URL" AM_RUNNER_URL="http://localhost:${RUNNER_PORT}" AM_STATIC_DIR="$WORK/web" \
 AM_DEV=1 AM_MAILER=mailbox AM_MEDIA_STORE=fs AM_MEDIA_DIR="$WORK/media" \
   "$WORK/core" serve >"$WORK/core.log" 2>&1 &
 CORE_PID=$!
@@ -61,6 +62,11 @@ set +e
 (cd "$APP" && URL="$URL" RUNNER_PORT="$RUNNER_PORT" OUTAGE_SECONDS="$OUTAGE_SECONDS" STAFF_EMAIL="$STAFF" bun e2e-core.mjs)
 rc=$?
 set -e
+# The candidate's answers must show on the dashboard's numbers too.
+if [ "$rc" -eq 0 ]; then
+  stored=$(curl -sf "http://localhost:${METRICS_PORT}/metrics" | awk '/^am_events_stored_total /{print $2}')
+  if awk "BEGIN{exit !(${stored:-0} > 0)}"; then ok "metrics: ${stored} candidate events stored"; else echo "metrics show no stored events"; rc=1; fi
+fi
 if [ "$rc" -ne 0 ]; then
   info "core log (last 40 lines):"
   tail -n 40 "$WORK/core.log"

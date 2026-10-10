@@ -1,0 +1,43 @@
+# promtool test rules deploy/prometheus/alerts_test.yml
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  # 5 of 100 saves failing pages; the rules refusing a submitted attempt do not.
+  - interval: 1m
+    input_series:
+      - series: 'am_rpc_requests_total{procedure="CandidateService/AppendEvents",code="ok"}'
+        values: '0+95x15'
+      - series: 'am_rpc_requests_total{procedure="CandidateService/AppendEvents",code="unavailable"}'
+        values: '0+5x15'
+      - series: 'am_rpc_requests_total{procedure="CandidateService/SubmitAttempt",code="failed_precondition"}'
+        values: '0+50x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AnswersNotSaving
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "More than 1% of answer saves or hand-ins are failing on the server"
+              impact: "Candidates see 'saved on this device' instead of 'saved'; their work queues locally. Check the core's error logs and the database."
+  - interval: 1m
+    input_series:
+      - series: 'am_rpc_requests_total{procedure="CandidateService/AppendEvents",code="ok"}'
+        values: '0+100x15'
+      - series: 'am_rpc_requests_total{procedure="CandidateService/SubmitAttempt",code="failed_precondition"}'
+        values: '0+50x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: AnswersNotSaving
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'up{job="assessmatrix-core",instance="core-1"}'
+        values: '1 1 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CoreDown
+        exp_alerts:
+          - exp_labels: { severity: page, job: assessmatrix-core, instance: core-1 }
+            exp_annotations:
+              summary: "Core instance core-1 is not answering"
+              impact: "Candidates' answers wait in their local queue; nothing is lost while the device keeps the tab, but hand-ins cannot be scored."
