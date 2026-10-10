@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-Stack as specified: **Go 1.27.1 · Bun · React 19 · TypeScript 7.0.2 · Mantine 9.6 ·
+Stack as specified: **Go 1.27.2 · Bun · React 19 · TypeScript 7.0.2 · Mantine 9.6 ·
 Tailwind CSS 4 · Vite 8 · gRPC / Connect RPC v3 · PWA + service worker + web workers ·
 mobile-first, excellent on desktop.**
 

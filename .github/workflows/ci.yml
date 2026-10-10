@@ -40,7 +40,7 @@ jobs:
           bun-version: 1.4.2
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.27.1
+          go-version: 1.27.2
       - run: bun install --frozen-lockfile
       - name: Install Go plugins
         run: |
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.27.1
+          go-version: 1.27.2
           cache-dependency-path: services/core/go.sum
       - name: Create the owner and the unprivileged application role
         env:
@@ -127,7 +127,7 @@ jobs:
           bun-version: 1.4.2
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.27.1
+          go-version: 1.27.2
           cache-dependency-path: services/core/go.sum
       - uses: actions/setup-python@v5
         with:
@@ -137,13 +137,13 @@ jobs:
       - name: Go dependencies and standard library (reachable code only)
         working-directory: services/core
         env:
-          GOTOOLCHAIN: go1.27.1
+          GOTOOLCHAIN: go1.27.2
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - name: Python dependencies
         run: pip install pip-audit==2.10.1 && pip-audit -r services/psychometrics/requirements.txt
       - name: No secrets in the history
         env:
-          GOTOOLCHAIN: go1.27.1
+          GOTOOLCHAIN: go1.27.2
         run: go run github.com/zricethezav/gitleaks/v8@v8.28.0 git --no-banner --redact .
 
   deploy:
@@ -165,10 +165,10 @@ jobs:
           docker run --rm -v "$PWD/deploy/prometheus:/r" -w /r --entrypoint promtool prom/prometheus:v3.5.0 test rules alerts_test.yml
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.27.1
+          go-version: 1.27.2
           cache-dependency-path: services/core/go.sum
       - name: Kubernetes manifests
-        env: { GOTOOLCHAIN: go1.27.1 }
+        env: { GOTOOLCHAIN: go1.27.2 }
         run: |
           go run sigs.k8s.io/kustomize/kustomize/v5@v5.8.3 build deploy/k8s > /tmp/k8s.yaml
           go run github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0 -strict -summary /tmp/k8s.yaml
@@ -198,7 +198,7 @@ jobs:
           bun-version: 1.4.2
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.27.1
+          go-version: 1.27.2
           cache-dependency-path: services/core/go.sum
       - run: bun install --frozen-lockfile
       - name: Create the owner and the unprivileged application role
