@@ -90,6 +90,24 @@ try {
   for (const [i, t] of ['0', 'panic', '-1', 'undefined'].entries())
     await page.getByPlaceholder(`Option ${'ABCD'[i]}`).first().fill(t)
   await page.getByRole('button', { name: /^Correct$/ }).first().click()
+  await page.evaluate(async (sel) => {
+    const c = document.createElement('canvas')
+    c.width = 600; c.height = 300
+    const x = c.getContext('2d')
+    x.fillStyle = '#2a78d6'; x.fillRect(0, 0, 600, 300)
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'))
+    const dt = new DataTransfer()
+    dt.items.add(new File([blob], 'diagram.png', { type: 'image/png' }))
+    const el = document.querySelector(sel)
+    el.files = dt.files
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  }, 'input[type="file"][aria-label="Add a figure to the question"]')
+  await page.waitForTimeout(1000)
+  await page.getByLabel('Image description (alt text)').fill('Diagram alur')
+  const src = await page.locator('main img[alt="Diagram alur"]').first().getAttribute('src')
+  ;/^\/media\/[0-9a-f-]{36}$/.test(src ?? '')
+    ? ok('an image is uploaded to storage; the item keeps only its address')
+    : bad(`the image was not uploaded: src=${String(src).slice(0, 40)}`)
   await page.getByRole('button', { name: /^Save draft$/ }).click()
   await page.waitForTimeout(600)
   ;(await page.getByRole('button', { name: /^Saved$/ }).count())
@@ -173,6 +191,9 @@ try {
   await cand.waitForTimeout(300)
   await cand.getByRole('button', { name: /Mulai sekarang/ }).click()
   await cand.waitForTimeout(600)
+  ;(await cand.locator('main img[alt="Diagram alur"]').evaluate((i) => i.complete && i.naturalWidth > 0))
+    ? ok('the candidate sees the uploaded figure')
+    : bad('the figure did not load for the candidate')
 
   // Pick the right answer, then let the browser die before submitting.
   await cand.locator('main button[aria-pressed]', { hasText: '0' }).first().click()

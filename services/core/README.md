@@ -14,6 +14,7 @@ invitations, candidate sessions, attempts and results. It implements the
 | Candidates never receive answer keys | `domain.ForCandidate` on everything served to them | `TestAuthorInviteSitScore` |
 | The server clock ends an exam, and offline work done in time is kept | `domain.Counts` | `TestDeadlineIsServerTime`, `TestCountsLateAnswers` |
 | Invitation rules from `docs/08` | `internal/api/candidate.go`, `invite.go` | `invite_test.go`, including the revoked-link and 25-wrong-guesses tests |
+| An image is readable only inside its tenant, and stored only in the tenant's region | `media` rows under row-level security decide every read of `/media/{id}`; uploads are sniffed (WebP, JPEG, PNG only) and refused when the tenant's region is not the store's | `media_test.go` |
 | Mail goes out only if the change commits, and a link or code is at rest only until sent | Outbox row and River job in the same transaction; the body is cleared on send | Manual check today; see `internal/mail` |
 
 Links, codes and session cookies are stored only as HMAC-SHA-256 under keys
@@ -65,3 +66,7 @@ Without those variables the database tests skip locally and fail in CI.
 | `AM_STATIC_DIR` | Serve the built web app from here, on the same origin |
 | `AM_TRUST_PROXY` | `1` behind a proxy that sets `X-Forwarded-For` |
 | `AM_DEV` | `1` allows http cookies and the dev mailbox |
+| `AM_MEDIA_STORE` | `fs`, `s3`, or `none` (default; image uploads are refused) |
+| `AM_MEDIA_REGION` | The region the store is in (default `id`). Tenants whose `region` differs cannot upload |
+| `AM_MEDIA_DIR` | Directory for `fs` |
+| `AM_S3_ENDPOINT`, `AM_S3_BUCKET`, `AM_S3_ACCESS_KEY`, `AM_S3_SECRET_KEY` | Any S3-compatible store for `s3`. `AM_S3_INSECURE=1` allows plain http in development |

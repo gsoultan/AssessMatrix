@@ -165,3 +165,18 @@ func (a *Authenticator) ClearCookie(h http.Header, name string) {
 
 // CookieValue reads a cookie from request headers.
 func CookieValue(h http.Header, name string) string { return cookie(h, name) }
+
+// Either resolves a plain HTTP request (not an RPC) to whoever holds a session:
+// a staff member first, else a candidate. It is for endpoints both may use,
+// such as images, where the row behind the URL decides the rest.
+func (a *Authenticator) Either(ctx context.Context, h http.Header) (*Principal, error) {
+	if p, err := a.staff(ctx, h); err == nil {
+		return p, nil
+	} else if !errors.Is(err, errUnauthenticated) {
+		return nil, err
+	}
+	return a.candidate(ctx, h)
+}
+
+// With attaches a principal to a context, for handlers outside the interceptor.
+func With(ctx context.Context, p *Principal) context.Context { return with(ctx, p) }

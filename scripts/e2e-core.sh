@@ -33,7 +33,7 @@ lsof -ti tcp:"${CORE_PORT}" 2>/dev/null | xargs kill -9 2>/dev/null || true
 AM_DATABASE_URL="$AM_E2E_DATABASE_URL" \
 AM_SECRET="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
 AM_LISTEN=":${CORE_PORT}" AM_PUBLIC_URL="$URL" AM_STATIC_DIR="$WORK/web" \
-AM_DEV=1 AM_MAILER=mailbox \
+AM_DEV=1 AM_MAILER=mailbox AM_MEDIA_STORE=fs AM_MEDIA_DIR="$WORK/media" \
   "$WORK/core" serve >"$WORK/core.log" 2>&1 &
 CORE_PID=$!
 stop() { kill "$CORE_PID" 2>/dev/null || true; wait "$CORE_PID" 2>/dev/null || true; }

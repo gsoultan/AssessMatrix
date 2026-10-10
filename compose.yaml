@@ -39,6 +39,18 @@ services:
       AM_SMTP_FROM: ${AM_SMTP_FROM:-}
       AM_SMTP_USER: ${AM_SMTP_USER:-}
       AM_SMTP_PASS: ${AM_SMTP_PASS:-}
+      # Images. fs keeps them on the media volume; s3 sends them to any
+      # S3-compatible store (set AM_S3_* in .env). Either way the store is in
+      # AM_MEDIA_REGION, and tenants of another region cannot upload here.
+      AM_MEDIA_STORE: ${AM_MEDIA_STORE:-fs}
+      AM_MEDIA_DIR: /data/media
+      AM_MEDIA_REGION: ${AM_MEDIA_REGION:-id}
+      AM_S3_ENDPOINT: ${AM_S3_ENDPOINT:-}
+      AM_S3_BUCKET: ${AM_S3_BUCKET:-}
+      AM_S3_ACCESS_KEY: ${AM_S3_ACCESS_KEY:-}
+      AM_S3_SECRET_KEY: ${AM_S3_SECRET_KEY:-}
+    volumes:
+      - media:/data/media
     ports: ["127.0.0.1:8080:8080"]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -46,3 +58,4 @@ services:
 
 volumes:
   pgdata:
+  media:

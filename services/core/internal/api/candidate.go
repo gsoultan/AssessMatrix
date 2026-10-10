@@ -486,7 +486,9 @@ func validateEvent(ev *v1.AttemptEvent) error {
 			return errors.New("value too long")
 		}
 	}
-	if f := ev.GetFile(); f != nil && (len(f.GetUrl()) > domain.MaxMediaURL || !strings.HasPrefix(f.GetUrl(), "data:image/") && !strings.HasPrefix(f.GetUrl(), "https://")) {
+	// A candidate's attachment is uploaded here or inline, never a link out:
+	// an outside URL would let a candidate make staff browsers fetch it.
+	if f := ev.GetFile(); f != nil && (len(f.GetUrl()) > domain.MaxMediaURL || !domain.MediaURL(f.GetUrl()) || strings.HasPrefix(f.GetUrl(), "https://")) {
 		return errors.New("attachment must be an image under the size limit")
 	}
 	return nil
