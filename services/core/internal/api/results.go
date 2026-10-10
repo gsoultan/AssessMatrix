@@ -77,10 +77,35 @@ func (s *resultService) GetAttemptLog(ctx context.Context, req *connect.Request[
 			return err
 		}
 		out.Events, out.ChainIntact, out.BrokenAtSeq, err = s.loadEvents(ctx, tx, a)
-		return err
+		if err != nil {
+			return err
+		}
+		e, err := examAt(ctx, tx, a.ExamID, a.ExamVersion)
+		if err != nil {
+			return err
+		}
+		out.Flags = flagsOut(domain.Flags(out.Events, questionNumbers(e), out.ChainIntact, out.BrokenAtSeq))
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "GetAttemptLog", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// questionNumbers gives a question's position as the candidate saw it.
+func questionNumbers(e *v1.Exam) func(string) int {
+	n := map[string]int{}
+	for i, it := range domain.AllItems(e) {
+		n[it.GetId()] = i + 1
+	}
+	return func(id string) int { return n[id] }
+}
+
+func flagsOut(fs []domain.Flag) []*v1.Flag {
+	out := make([]*v1.Flag, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, &v1.Flag{Type: f.Type, Severity: f.Severity, Reason: f.Reason, ReasonId: f.ReasonID, ItemId: f.ItemID})
+	}
+	return out
 }

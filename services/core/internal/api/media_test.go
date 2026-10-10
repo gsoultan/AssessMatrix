@@ -114,7 +114,7 @@ func TestCandidateReadsTheirTenantsImagesAndAttachesTheirOwn(t *testing.T) {
 		t.Fatalf("candidate upload: status %d", st)
 	}
 	ctx := context.Background()
-	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{}))).Msg.GetAttempt()
+	att := get(cand.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
 	get(cand.candidate.AppendEvents(ctx, connect.NewRequest(&v1.AppendEventsRequest{AttemptId: att.GetId(), BatchId: "m1",
 		Events: []*v1.AttemptEvent{{Kind: "answer.attached", ItemId: "q4", File: &v1.Media{Id: "m", Url: mine}}}})))
 	_, err := cand.candidate.AppendEvents(ctx, connect.NewRequest(&v1.AppendEventsRequest{AttemptId: att.GetId(), BatchId: "m2",

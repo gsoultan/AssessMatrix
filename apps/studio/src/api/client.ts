@@ -10,6 +10,7 @@ import { AuthService } from '@assessmatrix/proto/auth_pb'
 import { CandidateService } from '@assessmatrix/proto/candidate_pb'
 import { ExamService } from '@assessmatrix/proto/exam_pb'
 import { PersonService } from '@assessmatrix/proto/people_pb'
+import { ProctorService } from '@assessmatrix/proto/proctor_pb'
 import { ResultService } from '@assessmatrix/proto/result_pb'
 
 const transport = createConnectTransport({
@@ -25,4 +26,5 @@ export const api = {
   assignments: createClient(AssignmentService, transport),
   candidate: createClient(CandidateService, transport),
   results: createClient(ResultService, transport),
+  proctor: createClient(ProctorService, transport),
 }

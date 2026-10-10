@@ -104,6 +104,7 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.AssignmentServiceRevokeInviteProcedure,
 		assessmatrixv1connect.ResultServiceListResponsesProcedure,
 		assessmatrixv1connect.ResultServiceGetAttemptLogProcedure,
+		assessmatrixv1connect.ProctorServiceWatchExamProcedure,
 	)
 	return p
 }
@@ -123,6 +124,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(assessmatrixv1connect.NewAssignmentServiceHandler(&assignmentService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewCandidateServiceHandler(&candidateService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewResultServiceHandler(&resultService{s}, opts...))
+	mux.Handle(assessmatrixv1connect.NewProctorServiceHandler(&proctorService{s}, opts...))
 	return mux
 }
 

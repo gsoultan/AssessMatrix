@@ -179,7 +179,13 @@ message GetSessionResponse {
   int64 server_now = 5;
 }
 
-message StartAttemptRequest {}
+message StartAttemptRequest {
+  // The purposes the candidate agreed to on the consent screen, each
+  // separately. The tier's required purposes must all be here; the server
+  // records each as a consent event, and refuses any signal collected under
+  // a purpose that is missing.
+  repeated string consents = 1;
+}
 
 message StartAttemptResponse {
   Attempt attempt = 1;

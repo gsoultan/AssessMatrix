@@ -26,6 +26,7 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
+	"github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1/assessmatrixv1connect"
 	"github.com/gsoultan/assessmatrix/services/core/internal/api"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
@@ -181,6 +182,11 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	// Connect procedures are /assessmatrix.v1.<Service>/<Method>.
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/assessmatrix.v1.") {
+			// A monitor stream outlives the server's write timeout by design;
+			// it ends itself after api.WatchFor.
+			if r.URL.Path == assessmatrixv1connect.ProctorServiceWatchExamProcedure {
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(api.WatchFor + time.Minute))
+			}
 			rpc.ServeHTTP(w, r)
 			return
 		}
@@ -252,6 +258,13 @@ type statusWriter struct {
 }
 
 func (w *statusWriter) WriteHeader(code int) { w.status = code; w.ResponseWriter.WriteHeader(code) }
+
+// Unwrap lets http.ResponseController reach the connection, which a stream
+// needs to flush each message and to outlive the write timeout.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// Flush sends a stream's message now; connect needs it to stream at all.
+func (w *statusWriter) Flush() { http.NewResponseController(w.ResponseWriter).Flush() }
 
 // logRequests writes one structured line per request: method, path, status
 // and duration. Bodies are never logged; they carry answers and tokens.

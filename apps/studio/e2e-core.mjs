@@ -19,7 +19,7 @@
 import { chromium } from 'playwright'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -66,7 +66,7 @@ async function realBrowser(profile) {
   const proc = spawn(exe, ['--headless=new', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0',
     `--user-data-dir=${profile}`, '--window-size=420,900',
     // As Playwright launches it: CI runners and containers often cannot sandbox.
-    '--no-sandbox', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
+    '--no-sandbox', ...CAMERA, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
   const ws = await new Promise((resolve, reject) => {
     let err = ''
     proc.stderr.on('data', (d) => {
@@ -103,7 +103,16 @@ async function mail(to, kind, after = 0) {
 }
 const codeIn = (m) => m.Subject.match(/\d{6}/)[0]
 
-const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
+// A fake camera for the tier 2 face check, showing an empty grey room: the
+// default test pattern looks enough like a face to the detector to pass as one.
+const empty = join(tmpdir(), `am-empty-room-${process.pid}.y4m`)
+{
+  const [w, h] = [320, 240]
+  const frame = Buffer.concat([Buffer.from('FRAME\n'), Buffer.alloc(w * h, 128), Buffer.alloc((w * h) / 2, 128)])
+  writeFileSync(empty, Buffer.concat([Buffer.from(`YUV4MPEG2 W${w} H${h} F10:1 Ip A1:1 C420jpeg\n`), frame, frame]))
+}
+const CAMERA = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${empty}`]
+const browser = await chromium.launch({ args: CAMERA, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) })
 const staffCtx = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 // The candidate is someone else, on another device: no shared cookies.
 const candCtx = await browser.newContext({ viewport: { width: 420, height: 900 } })
@@ -270,7 +279,9 @@ try {
   loaded.some((p) => p.startsWith('/take/assets/')) && !loaded.some((p) => p.startsWith('/assets/'))
     ? ok('the candidate downloads the runner only, none of the studio')
     : bad(`the candidate loaded studio files: ${loaded.filter((p) => p.startsWith('/assets/')).join(' ')}`)
-  ;(await cand.evaluate(() => navigator.serviceWorker.getRegistration('/take/').then((r) => !!r)))
+  ;(await cand.evaluate(() =>
+    Promise.race([navigator.serviceWorker.ready.then(() => true), new Promise((r) => setTimeout(() => r(false), 10000))]),
+  ))
     ? ok('the runner installs its service worker')
     : bad('no service worker for the runner')
 
@@ -293,11 +304,26 @@ try {
 
   await cand.getByRole('button', { name: /^Mulai$/ }).click()
   await cand.waitForTimeout(300)
-  if (await cand.getByRole('button', { name: /Setuju dan lanjut/ }).count())
-    await cand.getByRole('button', { name: /Setuju dan lanjut/ }).click()
+  ;(await cand.getByText('Catatan aktivitas pengerjaan').count()) &&
+  (await cand.getByText('Layar penuh', { exact: true }).count()) &&
+  (await cand.getByText('Pemeriksaan wajah oleh perangkat').count())
+    ? ok('a tier 2 exam asks consent for each thing it records, one by one')
+    : bad('the consent screen did not list signals, full screen and the camera')
+  await cand.getByRole('button', { name: /Setuju dan lanjut/ }).click()
   await cand.waitForTimeout(300)
+  await cand.getByText(/Dapat dibuka/).waitFor({ timeout: 8000 }).then(
+    () => ok('the readiness check opens the camera for real'),
+    () => bad('the readiness check did not find the camera'),
+  )
   await cand.getByRole('button', { name: /Mulai sekarang/ }).click()
-  await cand.waitForTimeout(600)
+  await cand.getByText(/^Kamera aktif/).waitFor({ timeout: 20000 }).then(
+    () => ok('the face check runs on the device'),
+    async () => bad(`the face check did not start: ${await cand.locator('main').innerText()}`),
+  )
+  // Out of view for a moment: on the record, with how long.
+  await cand.evaluate(() => window.dispatchEvent(new Event('blur')))
+  await cand.waitForTimeout(1600)
+  await cand.evaluate(() => window.dispatchEvent(new Event('focus')))
   ;(await cand.locator('main img[alt="Diagram alur"]').evaluate((i) => i.complete && i.naturalWidth > 0))
     ? ok('the candidate sees the uploaded figure')
     : bad('the figure did not load for the candidate')
@@ -343,6 +369,20 @@ try {
   long.length === 0
     ? ok('no long task (over 50 ms) while answering')
     : bad(`long tasks while answering: ${long.join(', ')} ms`)
+
+  /* ---------------- the live monitor, while the attempt runs ---------------- */
+  await nav(/Proctor monitor/)
+  await page.getByRole('combobox', { name: 'Assessment' }).click()
+  await page.getByRole('option', { name: `E2E Core ${run}` }).click()
+  const sitting = page.getByRole('list', { name: 'Sittings' }).getByRole('button', { name: /Kandidat Uji/ })
+  await sitting.waitFor({ timeout: 8000 }).catch(() => {})
+  ;(await page.getByText(/Live · 1 in progress/).count()) && /Started/.test(await sitting.innerText().catch(() => ''))
+    ? ok('the monitor streams the sitting live, in progress')
+    : (await page.screenshot({ path: process.env.SHOT ?? '/dev/null' }), bad(`the monitor did not show the sitting in progress: ${await page.locator('body').innerText()}`))
+
+  // The fake camera shows no face: give the face check a stretch long enough to report.
+  await cand.getByText(/^Kamera aktif/).waitFor({ timeout: 20000 }).catch(() => {})
+  await cand.waitForTimeout(4500)
   await cand.getByRole('button', { name: /^Selesai/ }).click()
   await cand.waitForTimeout(300)
   await cand.getByRole('button', { name: /^Kumpulkan$/ }).click()
@@ -354,6 +394,18 @@ try {
     : bad(`the score was not 100%: ${await cand.locator('main').innerText()}`)
 
   /* ---------------- back on the staff side ---------------- */
+  // No reload: the stream brings the hand-in.
+  await page.getByText(/Handed in/).first().waitFor({ timeout: 8000 }).then(
+    () => ok('the monitor shows the hand-in without a reload'),
+    () => bad('the monitor did not update when the attempt was handed in'),
+  )
+  await sitting.click()
+  const record = page.getByRole('list', { name: 'Events' })
+  await record.waitFor({ timeout: 5000 }).catch(() => {})
+  const said = await record.innerText().catch(() => '')
+  ;(await page.getByText(/Record intact/).count()) && /Agreed to: camera/.test(said) && /Came back after \d+ s/.test(said) && /No face in view for \d+ s/.test(said)
+    ? ok('the attempt record shows the consents, the time away and the face check, sealed and intact')
+    : (await page.screenshot({ path: process.env.SHOT ?? '/dev/null', fullPage: true }), bad(`the attempt record is missing signals: ${said.slice(0, 1600)}`))
   await nav(/Assignments/)
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(600)

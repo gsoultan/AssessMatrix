@@ -1165,7 +1165,12 @@ func (x *GetSessionResponse) GetServerNow() int64 {
 }
 
 type StartAttemptRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The purposes the candidate agreed to on the consent screen, each
+	// separately. The tier's required purposes must all be here; the server
+	// records each as a consent event, and refuses any signal collected under
+	// a purpose that is missing.
+	Consents      []string `protobuf:"bytes,1,rep,name=consents,proto3" json:"consents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1198,6 +1203,13 @@ func (x *StartAttemptRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use StartAttemptRequest.ProtoReflect.Descriptor instead.
 func (*StartAttemptRequest) Descriptor() ([]byte, []int) {
 	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *StartAttemptRequest) GetConsents() []string {
+	if x != nil {
+		return x.Consents
+	}
+	return nil
 }
 
 type StartAttemptResponse struct {
@@ -1660,8 +1672,9 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x04exam\x18\x03 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\x122\n" +
 	"\aattempt\x18\x04 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12\x1d\n" +
 	"\n" +
-	"server_now\x18\x05 \x01(\x03R\tserverNow\"\x15\n" +
-	"\x13StartAttemptRequest\"i\n" +
+	"server_now\x18\x05 \x01(\x03R\tserverNow\"1\n" +
+	"\x13StartAttemptRequest\x12\x1a\n" +
+	"\bconsents\x18\x01 \x03(\tR\bconsents\"i\n" +
 	"\x14StartAttemptResponse\x122\n" +
 	"\aattempt\x18\x01 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12\x1d\n" +
 	"\n" +
