@@ -1,0 +1,34 @@
+# Run before each release's rollout. Concurrent runs are safe (an advisory
+# lock); migrations are forward-only. Only this Job holds the owner's URL.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: migrate }
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: assessmatrix
+          args: [migrate]
+          env:
+            - name: AM_MIGRATE_DATABASE_URL
+              valueFrom: { secretKeyRef: { name: assessmatrix, key: AM_MIGRATE_DATABASE_URL } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }

@@ -146,6 +146,35 @@ jobs:
           GOTOOLCHAIN: go1.27.1
         run: go run github.com/zricethezav/gitleaks/v8@v8.28.0 git --no-banner --redact .
 
+  deploy:
+    name: Deploy · image, configs, restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -f deploy/Dockerfile -t assessmatrix:local --build-arg VERSION=ci .
+      - name: Compose file
+        env: { POSTGRES_PASSWORD: x, AM_OWNER_PASSWORD: x, AM_APP_PASSWORD: x, AM_SECRET: x }
+        run: docker compose --profile tls config -q
+      - name: Caddyfile
+        run: docker run --rm -e AM_DOMAIN=exam.example.id -v "$PWD/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10 caddy validate --config /etc/caddy/Caddyfile
+      - name: Alert rules and their tests
+        run: |
+          docker run --rm -v "$PWD/deploy/prometheus:/r" -w /r --entrypoint promtool prom/prometheus:v3.5.0 check rules alerts.yml
+          docker run --rm -v "$PWD/deploy/prometheus:/r" -w /r --entrypoint promtool prom/prometheus:v3.5.0 test rules alerts_test.yml
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: services/core/go.sum
+      - name: Kubernetes manifests
+        env: { GOTOOLCHAIN: go1.27.1 }
+        run: |
+          go run sigs.k8s.io/kustomize/kustomize/v5@v5.8.3 build deploy/k8s > /tmp/k8s.yaml
+          go run github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0 -strict -summary /tmp/k8s.yaml
+      - name: Restore drill (point-in-time, on throwaway containers)
+        run: bash scripts/restore-drill.sh
+
   stack:
     name: Stack · studio against the core and Postgres
     runs-on: ubuntu-latest

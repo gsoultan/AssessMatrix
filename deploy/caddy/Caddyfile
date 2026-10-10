@@ -1,0 +1,19 @@
+# TLS in front of the core, for a self-hosted install (compose profile "tls").
+# Caddy gets and renews certificates by itself; point DNS for AM_DOMAIN (and
+# AM_RUNNER_DOMAIN, if the runner has its own host) at this machine and open
+# ports 80 and 443.
+{$AM_DOMAIN} {$AM_RUNNER_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy core:8080 {
+		# The live monitor is a server stream: pass each message on at once.
+		flush_interval -1
+		header_up X-Request-Id {http.request.uuid}
+	}
+	# The core's metrics port is not proxied: Prometheus scrapes core:9090.
+	# Links and codes travel in the URL fragment, which never reaches a
+	# server; Caddy redacts cookies and Authorization in its logs itself.
+	log {
+		output stdout
+		format json
+	}
+}
