@@ -10,6 +10,10 @@
     "e2e": "bun e2e.mjs"
   },
   "dependencies": {
+    "@assessmatrix/proto": "workspace:*",
+    "@bufbuild/protobuf": "2.16.0",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-web": "2.2.0",
     "@mantine/core": "9.6.2",
     "@mantine/hooks": "9.6.2",
     "@tabler/icons-react": "3.47.0",

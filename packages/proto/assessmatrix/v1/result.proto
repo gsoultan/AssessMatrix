@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+import "assessmatrix/v1/candidate.proto";
+
+// Submitted attempts, for the Responses screen and score reports.
+
+message Response {
+  string attempt_id = 1;
+  string assignment_id = 2;
+  // Empty for an anonymous questionnaire.
+  string person_id = 3;
+  int32 exam_version = 4;
+  int64 submitted_at = 5 [jstype = JS_NUMBER];
+  map<string, ItemAnswer> answers = 6;
+  Score score = 7;
+}
+
+service ResultService {
+  rpc ListResponses(ListResponsesRequest) returns (ListResponsesResponse);
+  // The full, hash-chained event log of one attempt, with a check of the chain.
+  rpc GetAttemptLog(GetAttemptLogRequest) returns (GetAttemptLogResponse);
+}
+
+message ListResponsesRequest {
+  string exam_id = 1;
+}
+
+message ListResponsesResponse {
+  repeated Response responses = 1;
+}
+
+message GetAttemptLogRequest {
+  string attempt_id = 1;
+}
+
+message GetAttemptLogResponse {
+  repeated AttemptEvent events = 1;
+  // False if any stored event no longer matches its hash chain.
+  bool chain_intact = 2;
+  // The first seq at which the chain breaks, when it does.
+  int64 broken_at_seq = 3 [jstype = JS_NUMBER];
+}

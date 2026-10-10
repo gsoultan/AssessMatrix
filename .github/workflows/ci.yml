@@ -25,3 +25,40 @@ jobs:
       - name: Install Chromium for Playwright
         run: bunx playwright install --with-deps chromium
       - run: make e2e
+
+  proto:
+    name: Proto · lint, breaking, generated code in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+      - run: bun install --frozen-lockfile
+      - name: Install Go plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.21.0
+      - name: buf lint
+        working-directory: packages/proto
+        run: ./node_modules/.bin/buf lint
+      - name: buf breaking against main
+        working-directory: packages/proto
+        run: |
+          if git cat-file -e origin/main:packages/proto/buf.yaml 2>/dev/null; then
+            ./node_modules/.bin/buf breaking --against "../../.git#ref=origin/main,subdir=packages/proto"
+          else
+            echo "main has no schema yet; nothing to break"
+          fi
+      - name: Generated code matches the schema
+        working-directory: packages/proto
+        run: |
+          PATH="$PATH:$(go env GOPATH)/bin:$PWD/node_modules/.bin" ./node_modules/.bin/buf generate
+          git diff --exit-code -- . ../../services/core/gen
+          test -z "$(git status --porcelain -- . ../../services/core/gen)"
