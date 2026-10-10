@@ -622,6 +622,12 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		}
 		if att.SubmittedAt != nil { // idempotent: a retried submit sees the result
 			out.Ok = true
+			var cred string
+			if err := tx.QueryRow(ctx, `SELECT id FROM credentials WHERE attempt_id = $1 AND revoked_at IS NULL`, att.ID).Scan(&cred); err == nil {
+				out.CredentialUrl = s.CredentialURL(cred)
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
 			out.Attempt, err = s.attemptProto(att, events, false)
 			return err
 		}
@@ -665,6 +671,13 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		if score != nil {
 			if err := storeScore(ctx, tx, att, e, answers, reviews, score); err != nil {
 				return err
+			}
+			cred, err := s.settleCredential(ctx, tx, att, e, score)
+			if err != nil {
+				return err
+			}
+			if cred != "" {
+				out.CredentialUrl = s.CredentialURL(cred)
 			}
 		}
 		att.SubmittedAt = &now

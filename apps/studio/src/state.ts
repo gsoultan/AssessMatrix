@@ -691,6 +691,7 @@ export const useApp = create<AppState>((set, get) => {
           set({
             attempt: {
               ...done,
+              credentialUrl: s.credentialUrl || undefined,
               events: append(a, force ? 'attempt.expired' : 'attempt.submitted', done.score ? `${done.score.pct}%` : 'response recorded'),
             },
           })

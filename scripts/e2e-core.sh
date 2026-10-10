@@ -23,7 +23,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 info "building the studio for the core"
-(cd "$APP" && VITE_BACKEND=core bunx vite build --outDir "$WORK/web" --emptyOutDir >/dev/null && VITE_BACKEND=core bunx vite build -c vite.runner.config.ts --outDir "$WORK/web" >/dev/null)
+(cd "$APP" && VITE_BACKEND=core bunx vite build --outDir "$WORK/web" --emptyOutDir >/dev/null && VITE_BACKEND=core bunx vite build -c vite.runner.config.ts --outDir "$WORK/web" >/dev/null \
+  && bunx vite build -c ../verify/vite.config.ts --outDir "$WORK/web/verify" >/dev/null)
 
 info "building the core"
 (cd "$ROOT/services/core" && go build -o "$WORK/core" ./cmd/core)

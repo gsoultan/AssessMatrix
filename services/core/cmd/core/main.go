@@ -174,6 +174,10 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		})
 	}
 	images := srv.MediaHandler()
+	// Anyone may check a credential: no session, ids only.
+	public := srv.PublicHandler()
+	mux.Handle("GET /credentials/", public)
+	mux.Handle("GET /issuers/", public)
 	mux.Handle(api.MediaPrefix, images)
 	mux.Handle("POST /media", images)
 	if cfg.StaticDir != "" {
@@ -281,11 +285,11 @@ func logRequests(log *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-// spa serves the built web app: the studio, and the candidate runner under
-// /take/. A path that is not a file falls back to its app's index. Hashed
-// assets are cached for good; everything else is revalidated, so a deploy
-// reaches the next page load (and the runner's service worker sees a new
-// sw.js and replaces its shell).
+// spa serves the built web app: the studio, the candidate runner under
+// /take/ and the public credential check under /verify/. A path that is not
+// a file falls back to its app's index. Hashed assets are cached for good;
+// everything else is revalidated, so a deploy reaches the next page load (and
+// the runner's service worker sees a new sw.js and replaces its shell).
 func spa(dir string) http.Handler {
 	// The runner's install manifest; Go's table does not know the extension.
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
@@ -297,12 +301,14 @@ func spa(dir string) http.Handler {
 			index := "index.html"
 			if clean == "/take" || strings.HasPrefix(clean, "/take/") {
 				index = "take/index.html"
+			} else if clean == "/verify" || strings.HasPrefix(clean, "/verify/") {
+				index = "verify/index.html"
 			}
 			w.Header().Set("Cache-Control", "no-cache")
 			http.ServeFile(w, r, filepath.Join(dir, index))
 			return
 		}
-		if strings.HasPrefix(clean, "/assets/") || strings.HasPrefix(clean, "/take/assets/") {
+		if strings.HasPrefix(clean, "/assets/") || strings.HasPrefix(clean, "/take/assets/") || strings.HasPrefix(clean, "/verify/assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
 			w.Header().Set("Cache-Control", "no-cache")

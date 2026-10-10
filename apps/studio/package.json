@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite --strictPort --port ${PORT:-5180}",
     "check": "tsc --noEmit",
-    "build": "tsc --noEmit && vite build && vite build -c vite.runner.config.ts",
+    "build": "tsc --noEmit && vite build && vite build -c vite.runner.config.ts && bun run --cwd ../verify build",
     "preview": "vite preview --strictPort --port ${PORT:-5180}",
     "e2e": "bun e2e.mjs"
   },

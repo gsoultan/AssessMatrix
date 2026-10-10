@@ -3,6 +3,8 @@
 package secure
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -16,7 +18,7 @@ import (
 // Keys are derived from one server secret, one per purpose, so a hash made
 // for one thing can never be replayed as another.
 type Keys struct {
-	link, code, session, chain []byte
+	link, code, session, chain, vault []byte
 }
 
 // MinSecretBytes is the least secret the core will start with.
@@ -31,7 +33,8 @@ func NewKeys(secret []byte) (*Keys, error) {
 		m.Write([]byte("assessmatrix/v1/" + purpose))
 		return m.Sum(nil)
 	}
-	return &Keys{link: derive("link"), code: derive("code"), session: derive("session"), chain: derive("attempt-chain")}, nil
+	return &Keys{link: derive("link"), code: derive("code"), session: derive("session"), chain: derive("attempt-chain"),
+		vault: derive("vault")}, nil
 }
 
 func mac(key []byte, parts ...[]byte) []byte {
@@ -109,4 +112,39 @@ func MaskEmail(email string) string {
 		return "•••" + email[at:]
 	}
 	return string(first) + "•••" + email[at:]
+}
+
+// Seal encrypts a secret kept in the database (an issuer's signing key) with
+// AES-256-GCM under a key derived from the server secret. The label is bound
+// in as associated data, so a sealed value cannot be moved to another row.
+func (k *Keys) Seal(label string, plain []byte) ([]byte, error) {
+	gcm, err := k.gcm()
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	return gcm.Seal(nonce, nonce, plain, []byte(label)), nil
+}
+
+// Open reverses Seal.
+func (k *Keys) Open(label string, sealed []byte) ([]byte, error) {
+	gcm, err := k.gcm()
+	if err != nil {
+		return nil, err
+	}
+	if len(sealed) < gcm.NonceSize() {
+		return nil, fmt.Errorf("sealed value too short")
+	}
+	return gcm.Open(nil, sealed[:gcm.NonceSize()], sealed[gcm.NonceSize():], []byte(label))
+}
+
+func (k *Keys) gcm() (cipher.AEAD, error) {
+	b, err := aes.NewCipher(k.vault)
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(b)
 }

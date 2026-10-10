@@ -109,6 +109,9 @@ message ScoreAnswerRequest {
 
 message ScoreAnswerResponse {
   Score score = 1;
+  // Set when this review completed a passing result and issued (or
+  // restored) the candidate's credential.
+  string credential_url = 2;
 }
 
 message GetItemAnalysisRequest {

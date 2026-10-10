@@ -168,6 +168,8 @@ export type InviteEvent = { seq: number; t: number; kind: string; detail?: strin
 export type AttemptEvent = { seq: number; t: number; kind: string; detail?: string }
 
 export type Attempt = {
+  /** Where the credential this attempt earned can be checked (core only). */
+  credentialUrl?: string
   /** The server's id. Absent for an attempt that lives only on this device (a preview). */
   id?: string
   examId: string

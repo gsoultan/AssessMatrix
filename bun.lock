@@ -32,6 +32,13 @@
         "vite": "8.3.0",
       },
     },
+    "apps/verify": {
+      "name": "@assessmatrix/verify",
+      "devDependencies": {
+        "typescript": "7.0.2",
+        "vite": "8.3.0",
+      },
+    },
     "packages/proto": {
       "name": "@assessmatrix/proto",
       "dependencies": {
@@ -47,6 +54,8 @@
     "@assessmatrix/proto": ["@assessmatrix/proto@workspace:packages/proto"],
 
     "@assessmatrix/studio": ["@assessmatrix/studio@workspace:apps/studio"],
+
+    "@assessmatrix/verify": ["@assessmatrix/verify@workspace:apps/verify"],
 
     "@bufbuild/buf": ["@bufbuild/buf@1.73.0", "", { "optionalDependencies": { "@bufbuild/buf-darwin-arm64": "1.73.0", "@bufbuild/buf-darwin-x64": "1.73.0", "@bufbuild/buf-linux-aarch64": "1.73.0", "@bufbuild/buf-linux-armv7": "1.73.0", "@bufbuild/buf-linux-x64": "1.73.0", "@bufbuild/buf-win32-arm64": "1.73.0", "@bufbuild/buf-win32-x64": "1.73.0" }, "bin": { "buf": "bin/buf", "protoc-gen-buf-lint": "bin/protoc-gen-buf-lint", "protoc-gen-buf-breaking": "bin/protoc-gen-buf-breaking" } }, "sha512-W3whb4P1y3Hs9bqwCu9++W1v1ofHZ3dBUCe6JSZq0Ff5OK5UKKZuMN4iunPbgdyXY4+4ujEYf2ESrN/6MbcFSQ=="],
 
