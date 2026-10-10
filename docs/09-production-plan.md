@@ -4,7 +4,7 @@ From today's prototype to a first real, paid, high-stakes exam. This plan adds n
 architecture: every decision it relies on is already made in `03`–`08` and `AGENTS.md`. What
 it adds is **order**, **exit gates**, and the list of things that are not production yet.
 
-## 0. Where we are (2026-10-10)
+## 0. Where we started (2026-10-10)
 
 | Area | State |
 | :--- | :--- |
@@ -15,6 +15,18 @@ it adds is **order**, **exit gates**, and the list of things that are not produc
 | Tests | Type-check, build, one Playwright smoke (`make e2e`) |
 | Source control | Local repo with **no commits**; `github.com/gsoultan/AssessMatrix` is empty |
 | Loose ends | `docs/07-mockups.md` is referenced by README, `05` and `06` but missing. Root README says eleven screens, `app/README.md` says thirteen. `package.json` is still `@assessmatrix/mockup` |
+
+### Progress
+
+| Phase | State |
+| :--- | :--- |
+| 0 · Repo, CI, monorepo | Done. `main` on GitHub; CI runs web, proto, core and full-stack jobs |
+| 1 · Proto contract | Done. `packages/proto`, lint and breaking checks in CI |
+| 2 · Go core | Done. Postgres with row-level security, hash-chained attempts, outbox mail; tenant isolation proven per RPC |
+| 3 · Studio on the core | Done. Every functional screen runs on the core (`VITE_BACKEND=core`), staff sign in by emailed code, candidates by link, mock-ups hidden. Images go to object storage in the tenant's region. QTI 3.0 packages export and import (2.1 too), and our own round-trip without loss. `make e2e-core` proves the loop against Postgres |
+| 4 · Runner that cannot lose work | Done. The runner is its own build at `/take/` (165 KB gzipped, budget 180, checked by `make build`) and can have its own origin (`AM_RUNNER_URL`); invitation links open it. Answers are flushed to OPFS by a worker before a batch is sent; a service worker keeps the shell and the exam's figures; the server holds the clock. One tab per sitting by Web Lock (not SharedWorker, which Android Chrome lacks); a refused tab is recorded on the attempt. `a11y.mjs` scans every candidate screen with axe (WCAG 2.2 AA) and answers every item type by keyboard alone; `e2e-core` fails on any long task over 50 ms while answering. **Gate:** in `make e2e-core` the candidate's browser is SIGKILLed during a 5-minute outage just after changing an answer, and the reopened sitting scores 100%; with the queue in localStorage the same test scores 0%. Not done: Background Sync (drains on reopen instead; Safari and Firefox have none) |
+| 5 · Integrity tiers 0–2 | Done. Consent per purpose (signals, full screen, camera) before the start, recorded by the server as `consent.*` rows; the server drops any signal without its consent, so a modified client cannot collect more. The runner sends focus, paste (character count only), time per question, a hashed device class, second tabs and full-screen exits; tier 2 runs a face detector in a worker on the device (BlazeFace, served from our origin, fetched only by tier 2) and sends durations, never frames. Ten flag types, each derived deterministically from the log with a reason a candidate can check, in English and Indonesian (`domain/integrity_test.go` fails any type without one). The studio's proctor monitor streams every sitting over `ProctorService.WatchExam` and opens each attempt's sealed record with its flags. DPIA draft in `10-dpia-camera.md`. **Gates:** a tampered answer is detected and raises a serious `record_altered` flag naming the event; every flag type has a contestable reason. Not done: lockdown beyond full screen (no browser can enforce it), the DPIA's open items |
+| 6 · Results, credentials, pilot | Built; the pilot itself is people's work (runbook: `11-pilot.md`). Essays go to a blind review queue (the Scoring screen, "Response N" in hand-in order); a person's score is sealed into the attempt's log and the attempt and its assignment are rescored from it. Every scoring updates a per-item index and queues the exam version; `services/psychometrics`, a Python worker outside any request, computes CTT only (p-value, corrected point-biserial, distractors by top/bottom 27%, KR-20) with plain-language notes, provisional below 30 hand-ins. A passed exam with nothing left to score earns an Open Badges 3.0 credential (VC-JWT, RS256), signed with the organisation's own key, sealed at rest under the server secret. It names the recipient only as a salted email hash and is revoked if a later review takes the result below the bar. `/verify/` checks it in the browser against the issuer's published key, with no account. **Gate:** the partner accepts the results in writing (not yet: no pilot has run) |
 
 **Nothing in the prototype is a security boundary.** Whoever holds the device can edit
 `localStorage`: invite tokens, OTP checks, scores and the attempt log are all forgeable today.
@@ -160,9 +172,20 @@ These are not a final phase. Leaving them until the end is how a pilot slips.
 | **Psychometrics** | A psychometrician engaged before the first Certify conversation (`04` risk #2) | psychometrics |
 | **Load** | Simulate the partner's cohort (all candidates starting in the same minute, autosaving) against staging, with headroom | perf/cost |
 
+Where the tracks stand:
+
+| Track | State |
+| :--- | :--- |
+| Deploy | Built. One image with the core and all three web apps (`deploy/Dockerfile`); compose with Caddy for TLS (`--profile tls`); a kustomize base for Kubernetes (`deploy/k8s`, validated in CI); images publish only from a version tag (`release.yml`). Runbook: `13-operations.md`. Not done: a staging environment (needs an account and a region) |
+| Data safety | Built. WAL archived every minute; `scripts/restore-drill.sh` restores to a moment and checks the writes either side of it and the core on the result, in CI on every PR. Not done: the drill on a production-sized database (go-live checklist) |
+| Observability | Built. Prometheus metrics per procedure (rate, code, duration), events stored, sync lag, signals dropped, records purged; alert rules with tests (`deploy/prometheus`). Not done: traces; sync lag stands in for sync-queue age, which only the device knows |
+| Privacy | Built. Hourly retention job (at most the year the consent text promises, by a database check) and erasure on request from the studio, both audited by id (`13-operations.md` §5). Changed from the plan: erasure deletes rows outright instead of crypto-shredding, and backups age out in 35 days. Not done: PII in a store separate from responses |
+| Security | Built. Content policy per app, HSTS, no framing; `bun audit`, `govulncheck`, `pip-audit` and a gitleaks history scan in CI (the first run found and fixed ten reachable Go vulnerabilities). Test scope: `12-security.md`. Not done: the external test itself |
+| Load | Built. `make load` (`cmd/loadsim`): a cohort starts within a minute, autosaves every ~10 s through the runner's procedures, hands in, and every acknowledged answer is looked for in its log. Local run, one core on a laptop-class container: 500 candidates, 12,704 calls, AppendEvents p99 12 ms, 0 errors, 0 answers lost. A 40-candidate run is in CI. Not done: the partner's cohort size against staging |
+
 ## 4. Go-live checklist
 
-- [ ] Tenant-isolation test covers every RPC and is green.
+- [x] Tenant-isolation test covers every RPC and is green.
 - [ ] Kill-the-browser and network-partition tests pass against production-like infrastructure.
 - [ ] Invite tests from `08` §4 pass, and the kill-the-browser test runs with the real session cookie.
 - [ ] Tampered-attempt replay is detected.

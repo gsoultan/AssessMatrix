@@ -1,0 +1,36 @@
+{
+  "name": "@assessmatrix/studio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --strictPort --port ${PORT:-5180}",
+    "check": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build && vite build -c vite.runner.config.ts && bun run --cwd ../verify build",
+    "preview": "vite preview --strictPort --port ${PORT:-5180}",
+    "e2e": "bun e2e.mjs"
+  },
+  "dependencies": {
+    "@assessmatrix/proto": "workspace:*",
+    "@bufbuild/protobuf": "2.16.0",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-web": "2.2.0",
+    "@mantine/core": "9.6.2",
+    "@mantine/hooks": "9.6.2",
+    "@mediapipe/tasks-vision": "1.1.0",
+    "@tabler/icons-react": "3.47.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "axe-core": "4.11.1",
+    "playwright": "1.63.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
+}

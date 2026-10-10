@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT/app"
+APP="$ROOT/apps/studio"
 PORT="${PORT:-5180}"
 
 bold()  { printf '\033[1m%s\033[0m\n' "$*"; }
@@ -17,9 +17,10 @@ need_bun() {
 
 ensure_deps() {
   need_bun
-  if [ ! -d "$APP/node_modules" ]; then
+  # Bun workspaces: one install at the root serves every app and package.
+  if [ ! -d "$ROOT/node_modules" ]; then
     info "installing dependencies…"
-    (cd "$APP" && bun install)
+    (cd "$ROOT" && bun install)
   fi
 }
 

@@ -1,0 +1,66 @@
+# Alert rules for the core (metrics: services/core/internal/metrics).
+# Scrape the core's metrics port (AM_METRICS_LISTEN, default :9090) as job
+# "assessmatrix-core". Severity "page" wakes someone; "ticket" waits for the
+# working day. Each alert says what a candidate or organiser is seeing.
+groups:
+  - name: assessmatrix-core
+    rules:
+      - alert: CoreDown
+        expr: up{job="assessmatrix-core"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "Core instance {{ $labels.instance }} is not answering"
+          impact: "Candidates' answers wait in their local queue; nothing is lost while the device keeps the tab, but hand-ins cannot be scored."
+
+      # Losing a candidate's work is the worst bug we can have (AGENTS.md).
+      # Refusals that are the rules working (a submitted attempt, the event
+      # limit, a bad request) are not failures.
+      - alert: AnswersNotSaving
+        expr: |
+          sum(rate(am_rpc_requests_total{procedure=~"CandidateService/(AppendEvents|SubmitAttempt)",code=~"internal|unknown|unavailable|deadline_exceeded"}[5m]))
+            /
+          sum(rate(am_rpc_requests_total{procedure=~"CandidateService/(AppendEvents|SubmitAttempt)"}[5m])) > 0.01
+        for: 3m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 1% of answer saves or hand-ins are failing on the server"
+          impact: "Candidates see 'saved on this device' instead of 'saved'; their work queues locally. Check the core's error logs and the database."
+
+      - alert: ServerErrors
+        expr: |
+          sum(rate(am_rpc_requests_total{code=~"internal|unknown"}[10m]))
+            /
+          sum(rate(am_rpc_requests_total[10m])) > 0.02
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 2% of calls end in a server error"
+
+      - alert: SlowCalls
+        expr: |
+          histogram_quantile(0.95, sum by (le, procedure) (rate(am_rpc_duration_seconds_bucket{procedure!="ProctorService/WatchExam"}[10m]))) > 1
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.procedure }} is slow: p95 above 1 s"
+
+      - alert: AnswersArrivingLate
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(am_sync_lag_seconds_bucket[10m]))) > 30
+          and sum(rate(am_sync_lag_seconds_count[10m])) > 1
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Candidates' events take over 30 s (p95) to reach the server"
+          impact: "Usually poor networks at an exam site, or clock skew on devices; the live monitor runs behind."
+
+      # The runner never sends a signal its tier did not ask consent for. A
+      # steady stream means a modified client, or a runner bug collecting
+      # beyond consent: a privacy matter either way.
+      - alert: SignalsWithoutConsent
+        expr: sum(increase(am_signals_dropped_total[1h])) > 50
+        labels: { severity: ticket }
+        annotations:
+          summary: "Integrity signals arriving without consent ({{ $value }} in the last hour)"
+          impact: "They are dropped, not stored. Tell the privacy reviewer if the runner is the cause."

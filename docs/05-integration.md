@@ -73,8 +73,8 @@ These are worth building product around, not just documenting:
    third-party origins, so the offline queue and service worker cannot behave like a
    first-party PWA. **Door 2 therefore cannot promise full offline.**
 
-Both get surfaced in a **live Preflight panel** in the embed configurator (see
-`07-mockups.md`, M2) that tells the integrator what will break *before* they ship, and names
+Both get surfaced in a **live Preflight panel** in the embed configurator (the Embed
+studio screen in `apps/studio`) that tells the integrator what will break *before* they ship, and names
 the fix. Offline-critical customers get routed to Door 1 or Door 4, where the runtime is
 first-party on its own origin and the service worker has full power.
 
@@ -102,7 +102,7 @@ attempt**, idempotency key on every payload, exponential backoff with a dead-let
 **The differentiator — replay.** Since the log is the source of truth, a customer can replay
 any webhook window: "resend everything for attempt X," or "resend all events from 14:00 to
 16:00 yesterday." Integration debugging stops being a support ticket. Ship a self-serve
-replay UI (M8) from day one.
+replay UI (the Event inspector screen in `apps/studio`) from day one.
 
 ## 5. Standards doors (orthogonal to the four)
 

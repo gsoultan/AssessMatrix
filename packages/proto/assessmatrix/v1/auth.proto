@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+// Staff sign-in. Email plus a one-time code, so there is no password store to
+// protect (docs/09 §5). OIDC is the next door, for enterprise tenants.
+// A verified code sets an HttpOnly, Secure, SameSite=Strict session cookie.
+
+message Staff {
+  string id = 1;
+  string email = 2;
+  string name = 3;
+  string tenant_id = 4;
+  string tenant_name = 5;
+}
+
+service AuthService {
+  // Always answers the same way, whether or not the address is known.
+  rpc RequestStaffCode(RequestStaffCodeRequest) returns (RequestStaffCodeResponse);
+  rpc VerifyStaffCode(VerifyStaffCodeRequest) returns (VerifyStaffCodeResponse);
+  rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
+  rpc SignOut(SignOutRequest) returns (SignOutResponse);
+}
+
+message RequestStaffCodeRequest {
+  string email = 1;
+}
+
+message RequestStaffCodeResponse {}
+
+message VerifyStaffCodeRequest {
+  string email = 1;
+  string code = 2;
+}
+
+message VerifyStaffCodeResponse {
+  bool ok = 1;
+  Staff staff = 2;
+}
+
+message WhoAmIRequest {}
+
+message WhoAmIResponse {
+  Staff staff = 1;
+}
+
+message SignOutRequest {}
+
+message SignOutResponse {}

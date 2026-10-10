@@ -7,7 +7,7 @@ bold "AssessMatrix — e2e"
 ensure_deps
 
 if ! (cd "$APP" && bunx playwright --version >/dev/null 2>&1); then
-  die "playwright is not installed. Run: cd app && bun add -d playwright && bunx playwright install chromium"
+  die "playwright is not installed. Run: bun install && bunx playwright install chromium (or set CHROMIUM_PATH)"
 fi
 
 started=""
@@ -24,6 +24,8 @@ set +e
 # Bun runs the test directly — no Node in the toolchain.
 (cd "$APP" && URL="http://localhost:${PORT}" bun e2e.mjs)
 rc=$?
+# Accessibility and the keyboard path through every item type (docs/09 phase 4).
+(cd "$APP" && URL="http://localhost:${PORT}" bun a11y.mjs) || rc=1
 set -e
 
 if [ -n "$started" ]; then
