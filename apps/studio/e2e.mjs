@@ -506,6 +506,84 @@ try {
   mean > 0 && answered > 0
     ? ok('aggregate shows distributions + mean, and counts ONE response per submit')
     : bad(`aggregate did not render (mean=${mean}, answered=${answered})`)
+
+  /* ── QTI 3.0: our own package round-trips; a 2.1 item from elsewhere reads ── */
+  const qti = await page.evaluate(async () => {
+    const { exportQti, importQti } = await import('/src/qti.ts')
+    const exams = JSON.parse(localStorage.getItem('am.exams.v1') ?? '[]')
+    // A figure on a stem and on an option, so the images travel too.
+    const c = document.createElement('canvas')
+    c.width = 6; c.height = 4
+    const g = c.getContext('2d'); g.fillStyle = '#c33'; g.fillRect(0, 0, 3, 4)
+    const pic = { id: 'm_t', url: c.toDataURL('image/png'), alt: 'red half', w: 6, h: 4, bytes: 80 }
+    const out = []
+    for (const original of exams) {
+      const e = structuredClone(original)
+      const choice = e.sections.flatMap((s) => s.items).find((i) => i.choices.length && i.type !== 'boolean')
+      if (choice) { choice.image = { ...pic }; choice.choices[0].image = { ...pic, alt: 'opt' } }
+      e.sections[0].items[0].stem += '\n\n  two spaces & <angle> "quotes"'
+      const blob = await exportQti(e)
+      const { exam: back, warnings } = await importQti(new File([blob], 'x.qti.zip'))
+      const canon = (x) => {
+        const strip = (m) => (m ? { alt: m.alt, data: m.url.startsWith('data:image/') } : undefined)
+        const y = structuredClone(x)
+        for (const k of ['id', 'status', 'version', 'publishedVersion', 'updatedAt']) delete y[k]
+        for (const s of y.sections) for (const i of s.items) {
+          i.image = strip(i.image)
+          for (const ch of i.choices) ch.image = strip(ch.image)
+        }
+        const sort = (v) => Array.isArray(v) ? v.map(sort) : v && typeof v === 'object'
+          ? Object.fromEntries(Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => [k, sort(v[k])])) : v
+        return JSON.stringify(sort(y))
+      }
+      out.push({ title: e.title, same: canon(e) === canon(back), warnings, a: canon(e), b: canon(back) })
+    }
+    const foreign = `<?xml version="1.0"?>
+      <assessmentItem xmlns="http://www.imsglobal.org/xsd/imsqti_v2p1" identifier="2plus2" title="Sum">
+        <responseDeclaration identifier="RESPONSE" cardinality="single" baseType="identifier">
+          <correctResponse><value>B</value></correctResponse>
+        </responseDeclaration>
+        <outcomeDeclaration identifier="SCORE" cardinality="single" baseType="float"/>
+        <itemBody>
+          <p>What is
+             2 + 2?</p>
+          <choiceInteraction responseIdentifier="RESPONSE" shuffle="false" maxChoices="1">
+            <simpleChoice identifier="A">3</simpleChoice>
+            <simpleChoice identifier="B">4</simpleChoice>
+          </choiceInteraction>
+          <img src="http://evil.example/x.png" alt=""/>
+        </itemBody>
+      </assessmentItem>`
+    const { writeZip } = await import('/src/zip.ts')
+    const zip = writeZip([['item1.xml', new TextEncoder().encode(foreign)]])
+    const f = (await importQti(new File([zip], 'bank.zip'))).exam
+    const it = f.sections[0]?.items[0]
+    return {
+      out,
+      foreign: it && it.stem === 'What is 2 + 2?' && it.type === 'single' && it.id === '_2plus2'.slice(1) &&
+        it.choices.map((c) => c.text).join() === '3,4' && it.correct.join() === 'B' && !it.image && f.kind === 'exam',
+      foreignDump: JSON.stringify(f).slice(0, 600),
+    }
+  })
+  for (const r of qti.out)
+    r.same && r.warnings.length === 0
+      ? ok(`QTI round-trip is lossless: "${r.title}"`)
+      : bad(`QTI round-trip lost something in "${r.title}" (warnings ${JSON.stringify(r.warnings)})\n    ${r.a}\n    ${r.b}`)
+  qti.foreign ? ok('a QTI 2.1 item from another tool imports; an outside image is dropped') : bad(`QTI 2.1 import: ${qti.foreignDump}`)
+
+  // The same through the screens: export from the library, import the file, land in the editor.
+  await nav(/Library/)
+  const first = page.getByRole('button', { name: /^Actions for / }).first()
+  await first.click()
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Export QTI/ }).click()])
+  const path = await download.path()
+  const before = (await page.evaluate(() => JSON.parse(localStorage.getItem('am.exams.v1')).length))
+  await page.locator('input[aria-label="QTI package"]').setInputFiles(path)
+  await page.waitForTimeout(800)
+  const after = (await page.evaluate(() => JSON.parse(localStorage.getItem('am.exams.v1')).length))
+  after === before + 1 && download.suggestedFilename().endsWith('.qti.zip')
+    ? ok('Export QTI downloads a package and Import QTI makes it a new draft')
+    : bad(`QTI via the screens: ${download.suggestedFilename()} ${before} → ${after}`)
 } catch (e) {
   bad(`threw: ${String(e.message).split('\n').slice(0, 6).join(' | ')}`)
 } finally {

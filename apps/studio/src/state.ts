@@ -30,6 +30,7 @@ import {
   backfillVersions,
 } from './store'
 import { tokenFromHash } from './invite'
+import { exportQti, importQti, qtiFileName } from './qti'
 import { CORE } from './backend/mode'
 import { type SaveHow, explain, isSignedOut, repo } from './backend/repo'
 import { type Seat, gate } from './backend/gate'
@@ -104,6 +105,10 @@ type AppState = {
   /** Save the working copy, then make it the version candidates get. */
   publishExam: (e: Exam) => Promise<Exam | null>
   createExam: (kind: Kind) => Promise<Exam | null>
+  /** A QTI package → a new draft. Anything left behind is said in `notice`. */
+  importExam: (file: File) => Promise<Exam | null>
+  /** Download the exam as a QTI 3.0 package. */
+  exportExam: (id: string) => Promise<void>
   duplicateExam: (id: string) => Promise<Exam | null>
   setStatus: (id: string, status: Status) => Promise<Exam | null>
   /** Archiving is the safe default; `destroyExam` is the irreversible one. */
@@ -418,6 +423,32 @@ export const useApp = create<AppState>((set, get) => {
         putExam(e)
         set({ currentExamId: e.id })
         return e
+      }),
+
+    importExam: (file) =>
+      run(null, async () => {
+        const { exam, warnings } = await importQti(file)
+        // The server names it; the package fills it.
+        const made = await repo.createExam(exam.kind)
+        const saved = await repo.saveExam({ ...exam, id: made.id, version: made.version, updatedAt: made.updatedAt }, 'draft')
+        putExam(saved)
+        set({
+          currentExamId: saved.id,
+          notice: warnings.length ? `Imported, with ${warnings.length} note${warnings.length === 1 ? '' : 's'}: ${warnings.slice(0, 3).join(' ')}${warnings.length > 3 ? ' …' : ''}` : '',
+        })
+        return saved
+      }),
+
+    exportExam: (id) =>
+      run(undefined, async () => {
+        const e = get().exams.find((x) => x.id === id)
+        if (!e) return
+        const url = URL.createObjectURL(await exportQti(e))
+        const a = document.createElement('a')
+        a.href = url
+        a.download = qtiFileName(e)
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 60_000)
       }),
 
     setStatus: (id, status) =>

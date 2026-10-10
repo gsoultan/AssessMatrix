@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Badge, Menu, TextInput } from '@mantine/core'
 import {
   IconSearch,
@@ -18,6 +18,8 @@ import {
   IconArchiveOff,
   IconRocket,
   IconPencilMinus,
+  IconFileImport,
+  IconFileExport,
 } from '@tabler/icons-react'
 import { useApp, useResponseCount } from '../state'
 import {
@@ -77,6 +79,8 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
   const previewAsCandidate = useApp((s) => s.previewAsCandidate)
   const openAssignments = useApp((s) => s.openAssignments)
   const setScreen = useApp((s) => s.setScreen)
+  const importExam = useApp((s) => s.importExam)
+  const exportExam = useApp((s) => s.exportExam)
 
   const [kind, setKind] = useState<Kind | 'all'>('all')
   const [view, setView] = useState<'active' | 'archived'>('active')
@@ -98,6 +102,25 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
         })
         .sort((a, b) => b.updatedAt - a.updatedAt),
     [exams, kind, q, view],
+  )
+
+  // Outside the menu: the menu unmounts its items as it closes, before a file is picked.
+  const qtiInput = useRef<HTMLInputElement>(null)
+  const qtiPicker = (
+    <input
+      ref={qtiInput}
+      type="file"
+      accept=".zip,application/zip"
+      hidden
+      aria-label="QTI package"
+      onChange={async (ev) => {
+        const f = ev.currentTarget.files?.[0]
+        ev.currentTarget.value = ''
+        if (!f) return
+        const e = await importExam(f)
+        if (e) openInEditor(e.id)
+      }}
+    />
   )
 
   const newMenu = (
@@ -127,6 +150,11 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             </Menu.Item>
           )
         })}
+        <Menu.Divider />
+        <Menu.Item leftSection={<IconFileImport size={15} stroke={1.8} />} onClick={() => qtiInput.current?.click()}>
+          <span className="block text-[12.5px]">Import QTI package</span>
+          <span className="block text-[11px] leading-snug text-ink-muted">A .zip from a QTI 2.1 or 3.0 tool.</span>
+        </Menu.Item>
       </Menu.Dropdown>
     </Menu>
   )
@@ -152,6 +180,9 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
               }}
             >
               Duplicate
+            </Menu.Item>
+            <Menu.Item leftSection={<IconFileExport size={14} stroke={1.9} />} onClick={() => exportExam(e.id)}>
+              Export QTI
             </Menu.Item>
             <Menu.Divider />
             <Menu.Item color="red" leftSection={<IconTrash size={14} stroke={1.9} />} onClick={() => destroyExam(e.id)}>
@@ -196,6 +227,9 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             >
               Duplicate
             </Menu.Item>
+            <Menu.Item leftSection={<IconFileExport size={14} stroke={1.9} />} onClick={() => exportExam(e.id)}>
+              Export QTI
+            </Menu.Item>
             <Menu.Divider />
             <Menu.Item leftSection={<IconArchive size={14} stroke={1.9} />} onClick={() => removeExam(e.id)}>
               Archive
@@ -233,6 +267,7 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
           </p>
         </div>
         {newMenu}
+        {qtiPicker}
       </header>
 
       <div className="mb-3 flex items-center gap-2">
