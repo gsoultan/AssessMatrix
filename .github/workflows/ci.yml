@@ -62,3 +62,39 @@ jobs:
           PATH="$PATH:$(go env GOPATH)/bin:$PWD/node_modules/.bin" ./node_modules/.bin/buf generate
           git diff --exit-code -- . ../../services/core/gen
           test -z "$(git status --porcelain -- . ../../services/core/gen)"
+
+  core:
+    name: Core · vet, test against Postgres with RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: services/core
+    env:
+      AM_TEST_DATABASE_URL: postgres://am_app:app@localhost:5432/assessmatrix_test
+      AM_TEST_MIGRATE_DATABASE_URL: postgres://am_owner:owner@localhost:5432/assessmatrix_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: services/core/go.sum
+      - name: Create the owner and the unprivileged application role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
+            -c "CREATE ROLE am_app LOGIN PASSWORD 'app'" \
+            -c "CREATE DATABASE assessmatrix_test OWNER am_owner"
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...

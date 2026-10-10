@@ -1,6 +1,6 @@
 # AssessMatrix — run `make` to see everything available.
 .DEFAULT_GOAL := help
-.PHONY: help dev check build preview e2e clean
+.PHONY: help dev check build preview e2e clean core-test proto
 
 help: ## Show this help
 	@echo "AssessMatrix"
@@ -27,3 +27,9 @@ e2e: ## Smoke-test the create → take → score loop in a browser
 
 clean: ## Remove build output and node_modules
 	@./scripts/clean.sh
+
+core-test: ## Go tests against Postgres (needs AM_TEST_* URLs; see services/core/README.md)
+	@cd services/core && go vet ./... && go test -race -count=1 ./...
+
+proto: ## Lint the schema and regenerate the Go and TypeScript clients
+	@cd packages/proto && PATH="$$PATH:$$(go env GOPATH)/bin:$$PWD/node_modules/.bin" sh -c 'buf lint && buf generate'

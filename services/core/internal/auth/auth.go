@@ -1,0 +1,167 @@
+// Package auth decides who is calling and whether they may call this
+// procedure. Authentication (which cookie, which row) and authorization (the
+// per-procedure policy) are separate steps, and an unknown procedure is
+// refused: a new RPC with no policy entry cannot be reached at all.
+package auth
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"connectrpc.com/connect"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+)
+
+// Access is who may call a procedure.
+type Access int
+
+const (
+	// Public procedures check their own credential (a link token, an email).
+	Public Access = iota + 1
+	Staff
+	Candidate
+)
+
+const (
+	StaffCookie     = "am_staff"
+	CandidateCookie = "am_candidate"
+	StaffSessionTTL = 12 * time.Hour
+)
+
+// Principal is an authenticated caller. Its tenant is the only tenant any of
+// its queries may touch.
+type Principal struct {
+	Tenant       db.TenantID
+	StaffID      string
+	AssignmentID string
+}
+
+type ctxKey struct{}
+
+func with(ctx context.Context, p *Principal) context.Context {
+	return context.WithValue(ctx, ctxKey{}, p)
+}
+
+// From returns the caller. Handlers behind Staff or Candidate always have one.
+func From(ctx context.Context) *Principal {
+	p, _ := ctx.Value(ctxKey{}).(*Principal)
+	return p
+}
+
+// Authenticator resolves cookies to principals.
+type Authenticator struct {
+	DB     *db.DB
+	Keys   *secure.Keys
+	Policy map[string]Access
+	// Secure cookies. Off only for local http development.
+	SecureCookies bool
+}
+
+var errUnauthenticated = connect.NewError(connect.CodeUnauthenticated, errors.New("sign in required"))
+
+// Interceptor enforces the policy on every unary call.
+func (a *Authenticator) Interceptor() connect.UnaryInterceptorFunc {
+	return func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			access, ok := a.Policy[req.Spec().Procedure]
+			if !ok {
+				return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("no access policy for %s", req.Spec().Procedure))
+			}
+			switch access {
+			case Public:
+				return next(ctx, req)
+			case Staff:
+				p, err := a.staff(ctx, req.Header())
+				if err != nil {
+					return nil, err
+				}
+				return next(with(ctx, p), req)
+			case Candidate:
+				p, err := a.candidate(ctx, req.Header())
+				if err != nil {
+					return nil, err
+				}
+				return next(with(ctx, p), req)
+			}
+			return nil, connect.NewError(connect.CodeInternal, errors.New("unhandled access level"))
+		}
+	}
+}
+
+func cookie(h http.Header, name string) string {
+	r := http.Request{Header: h}
+	c, err := r.Cookie(name)
+	if err != nil {
+		return ""
+	}
+	return c.Value
+}
+
+func (a *Authenticator) staff(ctx context.Context, h http.Header) (*Principal, error) {
+	token := cookie(h, StaffCookie)
+	if !secure.ValidToken(token) {
+		return nil, errUnauthenticated
+	}
+	var p Principal
+	err := a.DB.Unscoped(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT tenant_id, staff_id FROM am_staff_session($1)`, a.Keys.SessionHash(token)).
+			Scan(&p.Tenant, &p.StaffID)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errUnauthenticated
+	}
+	if err != nil {
+		return nil, fmt.Errorf("resolve staff session: %w", err)
+	}
+	return &p, nil
+}
+
+func (a *Authenticator) candidate(ctx context.Context, h http.Header) (*Principal, error) {
+	token := cookie(h, CandidateCookie)
+	if !secure.ValidToken(token) {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no invitation session"))
+	}
+	var p Principal
+	err := a.DB.Unscoped(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT tenant_id, assignment_id FROM am_assignment_by_session($1)`, a.Keys.SessionHash(token)).
+			Scan(&p.Tenant, &p.AssignmentID)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("this session has ended"))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("resolve candidate session: %w", err)
+	}
+	return &p, nil
+}
+
+// SetCookie writes an HttpOnly, SameSite=Strict session cookie.
+func (a *Authenticator) SetCookie(h http.Header, name, value string, maxAge time.Duration) {
+	c := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   a.SecureCookies,
+		SameSite: http.SameSiteStrictMode,
+	}
+	if maxAge > 0 {
+		c.MaxAge = int(maxAge.Seconds())
+	}
+	h.Add("Set-Cookie", c.String())
+}
+
+// ClearCookie removes a session cookie from the browser.
+func (a *Authenticator) ClearCookie(h http.Header, name string) {
+	c := &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: a.SecureCookies, SameSite: http.SameSiteStrictMode}
+	h.Add("Set-Cookie", c.String())
+}
+
+// CookieValue reads a cookie from request headers.
+func CookieValue(h http.Header, name string) string { return cookie(h, name) }
