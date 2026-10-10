@@ -33,21 +33,40 @@ Images work in all three places an assessment needs them: a **figure on the ques
 one), and a **participant attachment** on short/essay answers for handwritten working or a
 sketch.
 
-They share `src/store.ts`, which persists to `localStorage` and is shaped like the API the Go
-core would expose — an attempt is an append-only event log, not a mutable row, so swapping the
-store for Connect RPC calls should not require touching a screen. Essays are never auto-scored;
-their points are reported separately as pending human review.
+Essays are never auto-scored; their points are reported separately as pending human review.
 
-The other nine screens are design mockups driven by fixtures in `src/data.ts`.
+The other seven screens are design mockups driven by fixtures in `src/data.ts`.
+
+## Two backends, chosen at build time
+
+| `VITE_BACKEND` | Data lives in | Who signs in | Mock-up screens |
+| :--- | :--- | :--- | :--- |
+| unset (default) | this browser's `localStorage` | nobody | shown |
+| `core` | the Go core (`services/core`) over Connect | staff by emailed code; candidates by their invitation link | hidden (`VITE_MOCKS=1` shows them) |
+
+Screens never know which one they run on. They read and write through `src/state.ts`, which
+calls `src/backend/repo.ts` (staff data) and `src/backend/gate.ts` (the candidate's way in);
+each has a local and a core implementation. `src/backend/convert.ts` is the only place that
+knows the wire format. A candidate's answers go to the core as events through
+`src/backend/sync.ts`, a queue kept in `localStorage` so a dropped connection or a killed
+browser loses nothing that reached it.
+
+Against the core, a candidate who opens their link sees the assessment alone: no studio, no
+sign-in. The server holds the clock, the answer key and the score; the browser holds none of them.
 
 ```bash
 make dev      # from the repo root — installs, frees the port, starts on :5180
 make check    # type-check
 make build    # type-check + production build
-make e2e      # browser smoke test of the create → take → score loop
+make e2e      # browser test of the create → take → score loop, local data
+make e2e-core # the same loop against the core and Postgres (see scripts/e2e-core.sh)
 ```
 
 Or directly: `bun install && bun run dev`. Override the port with `PORT=3000 make dev`.
+
+To develop against the core, run it with `AM_PUBLIC_URL=http://localhost:5180` (see
+`services/core/README.md`), then `VITE_BACKEND=core bun run dev`. Vite forwards the API and
+the dev mailbox to `CORE_URL` (default `http://localhost:8080`).
 
 ## Stack
 

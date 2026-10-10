@@ -31,18 +31,9 @@ import { ItemImage } from '../components/ItemImage'
 import { Meter } from '../components/Viz'
 import type { Media } from '../media'
 import { SESSION_HASH, useApp, useResponses } from '../state'
-import {
-  type Refusal,
-  OTP_TRIES,
-  endSession,
-  listOutbox,
-  openLink,
-  requestCode,
-  requestNewLink,
-  resumeSession,
-  sessionStands,
-  verifyCode,
-} from '../invite'
+import { type Refusal, OTP_TRIES, listOutbox } from '../invite'
+import { type Seat, gate as door } from '../backend/gate'
+import { CORE } from '../backend/mode'
 import {
   type Assignment,
   type Exam,
@@ -64,18 +55,22 @@ type Stage = 'pick' | 'gate' | 'invite' | 'consent' | 'ready' | 'attempt' | 'rev
  * Where someone holding a link stands before they are let in. The token lives
  * here, in memory, for exactly as long as the code step takes.
  *
- * `stub` is the assignment id, kept only so the prototype's stand-in inbox can
- * show the right code. A real client learns nothing but the masked address
- * until the code is verified, and this field goes with the stub.
+ * `stub` is the assignment id, set only in a local build so the prototype's
+ * stand-in inbox can show the right code. Against the core a client learns
+ * nothing but the masked address until the code is verified.
  */
 type Gate =
   | { at: 'checking' }
-  | { at: 'send'; token: string; email: string; stub: string }
-  | { at: 'code'; token: string; email: string; stub: string; retryAt: number }
-  | { at: 'refused'; why: Refusal | 'session'; token?: string; email?: string; resent?: boolean }
+  | { at: 'send'; token: string; email: string; stub?: string }
+  | { at: 'code'; token: string; email: string; stub?: string; retryAt: number }
+  | { at: 'refused'; why: Refusal | 'session' | 'offline'; token?: string; email?: string; resent?: boolean }
 
 /** Why a link did not open, said to the person holding it, with what to do next. */
-const REFUSED: Record<Refusal | 'session', { title: string; body: string }> = {
+const REFUSED: Record<Refusal | 'session' | 'offline', { title: string; body: string }> = {
+  offline: {
+    title: 'Tidak dapat terhubung',
+    body: 'Periksa koneksi internet Anda, lalu buka kembali tautan dari email. Jawaban yang sudah tersimpan tidak hilang.',
+  },
   unknown: {
     title: 'Tautan ini tidak dikenali',
     body: 'Periksa kembali email undangan Anda dan buka tautan langsung dari sana, tanpa menyalin sebagian.',
@@ -186,7 +181,7 @@ function Row({ k, v }: { k: string; v: string }) {
 
 /* ── the candidate application ────────────────────────────────────────────── */
 
-export function CandidateApp() {
+export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   /* Shared, persisted state comes from the app store; only view state is local. */
   const exams = useApp((s) => s.exams)
   const attempt = useApp((s) => s.attempt)
@@ -204,16 +199,27 @@ export function CandidateApp() {
   const takeInviteToken = useApp((s) => s.takeInviteToken)
   const inviteToken = useApp((s) => s.inviteToken)
   const syncDelivery = useApp((s) => s.syncDelivery)
-  const people = useApp((s) => s.people)
+  const takeSeat = useApp((s) => s.admit)
+  const seat = useApp((s) => s.seat)
+  const sessionLost = useApp((s) => s.sessionLost)
+  const offline = useApp((s) => s.offline)
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [gate, setGate] = useState<Gate>({ at: 'checking' })
   const [code, setCode] = useState('')
   const [codeNote, setCodeNote] = useState('')
   const [now, setNow] = useState(() => Date.now())
-  /** Proof this tab holds the invitation's one session. Checked before start and submit. */
-  const session = useRef<string | null>(null)
+  /** Whether this tab holds an invitation's session. Checked with the server before start and submit. */
+  const session = useRef(false)
+  /** One submit at a time; the clock can ask again on every tick. */
+  const finalizing = useRef(false)
+  const [submitNote, setSubmitNote] = useState('')
+  /** The staff roster is not the candidate's to read; in a local build it is all one browser. */
+  const syncLocal = useCallback(() => {
+    if (!CORE) void syncDelivery()
+  }, [syncDelivery])
   const [exam, setExam] = useState<Exam | null>(null)
-  const responses = useResponses(exam?.id ?? '')
+  // A candidate cannot read other people's responses; the count is a local-build nicety.
+  const responses = useResponses(CORE ? '' : (exam?.id ?? ''))
   const [stage, setStage] = useState<Stage>('pick')
   const [idx, setIdx] = useState(0)
   const [blocked, setBlocked] = useState<string[]>([])
@@ -225,26 +231,26 @@ export function CandidateApp() {
 
   /** Past the gate: this tab now acts for one assignment and nothing else. */
   const admit = useCallback(
-    (as: Assignment, sessionHash: string) => {
-      const target = useApp.getState().exams.find((e) => e.id === as.examId)
-      if (!target) return setGate({ at: 'refused', why: 'closed' })
+    (s: Seat) => {
+      const as = s.assignment
       // A sitting that has been handed in is over; its session opens nothing.
       if (as.status === 'submitted') {
-        endSession()
+        void door.end()
         return setGate({ at: 'refused', why: 'submitted' })
       }
-      session.current = sessionHash
-      syncDelivery()
+      session.current = true
+      takeSeat(s)
+      syncLocal()
       setAssignment(as)
-      setExam(target)
+      setExam(s.exam)
       // Only this assignment's saved work — never whoever sat here before.
-      resumeAttempt(target, as.id)
+      resumeAttempt(s.exam, as.id)
       setIdx(0)
       setStage('invite')
       // The address bar says "in a session", not how it was reached.
       history.replaceState(null, '', location.pathname + location.search + SESSION_HASH)
     },
-    [resumeAttempt, syncDelivery],
+    [resumeAttempt, syncLocal, takeSeat],
   )
 
   // An invitation link is the real way in. It identifies the person and the
@@ -257,11 +263,14 @@ export function CandidateApp() {
     setGate({ at: 'checking' })
     setCode('')
     setCodeNote('')
-    void openLink(token).then((r) => {
-      syncDelivery()
-      setGate(r.ok ? { at: 'send', token, email: r.email, stub: r.assignment.id } : { at: 'refused', why: r.why, token, email: r.email })
-    })
-  }, [inviteToken, takeInviteToken, syncDelivery])
+    void door.openLink(token).then(
+      (r) => {
+        syncLocal()
+        setGate(r.ok ? { at: 'send', token, email: r.email, stub: r.stub } : { at: 'refused', why: r.why, token, email: r.email })
+      },
+      () => setGate({ at: 'refused', why: 'offline', token }),
+    )
+  }, [inviteToken, takeInviteToken, syncLocal])
 
   // Reloading mid-exam, or reopening a killed browser, comes back through the
   // session the link started rather than through the link again.
@@ -269,11 +278,14 @@ export function CandidateApp() {
     if (location.hash !== SESSION_HASH || session.current) return
     let stale = false
     setStage('gate')
-    void resumeSession().then((r) => {
-      if (stale) return
-      if (r) admit(r.assignment, r.sessionHash)
-      else setGate({ at: 'refused', why: 'session' })
-    })
+    void door.resume().then(
+      (r) => {
+        if (stale) return
+        if (r) admit(r)
+        else setGate({ at: 'refused', why: 'session' })
+      },
+      () => !stale && setGate({ at: 'refused', why: 'offline' }),
+    )
     return () => {
       stale = true
     }
@@ -286,9 +298,10 @@ export function CandidateApp() {
     return () => window.clearInterval(t)
   }, [stage, gate.at])
 
-  const sendCode = async (token: string, email: string, stub: string) => {
-    const r = await requestCode(token)
-    syncDelivery()
+  const sendCode = async (token: string, email: string, stub?: string) => {
+    const r = await door.requestCode(token).catch(() => null)
+    if (!r) return setGate({ at: 'refused', why: 'offline', token, email })
+    syncLocal()
     setNow(Date.now())
     if (r.ok) {
       setCode('')
@@ -300,9 +313,13 @@ export function CandidateApp() {
   }
 
   const submitCode = async (token: string) => {
-    const r = await verifyCode(token, code)
-    if (r.ok) return admit(r.assignment, r.sessionHash)
-    syncDelivery()
+    const r = await door.verifyCode(token, code).catch(() => null)
+    if (!r) return setCodeNote('Tidak dapat terhubung. Periksa koneksi Anda lalu coba lagi.')
+    if (r.ok) {
+      const s = await door.resume().catch(() => null)
+      return s ? admit(s) : setGate({ at: 'refused', why: 'session' })
+    }
+    syncLocal()
     setCode('')
     if (r.why === 'wrong')
       setCodeNote(`Kode tidak cocok. Sisa ${r.triesLeft} dari ${OTP_TRIES} percobaan untuk kode ini.`)
@@ -310,9 +327,10 @@ export function CandidateApp() {
     else setGate({ at: 'refused', why: r.why, token })
   }
 
-  const askNewLink = async (token: string, why: Refusal | 'session', email?: string) => {
-    const r = await requestNewLink(token)
-    syncDelivery()
+  const askNewLink = async (token: string, why: Refusal | 'session' | 'offline', email?: string) => {
+    const r = await door.requestNewLink(token).catch(() => null)
+    if (!r) return setGate({ at: 'refused', why: 'offline', token, email })
+    syncLocal()
     if (r.ok || r.why === 'cooldown') setGate({ at: 'refused', why, token, email, resent: true })
     else setGate({ at: 'refused', why: r.why === 'limit' ? 'locked' : r.why, email })
   }
@@ -344,33 +362,54 @@ export function CandidateApp() {
   const survey = !!exam && isSurvey(exam)
 
   /** A revoked or replaced invitation ends here, with the work still on the device. */
-  const sessionEnded = useCallback(() => {
-    if (!assignment || (session.current && sessionStands(assignment.id, session.current))) return false
-    endSession()
+  const endedView = useCallback(() => {
+    session.current = false
+    void door.end()
     setConfirming(false)
     setGate({ at: 'refused', why: 'session' })
     setStage('gate')
+  }, [])
+
+  const sessionEnded = useCallback(async () => {
+    if (!assignment || !seat) return false
+    if (session.current && (await door.stands(seat))) return false
+    endedView()
     return true
-  }, [assignment])
+  }, [assignment, seat, endedView])
+
+  // The server said so mid-attempt, while syncing an answer.
+  useEffect(() => {
+    if (sessionLost && session.current) endedView()
+  }, [sessionLost, endedView])
 
   const finalize = useCallback(
-    (force: boolean) => {
-      if (!exam) return
-      if (sessionEnded()) return
-      const missing = finalizeAttempt(exam, force)
-      if (missing.length > 0) {
-        setBlocked(missing)
-        setConfirming(false)
-        const first = items.findIndex((i) => i.id === missing[0])
-        if (first >= 0) setIdx(first)
-        setStage('attempt')
-        return
+    async (force: boolean) => {
+      if (!exam || finalizing.current) return
+      finalizing.current = true
+      try {
+        if (await sessionEnded()) return
+        const r = await finalizeAttempt(exam, force)
+        if (r.ok) {
+          setBlocked([])
+          setConfirming(false)
+          setSubmitNote('')
+          setStage('done')
+        } else if ('missing' in r) {
+          setBlocked(r.missing)
+          setConfirming(false)
+          const first = items.findIndex((i) => i.id === r.missing[0])
+          if (first >= 0) setIdx(first)
+          setStage('attempt')
+        } else if (r.why === 'session') endedView()
+        else {
+          setConfirming(false)
+          setSubmitNote('Belum terkirim: koneksi terputus. Jawaban Anda aman di perangkat ini. Coba kumpulkan lagi saat tersambung.')
+        }
+      } finally {
+        finalizing.current = false
       }
-      setBlocked([])
-      setConfirming(false)
-      setStage('done')
     },
-    [exam, items, finalizeAttempt, sessionEnded],
+    [exam, items, finalizeAttempt, sessionEnded, endedView],
   )
 
   useEffect(() => {
@@ -383,20 +422,21 @@ export function CandidateApp() {
 
   useEffect(() => {
     if (!attempt || attempt.submittedAt || !exam?.timed || stage === 'gate') return
-    if (attempt.secondsLeft <= 0) finalize(true)
+    if (attempt.secondsLeft <= 0) void finalize(true)
   }, [attempt, exam?.timed, finalize, stage])
 
   const open = (e: Exam) => {
-    session.current = null
+    session.current = false
     setExam(e)
     resumeAttempt(e)
     setIdx(0)
     setStage('invite')
   }
 
-  const begin = () => {
-    if (!exam || sessionEnded()) return
-    beginAttempt(exam, assignment ?? undefined)
+  const begin = async () => {
+    if (!exam || (await sessionEnded())) return
+    await beginAttempt(exam, assignment ?? undefined)
+    if (!useApp.getState().attempt) return
     setIdx(0)
     setStage('attempt')
   }
@@ -424,7 +464,7 @@ export function CandidateApp() {
   // The prototype has no mailbox to check, so the bar above the candidate's
   // screen shows the code that was "sent". It goes when real mail arrives.
   const stubCode =
-    stage === 'gate' && gate.at === 'code'
+    stage === 'gate' && gate.at === 'code' && gate.stub
       ? listOutbox().find((m) => m.kind === 'code' && m.assignmentId === gate.stub)?.code
       : undefined
 
@@ -600,11 +640,16 @@ export function CandidateApp() {
         </p>
 
         <p className="hair mt-5 rounded-xl bg-surface px-4 py-6 text-center text-[13px] leading-relaxed text-ink-muted">
-          Undangan hanya dapat dibuka dari tautan di email — tidak ada daftar untuk dipilih. Di
-          prototipe ini, email tersebut ada di panel <strong className="font-medium text-ink">Outbox</strong>{' '}
-          pada layar <strong className="font-medium text-ink">Assignments</strong>.
+          Undangan hanya dapat dibuka dari tautan di email — tidak ada daftar untuk dipilih.
+          {!CORE && (
+            <>
+              {' '}Di prototipe ini, email tersebut ada di panel <strong className="font-medium text-ink">Outbox</strong>{' '}
+              pada layar <strong className="font-medium text-ink">Assignments</strong>.
+            </>
+          )}
         </p>
 
+        {(!CORE || exams.some(isLive)) && (
         <details className="mt-6">
           <summary className="cursor-pointer text-[12.5px] font-medium text-ink-muted">
             Demo — buka tanpa undangan
@@ -635,10 +680,12 @@ export function CandidateApp() {
             ))}
           </div>
         </details>
+        )}
       </Screen>
     )
   else if (stage === 'invite') {
-    const saved = getAttempt(exam.id, assignment?.id)
+    // Against the core the seat carries the attempt; locally it is in this browser.
+    const saved = CORE && assignment ? attempt : getAttempt(exam.id, assignment?.id)
     const resumable = saved && !saved.submittedAt
     body = (
       <Screen>
@@ -647,7 +694,7 @@ export function CandidateApp() {
         {assignment && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-ink-2">
             <IconMail size={13} stroke={1.9} className="text-ink-muted" />
-            Untuk <strong className="font-medium text-ink">{people.find((p) => p.id === assignment.personId)?.name}</strong>
+            Untuk <strong className="font-medium text-ink">{seat?.who}</strong>
             {assignment.dueAt && (
               <span className="tnum text-ink-muted">· batas {new Date(assignment.dueAt).toLocaleDateString()}</span>
             )}
@@ -670,8 +717,8 @@ export function CandidateApp() {
               {exam.timed ? ` · sisa ${mmss(saved!.secondsLeft)}` : ''}
             </p>
             <button
-              onClick={() => {
-                if (sessionEnded()) return
+              onClick={async () => {
+                if (await sessionEnded()) return
                 resumeAttempt(exam, assignment?.id)
                 setStage('attempt')
               }}
@@ -903,9 +950,11 @@ export function CandidateApp() {
             <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
               Jawaban Anda sudah tercatat{exam!.anonymous ? ' secara anonim' : ''}.
             </p>
-            <p className="tnum mt-3 text-[12.5px] text-ink-muted">
-              {responses.length} tanggapan terkumpul
-            </p>
+            {!CORE && (
+              <p className="tnum mt-3 text-[12.5px] text-ink-muted">
+                {responses.length} tanggapan terkumpul
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -1005,7 +1054,7 @@ export function CandidateApp() {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-plane">
-      {previewBar}
+      {!standalone && previewBar}
 
       {exam && exam.status !== 'published' && stage !== 'pick' && (
         <div
@@ -1143,8 +1192,15 @@ export function CandidateApp() {
         </div>
       )}
 
-      {/* offline strip — honest, and never alarming */}
-      {inAttempt && attempt && attempt.queued > 0 && (
+      {submitNote && inAttempt && (
+        <p role="alert" className="shrink-0 border-t border-hair px-5 py-2 text-[12px] text-ink-2 sm:px-6" style={{ background: 'var(--color-wash-warn)' }}>
+          {submitNote}
+        </p>
+      )}
+
+      {/* offline strip — honest, and never alarming. Against the core it shows
+          only while answers are actually waiting for a connection. */}
+      {inAttempt && attempt && attempt.queued > 0 && (!attempt.id || offline) && (
         <div className="flex shrink-0 items-center gap-2 border-t border-hair px-5 py-2 sm:px-6" style={{ background: 'var(--color-wash-warn)' }}>
           <IconWifiOff size={13} stroke={1.8} className="text-ink-2" />
           <span className="tnum text-[11.5px] text-ink-2">

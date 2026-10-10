@@ -4,7 +4,7 @@ From today's prototype to a first real, paid, high-stakes exam. This plan adds n
 architecture: every decision it relies on is already made in `03`–`08` and `AGENTS.md`. What
 it adds is **order**, **exit gates**, and the list of things that are not production yet.
 
-## 0. Where we are (2026-10-10)
+## 0. Where we started (2026-10-10)
 
 | Area | State |
 | :--- | :--- |
@@ -15,6 +15,16 @@ it adds is **order**, **exit gates**, and the list of things that are not produc
 | Tests | Type-check, build, one Playwright smoke (`make e2e`) |
 | Source control | Local repo with **no commits**; `github.com/gsoultan/AssessMatrix` is empty |
 | Loose ends | `docs/07-mockups.md` is referenced by README, `05` and `06` but missing. Root README says eleven screens, `app/README.md` says thirteen. `package.json` is still `@assessmatrix/mockup` |
+
+### Progress
+
+| Phase | State |
+| :--- | :--- |
+| 0 · Repo, CI, monorepo | Done. `main` on GitHub; CI runs web, proto, core and full-stack jobs |
+| 1 · Proto contract | Done. `packages/proto`, lint and breaking checks in CI |
+| 2 · Go core | Done. Postgres with row-level security, hash-chained attempts, outbox mail; tenant isolation proven per RPC |
+| 3 · Studio on the core | In progress. Every functional screen runs on the core (`VITE_BACKEND=core`), staff sign in by emailed code, candidates by link, mock-ups hidden; `make e2e-core` proves the loop against Postgres. Media storage and QTI next |
+| 4–6 | Not started |
 
 **Nothing in the prototype is a security boundary.** Whoever holds the device can edit
 `localStorage`: invite tokens, OTP checks, scores and the attempt log are all forgeable today.

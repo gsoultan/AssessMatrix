@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Badge } from '@mantine/core'
 import { IconTrash, IconInbox, IconMessage2 } from '@tabler/icons-react'
-import { useApp } from '../state'
+import { useApp, useResponseCount, useResponses } from '../state'
+import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { StatTile } from '../components/Viz'
 import {
@@ -10,7 +11,6 @@ import {
   allItems,
   isScale,
   isScored,
-  listResponses,
   KINDS,
 } from '../store'
 
@@ -36,15 +36,26 @@ function Bar({ label, n, total }: { label: string; n: number; total: number }) {
 
 export function Responses() {
   const exams = useApp((s) => s.exams)
-  const byExam = useApp((s) => s.responses)
-  const clearFor = useApp((s) => s.clearResponsesFor)
-  const [exam, setExam] = useState<Exam>(
-    () => useApp.getState().exams.find((e) => e.kind === 'survey') ?? useApp.getState().exams[0]!,
-  )
+  const first = exams.find((e) => e.kind === 'survey') ?? exams[0]
+  if (!first)
+    return (
+      <div className="p-4 sm:p-6">
+        <h1 className="text-[15px] font-semibold tracking-tight">Responses</h1>
+        <p className="mt-2 text-[12.5px] text-ink-muted">Nothing to show yet. Create something in the Library first.</p>
+      </div>
+    )
+  return <ResponsesFor first={first} />
+}
 
-  // Fall back to storage for instruments not submitted to in this session.
-  const countFor = (id: string) => (byExam[id] ?? listResponses(id)).length
-  const responses = useMemo(() => byExam[exam.id] ?? listResponses(exam.id), [byExam, exam])
+function ResponsesFor({ first }: { first: Exam }) {
+  const exams = useApp((s) => s.exams)
+  const clearFor = useApp((s) => s.clearResponsesFor)
+  const [picked, setExam] = useState<Exam>(first)
+  // Follow edits made elsewhere; fall back if this one was deleted.
+  const exam = exams.find((e) => e.id === picked.id) ?? first
+
+  const countFor = useResponseCount()
+  const responses = useResponses(exam.id)
   const rows = useMemo(() => aggregate(exam, responses), [exam, responses])
   const items = allItems(exam)
 
@@ -170,6 +181,7 @@ export function Responses() {
             })}
           </div>
 
+          {!CORE && (
           <button
             onClick={() => clearFor(exam.id)}
             className="hair mt-4 inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[12.5px] font-medium text-ink-2"
@@ -177,6 +189,7 @@ export function Responses() {
             <IconTrash size={14} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
             Clear {responses.length} response{responses.length === 1 ? '' : 's'}
           </button>
+          )}
         </>
       )}
     </div>

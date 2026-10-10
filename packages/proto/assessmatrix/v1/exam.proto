@@ -6,8 +6,8 @@ package assessmatrix.v1;
 //
 // Shapes mirror apps/studio/src/store.ts so the prototype's screens can switch
 // from localStorage to this service without changing what they render.
-// Times are Unix milliseconds; JS_NUMBER keeps them plain numbers in the
-// browser client, which is safe for any date this product will see.
+// Times are Unix milliseconds. protobuf-es reads int64 as bigint; the studio
+// converts them to numbers at its edge (apps/studio/src/backend/convert.ts).
 
 // What an instrument is for. The engine is identical; what changes is whether
 // answers have a right one, whether there is a clock, and what "results" means.
@@ -104,7 +104,7 @@ message Exam {
   bool timed = 11;
   bool anonymous = 12;
   repeated Section sections = 13;
-  int64 updated_at = 14 [jstype = JS_NUMBER];
+  int64 updated_at = 14;
 }
 
 // A frozen copy. Publishing is what makes one; attempts and invitations are
@@ -112,7 +112,7 @@ message Exam {
 message ExamVersion {
   string exam_id = 1;
   int32 version = 2;
-  int64 published_at = 3 [jstype = JS_NUMBER];
+  int64 published_at = 3;
   string note = 4;
   Exam exam = 5;
 }
@@ -168,7 +168,7 @@ message SaveExamRequest {
   SaveMode mode = 2;
   // The updated_at the editor loaded. A newer stored copy refuses the save
   // (ABORTED) rather than silently overwriting someone else's edit.
-  int64 expected_updated_at = 3 [jstype = JS_NUMBER];
+  int64 expected_updated_at = 3;
 }
 
 message SaveExamResponse {

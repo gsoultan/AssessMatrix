@@ -133,6 +133,8 @@ const codeUsable = (a: Assignment, now: number) =>
 
 /** What the link is right now. The order is the order of precedence. */
 export function linkState(a: Assignment, now = Date.now()): LinkState {
+  // With the core as backend the secrets are on the server, and so is the verdict.
+  if (a.linkState) return a.linkState
   if (a.revokedAt) return 'revoked'
   if (!a.tokenHash) return 'unsent'
   if (a.redeemedAt) return 'used'

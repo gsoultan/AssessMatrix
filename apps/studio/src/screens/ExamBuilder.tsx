@@ -32,6 +32,8 @@ import {
   IconPencilMinus,
 } from '@tabler/icons-react'
 import { useApp } from '../state'
+import type { SaveHow } from '../backend/repo'
+import { CORE } from '../backend/mode'
 import { ImageField } from '../components/ImageField'
 import { ItemImage } from '../components/ItemImage'
 import { prettyBytes } from '../media'
@@ -53,7 +55,6 @@ import {
   allItems,
   examMediaBytes,
   missingAlt,
-  StorageFullError,
   uid,
 } from '../store'
 
@@ -473,15 +474,36 @@ function QuestionCard({
 
 export function ExamBuilder() {
   const exams = useApp((s) => s.exams)
-  const upsertExam = useApp((s) => s.upsertExam)
-  const saveVersioned = useApp((s) => s.saveVersioned)
+  const currentExamId = useApp((s) => s.currentExamId)
+  const setScreen = useApp((s) => s.setScreen)
+  const start = exams.find((e) => e.id === currentExamId) ?? exams.find((e) => e.status !== 'archived') ?? exams[0]
+  if (!start)
+    return (
+      <div className="p-4 sm:p-6">
+        <p className="text-[13px] text-ink-2">Nothing to edit yet.</p>
+        <button onClick={() => setScreen('library')} className="mt-2 text-[12.5px] font-medium" style={{ color: 'var(--color-brand-text)' }}>
+          Go to the Library to create an exam, quiz or questionnaire
+        </button>
+      </div>
+    )
+  return <Editor start={start} />
+}
+
+/** A brand-new instrument opens on its one empty question, ready to write. */
+const firstBlank = (e: Exam) => {
+  const items = allItems(e)
+  return items.length === 1 && !items[0]!.stem.trim() ? items[0]!.id : ''
+}
+
+function Editor({ start }: { start: Exam }) {
+  const exams = useApp((s) => s.exams)
+  const saveExam = useApp((s) => s.saveExam)
+  const publishExam = useApp((s) => s.publishExam)
   const removeExam = useApp((s) => s.removeExam)
   const createExam = useApp((s) => s.createExam)
   const setStatus = useApp((s) => s.setStatus)
   const currentExamId = useApp((s) => s.currentExamId)
-  const [exam, setExam] = useState<Exam>(
-    () => useApp.getState().exams.find((e) => e.id === currentExamId) ?? useApp.getState().exams[0]!,
-  )
+  const [exam, setExam] = useState<Exam>(start)
 
   // Opening something from the Library is what selects it here.
   useEffect(() => {
@@ -489,12 +511,12 @@ export function ExamBuilder() {
     const next = exams.find((e) => e.id === currentExamId)
     if (next) {
       setExam(next)
-      setOpenId('')
+      setOpenId(firstBlank(next))
       setSaved(true)
       setSettingsOpen(false)
     }
   }, [currentExamId, exams, exam.id])
-  const [openId, setOpenId] = useState<string>('')
+  const [openId, setOpenId] = useState<string>(() => firstBlank(start))
   const [saved, setSaved] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
@@ -556,17 +578,37 @@ export function ExamBuilder() {
   const [saveErr, setSaveErr] = useState('')
   const [askVersion, setAskVersion] = useState(false)
 
-  const writeExam = (mode: 'same' | 'new') => {
-    try {
-      const next = saveVersioned(exam, mode)
-      setExam(next)
-      setSaved(true)
-      setSaveErr('')
-      setAskVersion(false)
-    } catch (e) {
-      setSaveErr(e instanceof StorageFullError ? e.message : 'Could not save this exam.')
-      setAskVersion(false)
-    }
+  /** A failed write says why here, beside the button, rather than in the page-wide notice. */
+  const failed = () => {
+    const { notice, dismissNotice } = useApp.getState()
+    setSaveErr(notice || 'Could not save this exam.')
+    dismissNotice()
+  }
+
+  const done = (next: Exam | null) => {
+    if (!next) return failed()
+    setExam(next)
+    setSaved(true)
+    setSaveErr('')
+  }
+
+  const writeExam = async (how: SaveHow) => {
+    setAskVersion(false)
+    done(await saveExam(exam, how))
+  }
+
+  /** Save what is on screen and make it the version candidates get. */
+  const publishNow = async () => done(await publishExam(exam))
+
+  /**
+   * A status change bumps the server's copy, so the editor takes the new
+   * stamp; otherwise its next save would be refused as a conflict.
+   */
+  const changeStatus = async (status: Exam['status']) => {
+    const next = await setStatus(exam.id, status)
+    if (!next) return failed()
+    setExam((e) => ({ ...e, status: next.status, publishedVersion: next.publishedVersion, updatedAt: next.updatedAt }))
+    return next
   }
 
   /** Editing the exact version candidates are sitting is the only case that asks. */
@@ -577,13 +619,7 @@ export function ExamBuilder() {
       setAskVersion(true)
       return
     }
-    try {
-      upsertExam(exam)
-      setSaved(true)
-      setSaveErr('')
-    } catch (e) {
-      setSaveErr(e instanceof StorageFullError ? e.message : 'Could not save this exam.')
-    }
+    void writeExam('draft')
   }
 
   const pick = (e: Exam) => {
@@ -612,7 +648,7 @@ export function ExamBuilder() {
             </button>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Label>Stored in this browser</Menu.Label>
+            <Menu.Label>{CORE ? 'Your organisation' : 'Stored in this browser'}</Menu.Label>
             {exams.map((e) => (
               <Menu.Item
                 key={e.id}
@@ -624,10 +660,11 @@ export function ExamBuilder() {
                       role="button"
                       tabIndex={0}
                       aria-label={`Delete ${e.title}`}
-                      onClick={(ev) => {
+                      onClick={async (ev) => {
                         ev.stopPropagation()
-                        const next = removeExam(e.id)
-                        if (e.id === exam.id && next[0]) pick(next[0])
+                        await removeExam(e.id)
+                        const next = useApp.getState().exams.find((x) => x.status !== 'archived' && x.id !== e.id)
+                        if (e.id === exam.id && next) pick(next)
                       }}
                       onKeyDown={() => {}}
                     >
@@ -650,8 +687,9 @@ export function ExamBuilder() {
                 <Menu.Item
                   key={k.v}
                   leftSection={<Icon size={15} stroke={1.8} />}
-                  onClick={() => {
-                    const e = createExam(k.v)
+                  onClick={async () => {
+                    const e = await createExam(k.v)
+                    if (!e) return
                     pick(e)
                     setOpenId(allItems(e)[0]?.id ?? '')
                   }}
@@ -709,11 +747,7 @@ export function ExamBuilder() {
             <Tooltip label={`Make v${exam.version} the version candidates get`} withArrow>
               <div>
                 <button
-                  onClick={() => {
-                    writeExam('same')
-                    setStatus(exam.id, 'published')
-                    setExam((e) => ({ ...e, publishedVersion: e.version }))
-                  }}
+                  onClick={() => void publishNow()}
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-on-brand"
                   style={{ background: 'var(--color-s1)' }}
                 >
@@ -725,11 +759,7 @@ export function ExamBuilder() {
             <Tooltip label={items.length === 0 ? 'Add a question first' : 'Make it available to candidates'} withArrow>
               <div>
                 <button
-                  onClick={() => {
-                    publish()
-                    setStatus(exam.id, 'published')
-                    setExam((e) => ({ ...e, status: 'published' }))
-                  }}
+                  onClick={() => void publishNow()}
                   disabled={items.length === 0}
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-on-brand disabled:opacity-45"
                   style={{ background: 'var(--color-s1)' }}
@@ -748,18 +778,14 @@ export function ExamBuilder() {
               <Menu.Dropdown>
                 <Menu.Item
                   leftSection={<IconPencilMinus size={14} stroke={1.9} />}
-                  onClick={() => {
-                    setStatus(exam.id, 'draft')
-                    setExam((e) => ({ ...e, status: 'draft' }))
-                  }}
+                  onClick={() => void changeStatus('draft')}
                 >
                   Revert to draft
                 </Menu.Item>
                 <Menu.Item
                   leftSection={<IconArchive size={14} stroke={1.9} />}
-                  onClick={() => {
-                    setStatus(exam.id, 'archived')
-                    setScreen('library')
+                  onClick={async () => {
+                    if (await changeStatus('archived')) setScreen('library')
                   }}
                 >
                   Archive

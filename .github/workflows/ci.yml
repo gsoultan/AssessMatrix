@@ -99,3 +99,41 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
+
+  stack:
+    name: Stack · studio against the core and Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AM_E2E_DATABASE_URL: postgres://am_app:app@localhost:5432/assessmatrix
+      AM_E2E_MIGRATE_DATABASE_URL: postgres://am_owner:owner@localhost:5432/assessmatrix
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.1
+          cache-dependency-path: services/core/go.sum
+      - run: bun install --frozen-lockfile
+      - name: Create the owner and the unprivileged application role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
+            -c "CREATE ROLE am_app LOGIN PASSWORD 'app'" \
+            -c "CREATE DATABASE assessmatrix OWNER am_owner"
+      - name: Install Chromium for the Playwright version the studio pins
+        working-directory: apps/studio
+        run: bunx playwright install --with-deps chromium
+      - run: make e2e-core

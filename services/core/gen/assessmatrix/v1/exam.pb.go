@@ -1633,7 +1633,7 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aminutes\x18\x03 \x01(\x05R\aminutes\x12+\n" +
-	"\x05items\x18\x04 \x03(\v2\x15.assessmatrix.v1.ItemR\x05items\"\xbd\x03\n" +
+	"\x05items\x18\x04 \x03(\v2\x15.assessmatrix.v1.ItemR\x05items\"\xb9\x03\n" +
 	"\x04Exam\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x15.assessmatrix.v1.KindR\x04kind\x12/\n" +
@@ -1648,13 +1648,13 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	" \x01(\bR\ashuffle\x12\x14\n" +
 	"\x05timed\x18\v \x01(\bR\x05timed\x12\x1c\n" +
 	"\tanonymous\x18\f \x01(\bR\tanonymous\x124\n" +
-	"\bsections\x18\r \x03(\v2\x18.assessmatrix.v1.SectionR\bsections\x12!\n" +
+	"\bsections\x18\r \x03(\v2\x18.assessmatrix.v1.SectionR\bsections\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\x03B\x020\x02R\tupdatedAt\"\xa6\x01\n" +
+	"updated_at\x18\x0e \x01(\x03R\tupdatedAt\"\xa2\x01\n" +
 	"\vExamVersion\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\x05R\aversion\x12%\n" +
-	"\fpublished_at\x18\x03 \x01(\x03B\x020\x02R\vpublishedAt\x12\x12\n" +
+	"\aversion\x18\x02 \x01(\x05R\aversion\x12!\n" +
+	"\fpublished_at\x18\x03 \x01(\x03R\vpublishedAt\x12\x12\n" +
 	"\x04note\x18\x04 \x01(\tR\x04note\x12)\n" +
 	"\x04exam\x18\x05 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\"\x12\n" +
 	"\x10ListExamsRequest\"@\n" +
@@ -1667,11 +1667,11 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	"\x11CreateExamRequest\x12)\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x15.assessmatrix.v1.KindR\x04kind\"?\n" +
 	"\x12CreateExamResponse\x12)\n" +
-	"\x04exam\x18\x01 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\"\x9f\x01\n" +
+	"\x04exam\x18\x01 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\"\x9b\x01\n" +
 	"\x0fSaveExamRequest\x12)\n" +
 	"\x04exam\x18\x01 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\x12-\n" +
-	"\x04mode\x18\x02 \x01(\x0e2\x19.assessmatrix.v1.SaveModeR\x04mode\x122\n" +
-	"\x13expected_updated_at\x18\x03 \x01(\x03B\x020\x02R\x11expectedUpdatedAt\"=\n" +
+	"\x04mode\x18\x02 \x01(\x0e2\x19.assessmatrix.v1.SaveModeR\x04mode\x12.\n" +
+	"\x13expected_updated_at\x18\x03 \x01(\x03R\x11expectedUpdatedAt\"=\n" +
 	"\x10SaveExamResponse\x12)\n" +
 	"\x04exam\x18\x01 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\"&\n" +
 	"\x14DuplicateExamRequest\x12\x0e\n" +

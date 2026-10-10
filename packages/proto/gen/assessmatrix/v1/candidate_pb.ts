@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/candidate.proto.
  */
 export const file_assessmatrix_v1_candidate: GenFile = /*@__PURE__*/
-  fileDesc("Ch9hc3Nlc3NtYXRyaXgvdjEvY2FuZGlkYXRlLnByb3RvEg9hc3Nlc3NtYXRyaXgudjEizwEKEUludml0YXRpb25TdW1tYXJ5EhIKCmV4YW1fdGl0bGUYASABKAkSDgoGaXNzdWVyGAIgASgJEiMKBGtpbmQYAyABKA4yFS5hc3Nlc3NtYXRyaXgudjEuS2luZBIMCgR0aWVyGAQgASgFEg8KB21pbnV0ZXMYBSABKAUSEAoIcGFzc19wY3QYBiABKAUSEgoKaXRlbV9jb3VudBgHIAEoBRIUCgxtYXNrZWRfZW1haWwYCCABKAkSFgoKZXhwaXJlc19hdBgJIAEoA0ICMAIiIAoPT3BlbkxpbmtSZXF1ZXN0Eg0KBXRva2VuGAEgASgJIpcBChBPcGVuTGlua1Jlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBI2CgppbnZpdGF0aW9uGAMgASgLMiIuYXNzZXNzbWF0cml4LnYxLkludml0YXRpb25TdW1tYXJ5EhQKDG1hc2tlZF9lbWFpbBgEIAEoCSIjChJSZXF1ZXN0Q29kZVJlcXVlc3QSDQoFdG9rZW4YASABKAkicAoTUmVxdWVzdENvZGVSZXNwb25zZRIKCgJvaxgBIAEoCBIpCgdyZWZ1c2FsGAIgASgOMhguYXNzZXNzbWF0cml4LnYxLlJlZnVzYWwSFAoIcmV0cnlfYXQYAyABKANCAjACEgwKBGxlZnQYBCABKAUiMAoRVmVyaWZ5Q29kZVJlcXVlc3QSDQoFdG9rZW4YASABKAkSDAoEY29kZRgCIAEoCSJfChJWZXJpZnlDb2RlUmVzcG9uc2USCgoCb2sYASABKAgSKQoHcmVmdXNhbBgCIAEoDjIYLmFzc2Vzc21hdHJpeC52MS5SZWZ1c2FsEhIKCnRyaWVzX2xlZnQYAyABKAUiJgoVUmVxdWVzdE5ld0xpbmtSZXF1ZXN0Eg0KBXRva2VuGAEgASgJImUKFlJlcXVlc3ROZXdMaW5rUmVzcG9uc2USCgoCb2sYASABKAgSKQoHcmVmdXNhbBgCIAEoDjIYLmFzc2Vzc21hdHJpeC52MS5SZWZ1c2FsEhQKCHJldHJ5X2F0GAMgASgDQgIwAiJQCgpJdGVtQW5zd2VyEg4KBnZhbHVlcxgBIAMoCRIMCgR0ZXh0GAIgASgJEiQKBGZpbGUYAyABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWEixAEKDEF0dGVtcHRFdmVudBIPCgNzZXEYASABKANCAjACEhcKC3NlcnZlcl90aW1lGAIgASgDQgIwAhIXCgtjbGllbnRfdGltZRgDIAEoA0ICMAISDAoEa2luZBgEIAEoCRIPCgdpdGVtX2lkGAUgASgJEg4KBnZhbHVlcxgGIAMoCRIMCgR0ZXh0GAcgASgJEiQKBGZpbGUYCCABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWESDgoGZGV0YWlsGAkgASgJIlUKBVNjb3JlEgsKA3JhdxgBIAEoBRILCgNtYXgYAiABKAUSCwoDcGN0GAMgASgFEg4KBnBhc3NlZBgEIAEoCBIVCg1wZW5kaW5nX2h1bWFuGAUgASgFIqADCgdBdHRlbXB0EgoKAmlkGAEgASgJEhUKDWFzc2lnbm1lbnRfaWQYAiABKAkSDwoHZXhhbV9pZBgDIAEoCRIUCgxleGFtX3ZlcnNpb24YBCABKAUSFgoKc3RhcnRlZF9hdBgFIAEoA0ICMAISFwoLZGVhZGxpbmVfYXQYBiABKANCAjACEhgKDHN1Ym1pdHRlZF9hdBgHIAEoA0ICMAISNgoHYW5zd2VycxgIIAMoCzIlLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0LkFuc3dlcnNFbnRyeRIPCgdmbGFnZ2VkGAkgAygJEiUKBXNjb3JlGAogASgLMhYuYXNzZXNzbWF0cml4LnYxLlNjb3JlEhQKCGxhc3Rfc2VxGAsgASgDQgIwAhItCgZldmVudHMYDCADKAsyHS5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdEV2ZW50GksKDEFuc3dlcnNFbnRyeRILCgNrZXkYASABKAkSKgoFdmFsdWUYAiABKAsyGy5hc3Nlc3NtYXRyaXgudjEuSXRlbUFuc3dlcjoCOAEiEwoRR2V0U2Vzc2lvblJlcXVlc3QiywEKEkdldFNlc3Npb25SZXNwb25zZRIVCg1hc3NpZ25tZW50X2lkGAEgASgJEjYKCmludml0YXRpb24YAiABKAsyIi5hc3Nlc3NtYXRyaXgudjEuSW52aXRhdGlvblN1bW1hcnkSIwoEZXhhbRgDIAEoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtEikKB2F0dGVtcHQYBCABKAsyGC5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdBIWCgpzZXJ2ZXJfbm93GAUgASgDQgIwAiIVChNTdGFydEF0dGVtcHRSZXF1ZXN0IlkKFFN0YXJ0QXR0ZW1wdFJlc3BvbnNlEikKB2F0dGVtcHQYASABKAsyGC5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdBIWCgpzZXJ2ZXJfbm93GAIgASgDQgIwAiJqChNBcHBlbmRFdmVudHNSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSEAoIYmF0Y2hfaWQYAiABKAkSLQoGZXZlbnRzGAMgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudCJdChRBcHBlbmRFdmVudHNSZXNwb25zZRIUCghsYXN0X3NlcRgBIAEoA0ICMAISFgoKc2VydmVyX25vdxgCIAEoA0ICMAISFwoLZGVhZGxpbmVfYXQYAyABKANCAjACIjkKFFN1Ym1pdEF0dGVtcHRSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSDQoFZm9yY2UYAiABKAgiaAoVU3VibWl0QXR0ZW1wdFJlc3BvbnNlEgoKAm9rGAEgASgIEhgKEG1pc3NpbmdfaXRlbV9pZHMYAiADKAkSKQoHYXR0ZW1wdBgDIAEoCzIYLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0IhMKEUVuZFNlc3Npb25SZXF1ZXN0IhQKEkVuZFNlc3Npb25SZXNwb25zZSqjAgoHUmVmdXNhbBIXChNSRUZVU0FMX1VOU1BFQ0lGSUVEEAASEwoPUkVGVVNBTF9VTktOT1dOEAESEwoPUkVGVVNBTF9SRVZPS0VEEAISEwoPUkVGVVNBTF9FWFBJUkVEEAMSEgoOUkVGVVNBTF9MT0NLRUQQBBIQCgxSRUZVU0FMX1VTRUQQBRIWChJSRUZVU0FMX1NVUEVSU0VERUQQBhIVChFSRUZVU0FMX1NVQk1JVFRFRBAHEhIKDlJFRlVTQUxfQ0xPU0VEEAgSFAoQUkVGVVNBTF9DT09MRE9XThAJEhEKDVJFRlVTQUxfTElNSVQQChIWChJSRUZVU0FMX1dST05HX0NPREUQCxIWChJSRUZVU0FMX1NUQUxFX0NPREUQDDK/BgoQQ2FuZGlkYXRlU2VydmljZRJPCghPcGVuTGluaxIgLmFzc2Vzc21hdHJpeC52MS5PcGVuTGlua1JlcXVlc3QaIS5hc3Nlc3NtYXRyaXgudjEuT3BlbkxpbmtSZXNwb25zZRJYCgtSZXF1ZXN0Q29kZRIjLmFzc2Vzc21hdHJpeC52MS5SZXF1ZXN0Q29kZVJlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdENvZGVSZXNwb25zZRJVCgpWZXJpZnlDb2RlEiIuYXNzZXNzbWF0cml4LnYxLlZlcmlmeUNvZGVSZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLlZlcmlmeUNvZGVSZXNwb25zZRJhCg5SZXF1ZXN0TmV3TGluaxImLmFzc2Vzc21hdHJpeC52MS5SZXF1ZXN0TmV3TGlua1JlcXVlc3QaJy5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdE5ld0xpbmtSZXNwb25zZRJVCgpHZXRTZXNzaW9uEiIuYXNzZXNzbWF0cml4LnYxLkdldFNlc3Npb25SZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLkdldFNlc3Npb25SZXNwb25zZRJbCgxTdGFydEF0dGVtcHQSJC5hc3Nlc3NtYXRyaXgudjEuU3RhcnRBdHRlbXB0UmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5TdGFydEF0dGVtcHRSZXNwb25zZRJbCgxBcHBlbmRFdmVudHMSJC5hc3Nlc3NtYXRyaXgudjEuQXBwZW5kRXZlbnRzUmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5BcHBlbmRFdmVudHNSZXNwb25zZRJeCg1TdWJtaXRBdHRlbXB0EiUuYXNzZXNzbWF0cml4LnYxLlN1Ym1pdEF0dGVtcHRSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLlN1Ym1pdEF0dGVtcHRSZXNwb25zZRJVCgpFbmRTZXNzaW9uEiIuYXNzZXNzbWF0cml4LnYxLkVuZFNlc3Npb25SZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLkVuZFNlc3Npb25SZXNwb25zZULVAQoTY29tLmFzc2Vzc21hdHJpeC52MUIOQ2FuZGlkYXRlUHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z", [file_assessmatrix_v1_exam]);
+  fileDesc("Ch9hc3Nlc3NtYXRyaXgvdjEvY2FuZGlkYXRlLnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiywEKEUludml0YXRpb25TdW1tYXJ5EhIKCmV4YW1fdGl0bGUYASABKAkSDgoGaXNzdWVyGAIgASgJEiMKBGtpbmQYAyABKA4yFS5hc3Nlc3NtYXRyaXgudjEuS2luZBIMCgR0aWVyGAQgASgFEg8KB21pbnV0ZXMYBSABKAUSEAoIcGFzc19wY3QYBiABKAUSEgoKaXRlbV9jb3VudBgHIAEoBRIUCgxtYXNrZWRfZW1haWwYCCABKAkSEgoKZXhwaXJlc19hdBgJIAEoAyIgCg9PcGVuTGlua1JlcXVlc3QSDQoFdG9rZW4YASABKAkilwEKEE9wZW5MaW5rUmVzcG9uc2USCgoCb2sYASABKAgSKQoHcmVmdXNhbBgCIAEoDjIYLmFzc2Vzc21hdHJpeC52MS5SZWZ1c2FsEjYKCmludml0YXRpb24YAyABKAsyIi5hc3Nlc3NtYXRyaXgudjEuSW52aXRhdGlvblN1bW1hcnkSFAoMbWFza2VkX2VtYWlsGAQgASgJIiMKElJlcXVlc3RDb2RlUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJsChNSZXF1ZXN0Q29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBIQCghyZXRyeV9hdBgDIAEoAxIMCgRsZWZ0GAQgASgFIjAKEVZlcmlmeUNvZGVSZXF1ZXN0Eg0KBXRva2VuGAEgASgJEgwKBGNvZGUYAiABKAkiXwoSVmVyaWZ5Q29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBISCgp0cmllc19sZWZ0GAMgASgFIiYKFVJlcXVlc3ROZXdMaW5rUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJhChZSZXF1ZXN0TmV3TGlua1Jlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBIQCghyZXRyeV9hdBgDIAEoAyJQCgpJdGVtQW5zd2VyEg4KBnZhbHVlcxgBIAMoCRIMCgR0ZXh0GAIgASgJEiQKBGZpbGUYAyABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWEiuAEKDEF0dGVtcHRFdmVudBILCgNzZXEYASABKAMSEwoLc2VydmVyX3RpbWUYAiABKAMSEwoLY2xpZW50X3RpbWUYAyABKAMSDAoEa2luZBgEIAEoCRIPCgdpdGVtX2lkGAUgASgJEg4KBnZhbHVlcxgGIAMoCRIMCgR0ZXh0GAcgASgJEiQKBGZpbGUYCCABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWESDgoGZGV0YWlsGAkgASgJIlUKBVNjb3JlEgsKA3JhdxgBIAEoBRILCgNtYXgYAiABKAUSCwoDcGN0GAMgASgFEg4KBnBhc3NlZBgEIAEoCBIVCg1wZW5kaW5nX2h1bWFuGAUgASgFIpADCgdBdHRlbXB0EgoKAmlkGAEgASgJEhUKDWFzc2lnbm1lbnRfaWQYAiABKAkSDwoHZXhhbV9pZBgDIAEoCRIUCgxleGFtX3ZlcnNpb24YBCABKAUSEgoKc3RhcnRlZF9hdBgFIAEoAxITCgtkZWFkbGluZV9hdBgGIAEoAxIUCgxzdWJtaXR0ZWRfYXQYByABKAMSNgoHYW5zd2VycxgIIAMoCzIlLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0LkFuc3dlcnNFbnRyeRIPCgdmbGFnZ2VkGAkgAygJEiUKBXNjb3JlGAogASgLMhYuYXNzZXNzbWF0cml4LnYxLlNjb3JlEhAKCGxhc3Rfc2VxGAsgASgDEi0KBmV2ZW50cxgMIAMoCzIdLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0RXZlbnQaSwoMQW5zd2Vyc0VudHJ5EgsKA2tleRgBIAEoCRIqCgV2YWx1ZRgCIAEoCzIbLmFzc2Vzc21hdHJpeC52MS5JdGVtQW5zd2VyOgI4ASITChFHZXRTZXNzaW9uUmVxdWVzdCLHAQoSR2V0U2Vzc2lvblJlc3BvbnNlEhUKDWFzc2lnbm1lbnRfaWQYASABKAkSNgoKaW52aXRhdGlvbhgCIAEoCzIiLmFzc2Vzc21hdHJpeC52MS5JbnZpdGF0aW9uU3VtbWFyeRIjCgRleGFtGAMgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0SKQoHYXR0ZW1wdBgEIAEoCzIYLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0EhIKCnNlcnZlcl9ub3cYBSABKAMiFQoTU3RhcnRBdHRlbXB0UmVxdWVzdCJVChRTdGFydEF0dGVtcHRSZXNwb25zZRIpCgdhdHRlbXB0GAEgASgLMhguYXNzZXNzbWF0cml4LnYxLkF0dGVtcHQSEgoKc2VydmVyX25vdxgCIAEoAyJqChNBcHBlbmRFdmVudHNSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSEAoIYmF0Y2hfaWQYAiABKAkSLQoGZXZlbnRzGAMgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudCJRChRBcHBlbmRFdmVudHNSZXNwb25zZRIQCghsYXN0X3NlcRgBIAEoAxISCgpzZXJ2ZXJfbm93GAIgASgDEhMKC2RlYWRsaW5lX2F0GAMgASgDIjkKFFN1Ym1pdEF0dGVtcHRSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSDQoFZm9yY2UYAiABKAgiaAoVU3VibWl0QXR0ZW1wdFJlc3BvbnNlEgoKAm9rGAEgASgIEhgKEG1pc3NpbmdfaXRlbV9pZHMYAiADKAkSKQoHYXR0ZW1wdBgDIAEoCzIYLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0IhMKEUVuZFNlc3Npb25SZXF1ZXN0IhQKEkVuZFNlc3Npb25SZXNwb25zZSqjAgoHUmVmdXNhbBIXChNSRUZVU0FMX1VOU1BFQ0lGSUVEEAASEwoPUkVGVVNBTF9VTktOT1dOEAESEwoPUkVGVVNBTF9SRVZPS0VEEAISEwoPUkVGVVNBTF9FWFBJUkVEEAMSEgoOUkVGVVNBTF9MT0NLRUQQBBIQCgxSRUZVU0FMX1VTRUQQBRIWChJSRUZVU0FMX1NVUEVSU0VERUQQBhIVChFSRUZVU0FMX1NVQk1JVFRFRBAHEhIKDlJFRlVTQUxfQ0xPU0VEEAgSFAoQUkVGVVNBTF9DT09MRE9XThAJEhEKDVJFRlVTQUxfTElNSVQQChIWChJSRUZVU0FMX1dST05HX0NPREUQCxIWChJSRUZVU0FMX1NUQUxFX0NPREUQDDK/BgoQQ2FuZGlkYXRlU2VydmljZRJPCghPcGVuTGluaxIgLmFzc2Vzc21hdHJpeC52MS5PcGVuTGlua1JlcXVlc3QaIS5hc3Nlc3NtYXRyaXgudjEuT3BlbkxpbmtSZXNwb25zZRJYCgtSZXF1ZXN0Q29kZRIjLmFzc2Vzc21hdHJpeC52MS5SZXF1ZXN0Q29kZVJlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdENvZGVSZXNwb25zZRJVCgpWZXJpZnlDb2RlEiIuYXNzZXNzbWF0cml4LnYxLlZlcmlmeUNvZGVSZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLlZlcmlmeUNvZGVSZXNwb25zZRJhCg5SZXF1ZXN0TmV3TGluaxImLmFzc2Vzc21hdHJpeC52MS5SZXF1ZXN0TmV3TGlua1JlcXVlc3QaJy5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdE5ld0xpbmtSZXNwb25zZRJVCgpHZXRTZXNzaW9uEiIuYXNzZXNzbWF0cml4LnYxLkdldFNlc3Npb25SZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLkdldFNlc3Npb25SZXNwb25zZRJbCgxTdGFydEF0dGVtcHQSJC5hc3Nlc3NtYXRyaXgudjEuU3RhcnRBdHRlbXB0UmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5TdGFydEF0dGVtcHRSZXNwb25zZRJbCgxBcHBlbmRFdmVudHMSJC5hc3Nlc3NtYXRyaXgudjEuQXBwZW5kRXZlbnRzUmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5BcHBlbmRFdmVudHNSZXNwb25zZRJeCg1TdWJtaXRBdHRlbXB0EiUuYXNzZXNzbWF0cml4LnYxLlN1Ym1pdEF0dGVtcHRSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLlN1Ym1pdEF0dGVtcHRSZXNwb25zZRJVCgpFbmRTZXNzaW9uEiIuYXNzZXNzbWF0cml4LnYxLkVuZFNlc3Npb25SZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLkVuZFNlc3Npb25SZXNwb25zZULVAQoTY29tLmFzc2Vzc21hdHJpeC52MUIOQ2FuZGlkYXRlUHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z", [file_assessmatrix_v1_exam]);
 
 /**
  * What the invitation screen shows before anything is collected.
@@ -63,7 +63,7 @@ export type InvitationSummary = Message<"assessmatrix.v1.InvitationSummary"> & {
   maskedEmail: string;
 
   /**
-   * @generated from field: int64 expires_at = 9 [jstype = JS_NUMBER];
+   * @generated from field: int64 expires_at = 9;
    */
   expiresAt: bigint;
 };
@@ -158,7 +158,7 @@ export type RequestCodeResponse = Message<"assessmatrix.v1.RequestCodeResponse">
   refusal: Refusal;
 
   /**
-   * @generated from field: int64 retry_at = 3 [jstype = JS_NUMBER];
+   * @generated from field: int64 retry_at = 3;
    */
   retryAt: bigint;
 
@@ -258,7 +258,7 @@ export type RequestNewLinkResponse = Message<"assessmatrix.v1.RequestNewLinkResp
   refusal: Refusal;
 
   /**
-   * @generated from field: int64 retry_at = 3 [jstype = JS_NUMBER];
+   * @generated from field: int64 retry_at = 3;
    */
   retryAt: bigint;
 };
@@ -312,17 +312,17 @@ export const ItemAnswerSchema: GenMessage<ItemAnswer> = /*@__PURE__*/
  */
 export type AttemptEvent = Message<"assessmatrix.v1.AttemptEvent"> & {
   /**
-   * @generated from field: int64 seq = 1 [jstype = JS_NUMBER];
+   * @generated from field: int64 seq = 1;
    */
   seq: bigint;
 
   /**
-   * @generated from field: int64 server_time = 2 [jstype = JS_NUMBER];
+   * @generated from field: int64 server_time = 2;
    */
   serverTime: bigint;
 
   /**
-   * @generated from field: int64 client_time = 3 [jstype = JS_NUMBER];
+   * @generated from field: int64 client_time = 3;
    */
   clientTime: bigint;
 
@@ -428,7 +428,7 @@ export type Attempt = Message<"assessmatrix.v1.Attempt"> & {
   examVersion: number;
 
   /**
-   * @generated from field: int64 started_at = 5 [jstype = JS_NUMBER];
+   * @generated from field: int64 started_at = 5;
    */
   startedAt: bigint;
 
@@ -436,12 +436,12 @@ export type Attempt = Message<"assessmatrix.v1.Attempt"> & {
    * Server time is authoritative; the device clock never ends an exam.
    * 0 when the instrument is untimed.
    *
-   * @generated from field: int64 deadline_at = 6 [jstype = JS_NUMBER];
+   * @generated from field: int64 deadline_at = 6;
    */
   deadlineAt: bigint;
 
   /**
-   * @generated from field: int64 submitted_at = 7 [jstype = JS_NUMBER];
+   * @generated from field: int64 submitted_at = 7;
    */
   submittedAt: bigint;
 
@@ -465,7 +465,7 @@ export type Attempt = Message<"assessmatrix.v1.Attempt"> & {
   /**
    * The highest seq the server holds.
    *
-   * @generated from field: int64 last_seq = 11 [jstype = JS_NUMBER];
+   * @generated from field: int64 last_seq = 11;
    */
   lastSeq: bigint;
 
@@ -524,7 +524,7 @@ export type GetSessionResponse = Message<"assessmatrix.v1.GetSessionResponse"> &
   attempt?: Attempt | undefined;
 
   /**
-   * @generated from field: int64 server_now = 5 [jstype = JS_NUMBER];
+   * @generated from field: int64 server_now = 5;
    */
   serverNow: bigint;
 };
@@ -559,7 +559,7 @@ export type StartAttemptResponse = Message<"assessmatrix.v1.StartAttemptResponse
   attempt?: Attempt | undefined;
 
   /**
-   * @generated from field: int64 server_now = 2 [jstype = JS_NUMBER];
+   * @generated from field: int64 server_now = 2;
    */
   serverNow: bigint;
 };
@@ -607,17 +607,17 @@ export const AppendEventsRequestSchema: GenMessage<AppendEventsRequest> = /*@__P
  */
 export type AppendEventsResponse = Message<"assessmatrix.v1.AppendEventsResponse"> & {
   /**
-   * @generated from field: int64 last_seq = 1 [jstype = JS_NUMBER];
+   * @generated from field: int64 last_seq = 1;
    */
   lastSeq: bigint;
 
   /**
-   * @generated from field: int64 server_now = 2 [jstype = JS_NUMBER];
+   * @generated from field: int64 server_now = 2;
    */
   serverNow: bigint;
 
   /**
-   * @generated from field: int64 deadline_at = 3 [jstype = JS_NUMBER];
+   * @generated from field: int64 deadline_at = 3;
    */
   deadlineAt: bigint;
 };

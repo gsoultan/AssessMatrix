@@ -312,14 +312,14 @@ var File_assessmatrix_v1_result_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\n" +
-	"\x1cassessmatrix/v1/result.proto\x12\x0fassessmatrix.v1\x1a\x1fassessmatrix/v1/candidate.proto\"\xfe\x02\n" +
+	"\x1cassessmatrix/v1/result.proto\x12\x0fassessmatrix.v1\x1a\x1fassessmatrix/v1/candidate.proto\"\xfa\x02\n" +
 	"\bResponse\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12#\n" +
 	"\rassignment_id\x18\x02 \x01(\tR\fassignmentId\x12\x1b\n" +
 	"\tperson_id\x18\x03 \x01(\tR\bpersonId\x12!\n" +
-	"\fexam_version\x18\x04 \x01(\x05R\vexamVersion\x12%\n" +
-	"\fsubmitted_at\x18\x05 \x01(\x03B\x020\x02R\vsubmittedAt\x12@\n" +
+	"\fexam_version\x18\x04 \x01(\x05R\vexamVersion\x12!\n" +
+	"\fsubmitted_at\x18\x05 \x01(\x03R\vsubmittedAt\x12@\n" +
 	"\aanswers\x18\x06 \x03(\v2&.assessmatrix.v1.Response.AnswersEntryR\aanswers\x12,\n" +
 	"\x05score\x18\a \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\x1aW\n" +
 	"\fAnswersEntry\x12\x10\n" +
@@ -331,11 +331,11 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\tresponses\x18\x01 \x03(\v2\x19.assessmatrix.v1.ResponseR\tresponses\"5\n" +
 	"\x14GetAttemptLogRequest\x12\x1d\n" +
 	"\n" +
-	"attempt_id\x18\x01 \x01(\tR\tattemptId\"\x99\x01\n" +
+	"attempt_id\x18\x01 \x01(\tR\tattemptId\"\x95\x01\n" +
 	"\x15GetAttemptLogResponse\x125\n" +
 	"\x06events\x18\x01 \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x12!\n" +
-	"\fchain_intact\x18\x02 \x01(\bR\vchainIntact\x12&\n" +
-	"\rbroken_at_seq\x18\x03 \x01(\x03B\x020\x02R\vbrokenAtSeq2\xcf\x01\n" +
+	"\fchain_intact\x18\x02 \x01(\bR\vchainIntact\x12\"\n" +
+	"\rbroken_at_seq\x18\x03 \x01(\x03R\vbrokenAtSeq2\xcf\x01\n" +
 	"\rResultService\x12^\n" +
 	"\rListResponses\x12%.assessmatrix.v1.ListResponsesRequest\x1a&.assessmatrix.v1.ListResponsesResponse\x12^\n" +
 	"\rGetAttemptLog\x12%.assessmatrix.v1.GetAttemptLogRequest\x1a&.assessmatrix.v1.GetAttemptLogResponseB\xd2\x01\n" +

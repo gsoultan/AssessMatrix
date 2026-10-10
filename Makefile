@@ -1,6 +1,6 @@
 # AssessMatrix — run `make` to see everything available.
 .DEFAULT_GOAL := help
-.PHONY: help dev check build preview e2e clean core-test proto
+.PHONY: help dev check build preview e2e e2e-core clean core-test proto
 
 help: ## Show this help
 	@echo "AssessMatrix"
@@ -24,6 +24,9 @@ preview: ## Build, then serve the production bundle
 
 e2e: ## Smoke-test the create → take → score loop in a browser
 	@./scripts/e2e.sh
+
+e2e-core: ## The same loop against the Go core and Postgres (needs AM_E2E_* URLs)
+	@./scripts/e2e-core.sh
 
 clean: ## Remove build output and node_modules
 	@./scripts/clean.sh

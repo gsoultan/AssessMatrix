@@ -19,7 +19,7 @@ import {
   IconRocket,
   IconPencilMinus,
 } from '@tabler/icons-react'
-import { useApp } from '../state'
+import { useApp, useResponseCount } from '../state'
 import {
   type Exam,
   type Kind,
@@ -28,7 +28,6 @@ import {
   allItems,
   isScored,
   hasUnpublishedVersion,
-  listResponses,
   totalMinutes,
   totalPoints,
 } from '../store'
@@ -69,8 +68,7 @@ function ago(ts: number) {
 
 export function Library({ isDesktop }: { isDesktop: boolean }) {
   const exams = useApp((s) => s.exams)
-  const byExam = useApp((s) => s.responses)
-  const createExam = useApp((s) => s.createExam)
+    const createExam = useApp((s) => s.createExam)
   const duplicateExam = useApp((s) => s.duplicateExam)
   const removeExam = useApp((s) => s.removeExam)
   const destroyExam = useApp((s) => s.destroyExam)
@@ -87,7 +85,7 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
   const inView = (e: Exam) => (view === 'archived' ? e.status === 'archived' : e.status !== 'archived')
   const archivedCount = exams.filter((e) => e.status === 'archived').length
 
-  const countFor = (id: string) => (byExam[id] ?? listResponses(id)).length
+  const countFor = useResponseCount()
 
   const shown = useMemo(
     () =>
@@ -119,9 +117,9 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             <Menu.Item
               key={k.v}
               leftSection={<Icon size={15} stroke={1.8} />}
-              onClick={() => {
-                const e = createExam(k.v)
-                openInEditor(e.id)
+              onClick={async () => {
+                const e = await createExam(k.v)
+                if (e) openInEditor(e.id)
               }}
             >
               <span className="block text-[12.5px]">{k.label}</span>
@@ -148,8 +146,8 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             </Menu.Item>
             <Menu.Item
               leftSection={<IconCopy size={14} stroke={1.9} />}
-              onClick={() => {
-                const copy = duplicateExam(e.id)
+              onClick={async () => {
+                const copy = await duplicateExam(e.id)
                 if (copy) openInEditor(copy.id)
               }}
             >
@@ -191,8 +189,8 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             )}
             <Menu.Item
               leftSection={<IconCopy size={14} stroke={1.9} />}
-              onClick={() => {
-                const copy = duplicateExam(e.id)
+              onClick={async () => {
+                const copy = await duplicateExam(e.id)
                 if (copy) openInEditor(copy.id)
               }}
             >
