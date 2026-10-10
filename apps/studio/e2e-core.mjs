@@ -122,6 +122,25 @@ try {
     ? ok('the instrument survives a reload: it lives on the server')
     : bad('the instrument was not on the server after a reload')
 
+  /* ---------------- QTI out and back in ---------------- */
+  await nav(/Library/)
+  await page.getByRole('button', { name: new RegExp(`Actions for E2E Core ${run}`) }).click()
+  await page.waitForTimeout(250)
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Export QTI/ }).click()])
+  await page.locator('input[aria-label="QTI package"]').setInputFiles(await download.path())
+  await page.waitForTimeout(1500)
+  await page.getByLabel('Exam title').fill(`Imported ${run}`)
+  await page.locator('button[aria-expanded="false"]', { hasText: 'Apa keluaran' }).first().click()
+  await page.waitForTimeout(300)
+  const back = await page.locator('main img[alt="Diagram alur"]').first().getAttribute('src').catch(() => null)
+  const stem = await page.getByLabel('Question', { exact: true }).first().inputValue()
+  await page.getByRole('button', { name: /^Save draft$/ }).click()
+  await page.waitForTimeout(600)
+  ;/^\/media\/[0-9a-f-]{36}$/.test(back ?? '') && back !== src && stem.startsWith('Apa keluaran') &&
+  (await page.getByRole('button', { name: /^Saved$/ }).count())
+    ? ok('a QTI export imports as a new draft on the server, its figure uploaded again')
+    : bad(`QTI import against the core: src=${back} stem=${stem.slice(0, 30)} ${await page.locator('[role=alert]').allInnerTexts()}`)
+
   /* ---------------- roster and invitation ---------------- */
   await nav(/People/)
   await page.getByRole('button', { name: /^Import$/ }).click()
@@ -239,7 +258,12 @@ try {
   await nav(/Assignments/)
   await page.reload({ waitUntil: 'networkidle' })
   await page.waitForTimeout(600)
-  await nav(/Assignments/)
+  // Through the library: the imported copy is the newer instrument, so it would be the default.
+  await nav(/Library/)
+  await page.getByRole('button', { name: new RegExp(`Actions for E2E Core ${run}`) }).click()
+  await page.waitForTimeout(250)
+  await page.getByRole('menuitem', { name: /Assign people/ }).click()
+  await page.waitForTimeout(500)
   ;(await page.getByText('Submitted').count()) && (await page.getByText(/^100%$/).count())
     ? ok('the score lands on the assignment row')
     : bad('the assignment did not show the submitted score')

@@ -15,6 +15,8 @@
  */
 import type { Person, PersonDraft } from './store'
 
+import { type ZipEntry, type ZipFault, ZipError, zipEntries as readEntries, zipText as readText } from './zip'
+
 export const MAX_FILE_BYTES = 5 * 1024 * 1024
 export const MAX_ROWS = 5000
 /** Per zip entry, after inflation. A workbook is the classic zip bomb. */
@@ -72,67 +74,28 @@ export function parseCsv(input: string): string[][] {
 
 /* ── XLSX ─────────────────────────────────────────────────────────────────── */
 
-type ZipEntry = { name: string; method: number; packed: number; size: number; offset: number; encrypted: boolean }
-
-/** The central directory: what is in the archive and where. */
-function zipEntries(buf: ArrayBuffer): ZipEntry[] {
-  const v = new DataView(buf)
-  // The end-of-directory record sits at the tail, behind an optional comment.
-  let eocd = -1
-  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 22 - 0xffff); i--)
-    if (v.getUint32(i, true) === 0x06054b50) {
-      eocd = i
-      break
-    }
-  if (eocd < 0) throw new RosterFileError('That is not an Excel workbook (.xlsx).')
-  const count = v.getUint16(eocd + 10, true)
-  let at = v.getUint32(eocd + 16, true)
-  if (count === 0xffff || at === 0xffffffff) throw new RosterFileError('That workbook is too large to read here.')
-
-  const names = new TextDecoder()
-  const out: ZipEntry[] = []
-  for (let n = 0; n < count; n++) {
-    if (at + 46 > buf.byteLength || v.getUint32(at, true) !== 0x02014b50) throw new RosterFileError('That workbook is damaged.')
-    const nameLen = v.getUint16(at + 28, true)
-    out.push({
-      encrypted: (v.getUint16(at + 8, true) & 1) === 1,
-      method: v.getUint16(at + 10, true),
-      packed: v.getUint32(at + 20, true),
-      size: v.getUint32(at + 24, true),
-      offset: v.getUint32(at + 42, true),
-      name: names.decode(new Uint8Array(buf, at + 46, nameLen)),
-    })
-    at += 46 + nameLen + v.getUint16(at + 30, true) + v.getUint16(at + 32, true)
-  }
-  return out
+/** A ZIP fault, in words about a workbook. */
+const WORKBOOK: Record<ZipFault, string> = {
+  'not-zip': 'That is not an Excel workbook (.xlsx).',
+  damaged: 'That workbook is damaged.',
+  encrypted: 'That workbook is password-protected. Save a copy without the password.',
+  'too-large': 'That workbook is too large to read here.',
+  method: 'That workbook uses a compression this reader does not support.',
 }
 
-async function zipText(buf: ArrayBuffer, e: ZipEntry): Promise<string> {
-  if (e.encrypted) throw new RosterFileError('That workbook is password-protected. Save a copy without the password.')
-  // The declared size is the file's own claim; the cap below is on what actually comes out.
-  if (e.size > MAX_INFLATED_BYTES) throw new RosterFileError('That workbook is too large to read here.')
-  const v = new DataView(buf)
-  if (e.offset + 30 > buf.byteLength || v.getUint32(e.offset, true) !== 0x04034b50) throw new RosterFileError('That workbook is damaged.')
-  const start = e.offset + 30 + v.getUint16(e.offset + 26, true) + v.getUint16(e.offset + 28, true)
-  const packed = new Uint8Array(buf, start, e.packed)
-  if (e.method === 0) return new TextDecoder().decode(packed)
-  if (e.method !== 8) throw new RosterFileError('That workbook uses a compression this reader does not support.')
-
-  const reader = new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > MAX_INFLATED_BYTES) {
-      await reader.cancel()
-      throw new RosterFileError('That workbook is too large to read here.')
-    }
-    chunks.push(value)
+const asWorkbook = <T>(p: () => T): T => {
+  try {
+    return p()
+  } catch (e) {
+    throw e instanceof ZipError ? new RosterFileError(WORKBOOK[e.fault]) : e
   }
-  return new TextDecoder().decode(await new Blob(chunks as BlobPart[]).arrayBuffer())
 }
+
+const zipEntries = (buf: ArrayBuffer) => asWorkbook(() => readEntries(buf))
+const zipText = (buf: ArrayBuffer, e: ZipEntry) =>
+  readText(buf, e, MAX_INFLATED_BYTES).catch((err) => {
+    throw err instanceof ZipError ? new RosterFileError(WORKBOOK[err.fault]) : err
+  })
 
 function xml(text: string): Document {
   const doc = new DOMParser().parseFromString(text, 'application/xml')

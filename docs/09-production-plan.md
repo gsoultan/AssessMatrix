@@ -23,7 +23,7 @@ it adds is **order**, **exit gates**, and the list of things that are not produc
 | 0 · Repo, CI, monorepo | Done. `main` on GitHub; CI runs web, proto, core and full-stack jobs |
 | 1 · Proto contract | Done. `packages/proto`, lint and breaking checks in CI |
 | 2 · Go core | Done. Postgres with row-level security, hash-chained attempts, outbox mail; tenant isolation proven per RPC |
-| 3 · Studio on the core | In progress. Every functional screen runs on the core (`VITE_BACKEND=core`), staff sign in by emailed code, candidates by link, mock-ups hidden; `make e2e-core` proves the loop against Postgres. Media storage and QTI next |
+| 3 · Studio on the core | Done. Every functional screen runs on the core (`VITE_BACKEND=core`), staff sign in by emailed code, candidates by link, mock-ups hidden. Images go to object storage in the tenant's region. QTI 3.0 packages export and import (2.1 too), and our own round-trip without loss. `make e2e-core` proves the loop against Postgres |
 | 4–6 | Not started |
 
 **Nothing in the prototype is a security boundary.** Whoever holds the device can edit
