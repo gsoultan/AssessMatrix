@@ -47,7 +47,7 @@ message InvitationSummary {
   int32 item_count = 7;
   // b•••@example.id. A forwarded link must not hand over the inbox.
   string masked_email = 8;
-  int64 expires_at = 9 [jstype = JS_NUMBER];
+  int64 expires_at = 9;
 }
 
 service CandidateService {
@@ -87,7 +87,7 @@ message RequestCodeRequest {
 message RequestCodeResponse {
   bool ok = 1;
   Refusal refusal = 2;
-  int64 retry_at = 3 [jstype = JS_NUMBER];
+  int64 retry_at = 3;
   // Codes left for this link after this one.
   int32 left = 4;
 }
@@ -110,7 +110,7 @@ message RequestNewLinkRequest {
 message RequestNewLinkResponse {
   bool ok = 1;
   Refusal refusal = 2;
-  int64 retry_at = 3 [jstype = JS_NUMBER];
+  int64 retry_at = 3;
 }
 
 // One answer, as the candidate left it.
@@ -128,9 +128,9 @@ message ItemAnswer {
 // (text), answer.attached / answer.detached (file), item.flagged,
 // item.unflagged. Anything else (focus.lost, paste, ...) is evidence only.
 message AttemptEvent {
-  int64 seq = 1 [jstype = JS_NUMBER];
-  int64 server_time = 2 [jstype = JS_NUMBER];
-  int64 client_time = 3 [jstype = JS_NUMBER];
+  int64 seq = 1;
+  int64 server_time = 2;
+  int64 client_time = 3;
   string kind = 4;
   string item_id = 5;
   repeated string values = 6;
@@ -153,17 +153,17 @@ message Attempt {
   string assignment_id = 2;
   string exam_id = 3;
   int32 exam_version = 4;
-  int64 started_at = 5 [jstype = JS_NUMBER];
+  int64 started_at = 5;
   // Server time is authoritative; the device clock never ends an exam.
   // 0 when the instrument is untimed.
-  int64 deadline_at = 6 [jstype = JS_NUMBER];
-  int64 submitted_at = 7 [jstype = JS_NUMBER];
+  int64 deadline_at = 6;
+  int64 submitted_at = 7;
   // Folded from the event log.
   map<string, ItemAnswer> answers = 8;
   repeated string flagged = 9;
   Score score = 10;
   // The highest seq the server holds.
-  int64 last_seq = 11 [jstype = JS_NUMBER];
+  int64 last_seq = 11;
   repeated AttemptEvent events = 12;
 }
 
@@ -176,14 +176,14 @@ message GetSessionResponse {
   Exam exam = 3;
   // The attempt so far, if one was started.
   Attempt attempt = 4;
-  int64 server_now = 5 [jstype = JS_NUMBER];
+  int64 server_now = 5;
 }
 
 message StartAttemptRequest {}
 
 message StartAttemptResponse {
   Attempt attempt = 1;
-  int64 server_now = 2 [jstype = JS_NUMBER];
+  int64 server_now = 2;
 }
 
 message AppendEventsRequest {
@@ -195,9 +195,9 @@ message AppendEventsRequest {
 }
 
 message AppendEventsResponse {
-  int64 last_seq = 1 [jstype = JS_NUMBER];
-  int64 server_now = 2 [jstype = JS_NUMBER];
-  int64 deadline_at = 3 [jstype = JS_NUMBER];
+  int64 last_seq = 1;
+  int64 server_now = 2;
+  int64 deadline_at = 3;
 }
 
 message SubmitAttemptRequest {

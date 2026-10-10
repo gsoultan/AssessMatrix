@@ -33,7 +33,7 @@ enum LinkState {
 // a thousand times cannot grow the log.
 message InviteEvent {
   int32 seq = 1;
-  int64 at = 2 [jstype = JS_NUMBER];
+  int64 at = 2;
   string kind = 3;
   string detail = 4;
   int32 count = 5;
@@ -45,19 +45,19 @@ message Assignment {
   // The version this invitation opens. Pinned when assigned.
   int32 exam_version = 3;
   string person_id = 4;
-  int64 assigned_at = 5 [jstype = JS_NUMBER];
+  int64 assigned_at = 5;
   // 0 when there is no due date.
-  int64 due_at = 6 [jstype = JS_NUMBER];
+  int64 due_at = 6;
   AssignStatus status = 7;
-  int64 started_at = 8 [jstype = JS_NUMBER];
-  int64 submitted_at = 9 [jstype = JS_NUMBER];
+  int64 started_at = 8;
+  int64 submitted_at = 9;
   // Set once a scored attempt is submitted.
   optional int32 score_pct = 10;
   optional bool passed = 11;
-  int64 sent_at = 12 [jstype = JS_NUMBER];
-  int64 expires_at = 13 [jstype = JS_NUMBER];
-  int64 redeemed_at = 14 [jstype = JS_NUMBER];
-  int64 revoked_at = 15 [jstype = JS_NUMBER];
+  int64 sent_at = 12;
+  int64 expires_at = 13;
+  int64 redeemed_at = 14;
+  int64 revoked_at = 15;
   LinkState link_state = 16;
   int32 otp_sends = 17;
   int32 self_serves = 18;
@@ -90,7 +90,7 @@ message AssignPeopleRequest {
   string exam_id = 1;
   repeated string person_ids = 2;
   // 0 for no due date.
-  int64 due_at = 3 [jstype = JS_NUMBER];
+  int64 due_at = 3;
 }
 
 message AssignPeopleResponse {

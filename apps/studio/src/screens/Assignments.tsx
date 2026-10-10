@@ -14,6 +14,7 @@ import {
   IconInbox,
 } from '@tabler/icons-react'
 import { useApp } from '../state'
+import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { RosterImport } from '../components/RosterImport'
 import { type LinkState, EVENT_LABEL, linkState, listOutbox } from '../invite'
@@ -150,7 +151,8 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   // Every send writes an assignment, so this re-reads exactly when there is something new.
   const mails = useMemo(() => {
     const mine = new Set(rows.map((r) => r.id))
-    return listOutbox().filter((m) => mine.has(m.assignmentId)).slice(0, 12)
+    // Against the core, mail goes to real inboxes; there is no outbox to show.
+    return CORE ? [] : listOutbox().filter((m) => mine.has(m.assignmentId)).slice(0, 12)
   }, [rows])
 
   const resend = async (a: Assignment, name: string) => {
@@ -554,6 +556,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
         </Panel>
       </div>
 
+      {!CORE && (
       <Panel
         className="mt-4"
         title={
@@ -590,6 +593,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
           </ul>
         )}
       </Panel>
+      )}
     </div>
   )
 }

@@ -12,7 +12,7 @@ message Response {
   // Empty for an anonymous questionnaire.
   string person_id = 3;
   int32 exam_version = 4;
-  int64 submitted_at = 5 [jstype = JS_NUMBER];
+  int64 submitted_at = 5;
   map<string, ItemAnswer> answers = 6;
   Score score = 7;
 }
@@ -40,5 +40,5 @@ message GetAttemptLogResponse {
   // False if any stored event no longer matches its hash chain.
   bool chain_intact = 2;
   // The first seq at which the chain breaks, when it does.
-  int64 broken_at_seq = 3 [jstype = JS_NUMBER];
+  int64 broken_at_seq = 3;
 }

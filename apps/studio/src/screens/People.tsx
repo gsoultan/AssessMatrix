@@ -95,8 +95,8 @@ export function People({ isDesktop }: { isDesktop: boolean }) {
           <RosterImport
             roster={people}
             action="Add"
-            onConfirm={(drafts) => {
-              const n = addPeople(drafts)
+            onConfirm={async (drafts) => {
+              const n = await addPeople(drafts)
               setNote(`Added ${n} from the file.`)
             }}
           />
@@ -113,8 +113,8 @@ export function People({ isDesktop }: { isDesktop: boolean }) {
           />
           <div className="mt-3 flex items-center gap-2">
             <button
-              onClick={() => {
-                const r = importRoster(paste)
+              onClick={async () => {
+                const r = await importRoster(paste)
                 setNote(
                   r.added === 0 && r.skipped === 0
                     ? 'Nothing recognisable in that paste.'

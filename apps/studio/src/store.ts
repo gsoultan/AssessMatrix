@@ -158,6 +158,8 @@ export type Assignment = {
   /** New links the candidate asked for themselves since an admin last sent one. */
   selfServes: number
   history: InviteEvent[]
+  /** The server's verdict on the link. Set only when the core is the backend. */
+  linkState?: 'unsent' | 'live' | 'used' | 'expired' | 'locked' | 'revoked'
 }
 
 /** Append-only. What happened to an invitation, in order, for whoever has to explain it. */
@@ -166,6 +168,8 @@ export type InviteEvent = { seq: number; t: number; kind: string; detail?: strin
 export type AttemptEvent = { seq: number; t: number; kind: string; detail?: string }
 
 export type Attempt = {
+  /** The server's id. Absent for an attempt that lives only on this device (a preview). */
+  id?: string
   examId: string
   answers: Record<string, string[]>
   text: Record<string, string>
@@ -173,6 +177,8 @@ export type Attempt = {
   files: Record<string, Media>
   flagged: string[]
   startedAt: number
+  /** Server time the attempt ends, when the core runs the clock. */
+  deadlineAt?: number
   secondsLeft: number
   submittedAt?: number
   score?: { raw: number; max: number; pct: number; passed: boolean }
@@ -476,7 +482,7 @@ const normalise = (e: Exam): Exam => ({
   // Records written before the lifecycle existed were all effectively live.
   status: e.status ?? 'published',
   version: e.version ?? 1,
-  publishedVersion: e.publishedVersion ?? (e.status ?? 'published') === 'published' ? e.version ?? 1 : undefined,
+  publishedVersion: e.publishedVersion ?? ((e.status ?? 'published') === 'published' ? (e.version ?? 1) : undefined),
   timed: e.timed ?? true,
   anonymous: e.anonymous ?? false,
 })
@@ -660,12 +666,13 @@ export function deletePerson(id: string): Person[] {
  * or comma/tab separated "Name, email, group". Existing emails are skipped
  * rather than duplicated — re-pasting a roster must not double it.
  */
-export function importPeople(text: string): { added: Person[]; skipped: number } {
-  const existing = listPeople()
-  const seen = new Set(existing.map((p) => p.email.toLowerCase()))
-  const added: Person[] = []
-  let skipped = 0
-
+/**
+ * Accepts the shapes people actually paste: a bare email, "Name <email>",
+ * or comma/tab separated "Name, email, group". Lines without an address are
+ * dropped; repeats are left for whoever adds them to the roster to skip.
+ */
+export function parsePeopleText(text: string): PersonDraft[] {
+  const out: PersonDraft[] = []
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line) continue
@@ -687,22 +694,16 @@ export function importPeople(text: string): { added: Person[]; skipped: number }
       group = parts.filter((x) => x !== at)[1] ?? ''
     }
     if (!email.includes('@')) continue
-    if (seen.has(email.toLowerCase())) {
-      skipped++
-      continue
-    }
-    seen.add(email.toLowerCase())
-    added.push({
-      id: uid('p'),
-      name: name || email.split('@')[0]!,
-      email,
-      group,
-      createdAt: Date.now(),
-    })
+    out.push({ name: name || email.split('@')[0]!, email, group })
   }
+  return out
+}
 
-  if (added.length) write(PEOPLE_KEY, [...added, ...existing])
-  return { added, skipped }
+/** Existing emails are skipped rather than duplicated: re-pasting a roster must not double it. */
+export function importPeople(text: string): { added: number; skipped: number } {
+  const drafts = parsePeopleText(text)
+  const { created } = ensureDrafts(drafts)
+  return { added: created, skipped: drafts.length - created }
 }
 
 /**
@@ -710,23 +711,7 @@ export function importPeople(text: string): { added: Person[]; skipped: number }
  * an assignment needs a person to hang status and score on, so "off-roster"
  * means "you did not have to add them first", not "no record exists".
  */
-export function ensurePeople(text: string): { ids: string[]; created: number } {
-  const before = listPeople()
-  const byEmail = new Map(before.map((p) => [p.email.toLowerCase(), p]))
-  const { added } = importPeople(text)
-  added.forEach((p) => byEmail.set(p.email.toLowerCase(), p))
-
-  const ids: string[] = []
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim()
-    if (!line) continue
-    const m = line.match(/<([^>]+)>/) ?? line.match(/([^\s,;\t]+@[^\s,;\t]+)/)
-    const email = m?.[1]?.trim().toLowerCase()
-    const hit = email ? byEmail.get(email) : undefined
-    if (hit && !ids.includes(hit.id)) ids.push(hit.id)
-  }
-  return { ids, created: added.length }
-}
+export const ensurePeople = (text: string) => ensureDrafts(parsePeopleText(text))
 
 /** A person as a file or a form supplies one, before it has an id. */
 export type PersonDraft = { name: string; email: string; group: string }

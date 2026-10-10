@@ -1,4 +1,5 @@
 
+import { useEffect } from 'react'
 import type React from 'react'
 import { Drawer, Burger, useMantineColorScheme } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
@@ -18,6 +19,8 @@ import {
   IconSparkles,
   IconSun,
   IconMoon,
+  IconLogout,
+  IconX,
 } from '@tabler/icons-react'
 
 import { CandidateApp } from './screens/CandidateApp'
@@ -33,9 +36,14 @@ import { Responses } from './screens/Responses'
 import { Library } from './screens/Library'
 import { People } from './screens/People'
 import { Assignments } from './screens/Assignments'
+import { SignIn } from './screens/SignIn'
 import { useApp } from './state'
+import { CORE, SHOW_MOCKS } from './backend/mode'
 
-const SCREENS = [
+/** Design mock-ups with canned data. Shown in a local build; hidden against the core unless asked for. */
+const MOCKS = new Set(['author', 'aitask', 'profile', 'hub', 'embed', 'events', 'monitor'])
+
+const ALL_SCREENS = [
   { key: 'library', group: 'Build', name: 'Library', sub: 'All exams, quizzes, surveys', Icon: IconLibrary, El: Library },
   { key: 'builder', group: 'Build', name: 'Editor', sub: 'Sections · questions · publish', Icon: IconEdit, El: ExamBuilder },
   { key: 'author', group: 'Build', name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },
@@ -51,7 +59,8 @@ const SCREENS = [
   { key: 'monitor', group: 'Operate', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: ProctorMonitor },
 ] as const
 
-type Key = (typeof SCREENS)[number]['key']
+type Key = (typeof ALL_SCREENS)[number]['key']
+const SCREENS = ALL_SCREENS.filter((s) => SHOW_MOCKS || !MOCKS.has(s.key))
 
 /**
  * Reachable, but not listed. The editor is always entered by opening something
@@ -62,6 +71,36 @@ const HIDDEN_FROM_NAV = new Set<Key>(['builder'])
 const NAV = SCREENS.filter((s) => !HIDDEN_FROM_NAV.has(s.key))
 
 export function App() {
+  const staff = useApp((s) => s.staff)
+  const candidateView = useApp((s) => s.candidateView)
+  const boot = useApp((s) => s.boot)
+  useEffect(() => {
+    // A candidate who came by link never needs a staff session checked.
+    if (!candidateView) void boot()
+  }, [boot, candidateView])
+
+  // Against the core, a candidate gets their assessment and nothing else.
+  if (CORE && candidateView)
+    return (
+      <main className="flex min-h-full flex-col">
+        <CandidateApp standalone />
+      </main>
+    )
+  if (staff === undefined)
+    return (
+      <p role="status" className="p-8 text-center text-[13px] text-ink-muted">
+        Loading…
+      </p>
+    )
+  if (staff === null) return <SignIn />
+  return <Shell />
+}
+
+function Shell() {
+  const staff = useApp((st) => st.staff)
+  const signOut = useApp((st) => st.signOut)
+  const notice = useApp((st) => st.notice)
+  const dismissNotice = useApp((st) => st.dismissNotice)
   // Active screen lives in the store so a screen can navigate — "open this in
   // the editor" is a selection plus a navigation, and both belong together.
   const active = useApp((st) => st.screen) as Key
@@ -87,6 +126,16 @@ export function App() {
     >
       {dark ? <IconSun size={14} stroke={1.9} /> : <IconMoon size={14} stroke={1.9} />}
       {dark ? 'Light' : 'Dark'}
+    </button>
+  )
+
+  const signOutButton = (
+    <button
+      onClick={() => void signOut()}
+      title={staff?.email}
+      className="hair flex items-center gap-1.5 rounded-lg bg-surface px-2.5 py-1.5 text-[11.5px] font-medium text-ink-2"
+    >
+      <IconLogout size={14} stroke={1.9} /> Sign out
     </button>
   )
 
@@ -134,11 +183,16 @@ export function App() {
           </div>
           <div>
             <p className="text-[13px] font-semibold leading-none tracking-tight">AssessMatrix</p>
-            <p className="mt-1 text-[11px] leading-none text-ink-muted">prototype · local data</p>
+            <p className="mt-1 text-[11px] leading-none text-ink-muted">
+              {CORE ? staff?.tenantName : 'prototype · local data'}
+            </p>
           </div>
         </div>
         {nav}
-        <div className="px-3 pb-4">{themeToggle}</div>
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-4">
+          {themeToggle}
+          {CORE && signOutButton}
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -154,7 +208,17 @@ export function App() {
 
         <Drawer opened={opened} onClose={close} size="260px" title="AssessMatrix" padding={0} hiddenFrom="lg">
           {nav}
+          {CORE && <div className="px-3 pb-4">{signOutButton}</div>}
         </Drawer>
+
+        {notice && (
+          <div role="alert" className="flex items-start gap-2 border-b border-hair px-4 py-2.5 sm:px-6" style={{ background: 'var(--color-wash-warn)' }}>
+            <p className="min-w-0 flex-1 text-[12.5px] leading-snug text-ink">{notice}</p>
+            <button onClick={dismissNotice} aria-label="Dismiss" className="shrink-0 text-ink-muted">
+              <IconX size={15} stroke={2} />
+            </button>
+          </div>
+        )}
 
         <main className="min-w-0 flex-1">
           <Screen isDesktop={!!isDesktop} />

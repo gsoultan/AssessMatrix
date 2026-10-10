@@ -517,14 +517,14 @@ var File_assessmatrix_v1_people_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_people_proto_rawDesc = "" +
 	"\n" +
-	"\x1cassessmatrix/v1/people.proto\x12\x0fassessmatrix.v1\"{\n" +
+	"\x1cassessmatrix/v1/people.proto\x12\x0fassessmatrix.v1\"w\n" +
 	"\x06Person\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
-	"\x05group\x18\x04 \x01(\tR\x05group\x12!\n" +
+	"\x05group\x18\x04 \x01(\tR\x05group\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\x03B\x020\x02R\tcreatedAt\"M\n" +
+	"created_at\x18\x05 \x01(\x03R\tcreatedAt\"M\n" +
 	"\vPersonDraft\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x14\n" +

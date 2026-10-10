@@ -873,36 +873,36 @@ var File_assessmatrix_v1_assignment_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_assignment_proto_rawDesc = "" +
 	"\n" +
-	" assessmatrix/v1/assignment.proto\x12\x0fassessmatrix.v1\"u\n" +
+	" assessmatrix/v1/assignment.proto\x12\x0fassessmatrix.v1\"q\n" +
 	"\vInviteEvent\x12\x10\n" +
-	"\x03seq\x18\x01 \x01(\x05R\x03seq\x12\x12\n" +
-	"\x02at\x18\x02 \x01(\x03B\x020\x02R\x02at\x12\x12\n" +
+	"\x03seq\x18\x01 \x01(\x05R\x03seq\x12\x0e\n" +
+	"\x02at\x18\x02 \x01(\x03R\x02at\x12\x12\n" +
 	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x16\n" +
 	"\x06detail\x18\x04 \x01(\tR\x06detail\x12\x14\n" +
-	"\x05count\x18\x05 \x01(\x05R\x05count\"\xc7\x05\n" +
+	"\x05count\x18\x05 \x01(\x05R\x05count\"\xa7\x05\n" +
 	"\n" +
 	"Assignment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aexam_id\x18\x02 \x01(\tR\x06examId\x12!\n" +
 	"\fexam_version\x18\x03 \x01(\x05R\vexamVersion\x12\x1b\n" +
-	"\tperson_id\x18\x04 \x01(\tR\bpersonId\x12#\n" +
-	"\vassigned_at\x18\x05 \x01(\x03B\x020\x02R\n" +
-	"assignedAt\x12\x19\n" +
-	"\x06due_at\x18\x06 \x01(\x03B\x020\x02R\x05dueAt\x125\n" +
-	"\x06status\x18\a \x01(\x0e2\x1d.assessmatrix.v1.AssignStatusR\x06status\x12!\n" +
+	"\tperson_id\x18\x04 \x01(\tR\bpersonId\x12\x1f\n" +
+	"\vassigned_at\x18\x05 \x01(\x03R\n" +
+	"assignedAt\x12\x15\n" +
+	"\x06due_at\x18\x06 \x01(\x03R\x05dueAt\x125\n" +
+	"\x06status\x18\a \x01(\x0e2\x1d.assessmatrix.v1.AssignStatusR\x06status\x12\x1d\n" +
 	"\n" +
-	"started_at\x18\b \x01(\x03B\x020\x02R\tstartedAt\x12%\n" +
-	"\fsubmitted_at\x18\t \x01(\x03B\x020\x02R\vsubmittedAt\x12 \n" +
+	"started_at\x18\b \x01(\x03R\tstartedAt\x12!\n" +
+	"\fsubmitted_at\x18\t \x01(\x03R\vsubmittedAt\x12 \n" +
 	"\tscore_pct\x18\n" +
 	" \x01(\x05H\x00R\bscorePct\x88\x01\x01\x12\x1b\n" +
-	"\x06passed\x18\v \x01(\bH\x01R\x06passed\x88\x01\x01\x12\x1b\n" +
-	"\asent_at\x18\f \x01(\x03B\x020\x02R\x06sentAt\x12!\n" +
+	"\x06passed\x18\v \x01(\bH\x01R\x06passed\x88\x01\x01\x12\x17\n" +
+	"\asent_at\x18\f \x01(\x03R\x06sentAt\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\r \x01(\x03B\x020\x02R\texpiresAt\x12#\n" +
-	"\vredeemed_at\x18\x0e \x01(\x03B\x020\x02R\n" +
-	"redeemedAt\x12!\n" +
+	"expires_at\x18\r \x01(\x03R\texpiresAt\x12\x1f\n" +
+	"\vredeemed_at\x18\x0e \x01(\x03R\n" +
+	"redeemedAt\x12\x1d\n" +
 	"\n" +
-	"revoked_at\x18\x0f \x01(\x03B\x020\x02R\trevokedAt\x129\n" +
+	"revoked_at\x18\x0f \x01(\x03R\trevokedAt\x129\n" +
 	"\n" +
 	"link_state\x18\x10 \x01(\x0e2\x1a.assessmatrix.v1.LinkStateR\tlinkState\x12\x1b\n" +
 	"\totp_sends\x18\x11 \x01(\x05R\botpSends\x12\x1f\n" +
@@ -915,12 +915,12 @@ const file_assessmatrix_v1_assignment_proto_rawDesc = "" +
 	"\x16ListAssignmentsRequest\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\"X\n" +
 	"\x17ListAssignmentsResponse\x12=\n" +
-	"\vassignments\x18\x01 \x03(\v2\x1b.assessmatrix.v1.AssignmentR\vassignments\"h\n" +
+	"\vassignments\x18\x01 \x03(\v2\x1b.assessmatrix.v1.AssignmentR\vassignments\"d\n" +
 	"\x13AssignPeopleRequest\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12\x1d\n" +
 	"\n" +
-	"person_ids\x18\x02 \x03(\tR\tpersonIds\x12\x19\n" +
-	"\x06due_at\x18\x03 \x01(\x03B\x020\x02R\x05dueAt\"i\n" +
+	"person_ids\x18\x02 \x03(\tR\tpersonIds\x12\x15\n" +
+	"\x06due_at\x18\x03 \x01(\x03R\x05dueAt\"i\n" +
 	"\x14AssignPeopleResponse\x12=\n" +
 	"\vassignments\x18\x01 \x03(\v2\x1b.assessmatrix.v1.AssignmentR\vassignments\x12\x12\n" +
 	"\x04sent\x18\x02 \x01(\x05R\x04sent\"!\n" +

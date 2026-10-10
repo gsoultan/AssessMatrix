@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/assignment.proto.
  */
 export const file_assessmatrix_v1_assignment: GenFile = /*@__PURE__*/
-  fileDesc("CiBhc3Nlc3NtYXRyaXgvdjEvYXNzaWdubWVudC5wcm90bxIPYXNzZXNzbWF0cml4LnYxIlcKC0ludml0ZUV2ZW50EgsKA3NlcRgBIAEoBRIOCgJhdBgCIAEoA0ICMAISDAoEa2luZBgDIAEoCRIOCgZkZXRhaWwYBCABKAkSDQoFY291bnQYBSABKAUiiwQKCkFzc2lnbm1lbnQSCgoCaWQYASABKAkSDwoHZXhhbV9pZBgCIAEoCRIUCgxleGFtX3ZlcnNpb24YAyABKAUSEQoJcGVyc29uX2lkGAQgASgJEhcKC2Fzc2lnbmVkX2F0GAUgASgDQgIwAhISCgZkdWVfYXQYBiABKANCAjACEi0KBnN0YXR1cxgHIAEoDjIdLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25TdGF0dXMSFgoKc3RhcnRlZF9hdBgIIAEoA0ICMAISGAoMc3VibWl0dGVkX2F0GAkgASgDQgIwAhIWCglzY29yZV9wY3QYCiABKAVIAIgBARITCgZwYXNzZWQYCyABKAhIAYgBARITCgdzZW50X2F0GAwgASgDQgIwAhIWCgpleHBpcmVzX2F0GA0gASgDQgIwAhIXCgtyZWRlZW1lZF9hdBgOIAEoA0ICMAISFgoKcmV2b2tlZF9hdBgPIAEoA0ICMAISLgoKbGlua19zdGF0ZRgQIAEoDjIaLmFzc2Vzc21hdHJpeC52MS5MaW5rU3RhdGUSEQoJb3RwX3NlbmRzGBEgASgFEhMKC3NlbGZfc2VydmVzGBIgASgFEi0KB2hpc3RvcnkYEyADKAsyHC5hc3Nlc3NtYXRyaXgudjEuSW52aXRlRXZlbnRCDAoKX3Njb3JlX3BjdEIJCgdfcGFzc2VkIikKFkxpc3RBc3NpZ25tZW50c1JlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCSJLChdMaXN0QXNzaWdubWVudHNSZXNwb25zZRIwCgthc3NpZ25tZW50cxgBIAMoCzIbLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25tZW50Ik4KE0Fzc2lnblBlb3BsZVJlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCRISCgpwZXJzb25faWRzGAIgAygJEhIKBmR1ZV9hdBgDIAEoA0ICMAIiVgoUQXNzaWduUGVvcGxlUmVzcG9uc2USMAoLYXNzaWdubWVudHMYASADKAsyGy5hc3Nlc3NtYXRyaXgudjEuQXNzaWdubWVudBIMCgRzZW50GAIgASgFIh0KD1VuYXNzaWduUmVxdWVzdBIKCgJpZBgBIAEoCSISChBVbmFzc2lnblJlc3BvbnNlIiwKElNlbmRJbnZpdGVzUmVxdWVzdBIWCg5hc3NpZ25tZW50X2lkcxgBIAMoCSIjChNTZW5kSW52aXRlc1Jlc3BvbnNlEgwKBHNlbnQYASABKAUiLAoTUmV2b2tlSW52aXRlUmVxdWVzdBIVCg1hc3NpZ25tZW50X2lkGAEgASgJIkcKFFJldm9rZUludml0ZVJlc3BvbnNlEi8KCmFzc2lnbm1lbnQYASABKAsyGy5hc3Nlc3NtYXRyaXgudjEuQXNzaWdubWVudCqbAQoMQXNzaWduU3RhdHVzEh0KGUFTU0lHTl9TVEFUVVNfVU5TUEVDSUZJRUQQABIZChVBU1NJR05fU1RBVFVTX0lOVklURUQQARIZChVBU1NJR05fU1RBVFVTX1NUQVJURUQQAhIbChdBU1NJR05fU1RBVFVTX1NVQk1JVFRFRBADEhkKFUFTU0lHTl9TVEFUVVNfRVhQSVJFRBAEKq8BCglMaW5rU3RhdGUSGgoWTElOS19TVEFURV9VTlNQRUNJRklFRBAAEhUKEUxJTktfU1RBVEVfVU5TRU5UEAESEwoPTElOS19TVEFURV9MSVZFEAISEwoPTElOS19TVEFURV9VU0VEEAMSFgoSTElOS19TVEFURV9FWFBJUkVEEAQSFQoRTElOS19TVEFURV9MT0NLRUQQBRIWChJMSU5LX1NUQVRFX1JFVk9LRUQQBjLeAwoRQXNzaWdubWVudFNlcnZpY2USZAoPTGlzdEFzc2lnbm1lbnRzEicuYXNzZXNzbWF0cml4LnYxLkxpc3RBc3NpZ25tZW50c1JlcXVlc3QaKC5hc3Nlc3NtYXRyaXgudjEuTGlzdEFzc2lnbm1lbnRzUmVzcG9uc2USWwoMQXNzaWduUGVvcGxlEiQuYXNzZXNzbWF0cml4LnYxLkFzc2lnblBlb3BsZVJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuQXNzaWduUGVvcGxlUmVzcG9uc2USTwoIVW5hc3NpZ24SIC5hc3Nlc3NtYXRyaXgudjEuVW5hc3NpZ25SZXF1ZXN0GiEuYXNzZXNzbWF0cml4LnYxLlVuYXNzaWduUmVzcG9uc2USWAoLU2VuZEludml0ZXMSIy5hc3Nlc3NtYXRyaXgudjEuU2VuZEludml0ZXNSZXF1ZXN0GiQuYXNzZXNzbWF0cml4LnYxLlNlbmRJbnZpdGVzUmVzcG9uc2USWwoMUmV2b2tlSW52aXRlEiQuYXNzZXNzbWF0cml4LnYxLlJldm9rZUludml0ZVJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuUmV2b2tlSW52aXRlUmVzcG9uc2VC1gEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCD0Fzc2lnbm1lbnRQcm90b1ABWlFnaXRodWIuY29tL2dzb3VsdGFuL2Fzc2Vzc21hdHJpeC9zZXJ2aWNlcy9jb3JlL2dlbi9hc3Nlc3NtYXRyaXgvdjE7YXNzZXNzbWF0cml4djGiAgNBWFiqAg9Bc3Nlc3NtYXRyaXguVjHKAg9Bc3Nlc3NtYXRyaXhcVjHiAhtBc3Nlc3NtYXRyaXhcVjFcR1BCTWV0YWRhdGHqAhBBc3Nlc3NtYXRyaXg6OlYxYgZwcm90bzM");
+  fileDesc("CiBhc3Nlc3NtYXRyaXgvdjEvYXNzaWdubWVudC5wcm90bxIPYXNzZXNzbWF0cml4LnYxIlMKC0ludml0ZUV2ZW50EgsKA3NlcRgBIAEoBRIKCgJhdBgCIAEoAxIMCgRraW5kGAMgASgJEg4KBmRldGFpbBgEIAEoCRINCgVjb3VudBgFIAEoBSLrAwoKQXNzaWdubWVudBIKCgJpZBgBIAEoCRIPCgdleGFtX2lkGAIgASgJEhQKDGV4YW1fdmVyc2lvbhgDIAEoBRIRCglwZXJzb25faWQYBCABKAkSEwoLYXNzaWduZWRfYXQYBSABKAMSDgoGZHVlX2F0GAYgASgDEi0KBnN0YXR1cxgHIAEoDjIdLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25TdGF0dXMSEgoKc3RhcnRlZF9hdBgIIAEoAxIUCgxzdWJtaXR0ZWRfYXQYCSABKAMSFgoJc2NvcmVfcGN0GAogASgFSACIAQESEwoGcGFzc2VkGAsgASgISAGIAQESDwoHc2VudF9hdBgMIAEoAxISCgpleHBpcmVzX2F0GA0gASgDEhMKC3JlZGVlbWVkX2F0GA4gASgDEhIKCnJldm9rZWRfYXQYDyABKAMSLgoKbGlua19zdGF0ZRgQIAEoDjIaLmFzc2Vzc21hdHJpeC52MS5MaW5rU3RhdGUSEQoJb3RwX3NlbmRzGBEgASgFEhMKC3NlbGZfc2VydmVzGBIgASgFEi0KB2hpc3RvcnkYEyADKAsyHC5hc3Nlc3NtYXRyaXgudjEuSW52aXRlRXZlbnRCDAoKX3Njb3JlX3BjdEIJCgdfcGFzc2VkIikKFkxpc3RBc3NpZ25tZW50c1JlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCSJLChdMaXN0QXNzaWdubWVudHNSZXNwb25zZRIwCgthc3NpZ25tZW50cxgBIAMoCzIbLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25tZW50IkoKE0Fzc2lnblBlb3BsZVJlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCRISCgpwZXJzb25faWRzGAIgAygJEg4KBmR1ZV9hdBgDIAEoAyJWChRBc3NpZ25QZW9wbGVSZXNwb25zZRIwCgthc3NpZ25tZW50cxgBIAMoCzIbLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25tZW50EgwKBHNlbnQYAiABKAUiHQoPVW5hc3NpZ25SZXF1ZXN0EgoKAmlkGAEgASgJIhIKEFVuYXNzaWduUmVzcG9uc2UiLAoSU2VuZEludml0ZXNSZXF1ZXN0EhYKDmFzc2lnbm1lbnRfaWRzGAEgAygJIiMKE1NlbmRJbnZpdGVzUmVzcG9uc2USDAoEc2VudBgBIAEoBSIsChNSZXZva2VJbnZpdGVSZXF1ZXN0EhUKDWFzc2lnbm1lbnRfaWQYASABKAkiRwoUUmV2b2tlSW52aXRlUmVzcG9uc2USLwoKYXNzaWdubWVudBgBIAEoCzIbLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25tZW50KpsBCgxBc3NpZ25TdGF0dXMSHQoZQVNTSUdOX1NUQVRVU19VTlNQRUNJRklFRBAAEhkKFUFTU0lHTl9TVEFUVVNfSU5WSVRFRBABEhkKFUFTU0lHTl9TVEFUVVNfU1RBUlRFRBACEhsKF0FTU0lHTl9TVEFUVVNfU1VCTUlUVEVEEAMSGQoVQVNTSUdOX1NUQVRVU19FWFBJUkVEEAQqrwEKCUxpbmtTdGF0ZRIaChZMSU5LX1NUQVRFX1VOU1BFQ0lGSUVEEAASFQoRTElOS19TVEFURV9VTlNFTlQQARITCg9MSU5LX1NUQVRFX0xJVkUQAhITCg9MSU5LX1NUQVRFX1VTRUQQAxIWChJMSU5LX1NUQVRFX0VYUElSRUQQBBIVChFMSU5LX1NUQVRFX0xPQ0tFRBAFEhYKEkxJTktfU1RBVEVfUkVWT0tFRBAGMt4DChFBc3NpZ25tZW50U2VydmljZRJkCg9MaXN0QXNzaWdubWVudHMSJy5hc3Nlc3NtYXRyaXgudjEuTGlzdEFzc2lnbm1lbnRzUmVxdWVzdBooLmFzc2Vzc21hdHJpeC52MS5MaXN0QXNzaWdubWVudHNSZXNwb25zZRJbCgxBc3NpZ25QZW9wbGUSJC5hc3Nlc3NtYXRyaXgudjEuQXNzaWduUGVvcGxlUmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5Bc3NpZ25QZW9wbGVSZXNwb25zZRJPCghVbmFzc2lnbhIgLmFzc2Vzc21hdHJpeC52MS5VbmFzc2lnblJlcXVlc3QaIS5hc3Nlc3NtYXRyaXgudjEuVW5hc3NpZ25SZXNwb25zZRJYCgtTZW5kSW52aXRlcxIjLmFzc2Vzc21hdHJpeC52MS5TZW5kSW52aXRlc1JlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuU2VuZEludml0ZXNSZXNwb25zZRJbCgxSZXZva2VJbnZpdGUSJC5hc3Nlc3NtYXRyaXgudjEuUmV2b2tlSW52aXRlUmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5SZXZva2VJbnZpdGVSZXNwb25zZULWAQoTY29tLmFzc2Vzc21hdHJpeC52MUIPQXNzaWdubWVudFByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw");
 
 /**
  * Append-only. Repeats of the same event fold into `count`, so a link opened
@@ -25,7 +25,7 @@ export type InviteEvent = Message<"assessmatrix.v1.InviteEvent"> & {
   seq: number;
 
   /**
-   * @generated from field: int64 at = 2 [jstype = JS_NUMBER];
+   * @generated from field: int64 at = 2;
    */
   at: bigint;
 
@@ -79,14 +79,14 @@ export type Assignment = Message<"assessmatrix.v1.Assignment"> & {
   personId: string;
 
   /**
-   * @generated from field: int64 assigned_at = 5 [jstype = JS_NUMBER];
+   * @generated from field: int64 assigned_at = 5;
    */
   assignedAt: bigint;
 
   /**
    * 0 when there is no due date.
    *
-   * @generated from field: int64 due_at = 6 [jstype = JS_NUMBER];
+   * @generated from field: int64 due_at = 6;
    */
   dueAt: bigint;
 
@@ -96,12 +96,12 @@ export type Assignment = Message<"assessmatrix.v1.Assignment"> & {
   status: AssignStatus;
 
   /**
-   * @generated from field: int64 started_at = 8 [jstype = JS_NUMBER];
+   * @generated from field: int64 started_at = 8;
    */
   startedAt: bigint;
 
   /**
-   * @generated from field: int64 submitted_at = 9 [jstype = JS_NUMBER];
+   * @generated from field: int64 submitted_at = 9;
    */
   submittedAt: bigint;
 
@@ -118,22 +118,22 @@ export type Assignment = Message<"assessmatrix.v1.Assignment"> & {
   passed?: boolean | undefined;
 
   /**
-   * @generated from field: int64 sent_at = 12 [jstype = JS_NUMBER];
+   * @generated from field: int64 sent_at = 12;
    */
   sentAt: bigint;
 
   /**
-   * @generated from field: int64 expires_at = 13 [jstype = JS_NUMBER];
+   * @generated from field: int64 expires_at = 13;
    */
   expiresAt: bigint;
 
   /**
-   * @generated from field: int64 redeemed_at = 14 [jstype = JS_NUMBER];
+   * @generated from field: int64 redeemed_at = 14;
    */
   redeemedAt: bigint;
 
   /**
-   * @generated from field: int64 revoked_at = 15 [jstype = JS_NUMBER];
+   * @generated from field: int64 revoked_at = 15;
    */
   revokedAt: bigint;
 
@@ -218,7 +218,7 @@ export type AssignPeopleRequest = Message<"assessmatrix.v1.AssignPeopleRequest">
   /**
    * 0 for no due date.
    *
-   * @generated from field: int64 due_at = 3 [jstype = JS_NUMBER];
+   * @generated from field: int64 due_at = 3;
    */
   dueAt: bigint;
 };

@@ -121,7 +121,7 @@ func (b *Mailbox) Send(_ context.Context, m Message) error {
 func (b *Mailbox) List() []Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return append([]Message(nil), b.msgs...)
+	return append([]Message{}, b.msgs...)
 }
 
 // SMTP sends through a relay with STARTTLS required.

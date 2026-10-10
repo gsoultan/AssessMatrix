@@ -11,7 +11,7 @@ message Person {
   string email = 3;
   // Cohort, department, class: whatever the organisation groups by.
   string group = 4;
-  int64 created_at = 5 [jstype = JS_NUMBER];
+  int64 created_at = 5;
 }
 
 // A person as a file or a form supplies one, before it has an id.

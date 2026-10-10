@@ -1565,7 +1565,7 @@ var File_assessmatrix_v1_candidate_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\n" +
-	"\x1fassessmatrix/v1/candidate.proto\x12\x0fassessmatrix.v1\x1a\x1aassessmatrix/v1/exam.proto\"\xa3\x02\n" +
+	"\x1fassessmatrix/v1/candidate.proto\x12\x0fassessmatrix.v1\x1a\x1aassessmatrix/v1/exam.proto\"\x9f\x02\n" +
 	"\x11InvitationSummary\x12\x1d\n" +
 	"\n" +
 	"exam_title\x18\x01 \x01(\tR\texamTitle\x12\x16\n" +
@@ -1576,9 +1576,9 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\bpass_pct\x18\x06 \x01(\x05R\apassPct\x12\x1d\n" +
 	"\n" +
 	"item_count\x18\a \x01(\x05R\titemCount\x12!\n" +
-	"\fmasked_email\x18\b \x01(\tR\vmaskedEmail\x12!\n" +
+	"\fmasked_email\x18\b \x01(\tR\vmaskedEmail\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\t \x01(\x03B\x020\x02R\texpiresAt\"'\n" +
+	"expires_at\x18\t \x01(\x03R\texpiresAt\"'\n" +
 	"\x0fOpenLinkRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\xbd\x01\n" +
 	"\x10OpenLinkResponse\x12\x0e\n" +
@@ -1589,11 +1589,11 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"invitation\x12!\n" +
 	"\fmasked_email\x18\x04 \x01(\tR\vmaskedEmail\"*\n" +
 	"\x12RequestCodeRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\x8c\x01\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x88\x01\n" +
 	"\x13RequestCodeResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x122\n" +
-	"\arefusal\x18\x02 \x01(\x0e2\x18.assessmatrix.v1.RefusalR\arefusal\x12\x1d\n" +
-	"\bretry_at\x18\x03 \x01(\x03B\x020\x02R\aretryAt\x12\x12\n" +
+	"\arefusal\x18\x02 \x01(\x0e2\x18.assessmatrix.v1.RefusalR\arefusal\x12\x19\n" +
+	"\bretry_at\x18\x03 \x01(\x03R\aretryAt\x12\x12\n" +
 	"\x04left\x18\x04 \x01(\x05R\x04left\"=\n" +
 	"\x11VerifyCodeRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x12\n" +
@@ -1604,21 +1604,21 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\n" +
 	"tries_left\x18\x03 \x01(\x05R\ttriesLeft\"-\n" +
 	"\x15RequestNewLinkRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"{\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"w\n" +
 	"\x16RequestNewLinkResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x122\n" +
-	"\arefusal\x18\x02 \x01(\x0e2\x18.assessmatrix.v1.RefusalR\arefusal\x12\x1d\n" +
-	"\bretry_at\x18\x03 \x01(\x03B\x020\x02R\aretryAt\"d\n" +
+	"\arefusal\x18\x02 \x01(\x0e2\x18.assessmatrix.v1.RefusalR\arefusal\x12\x19\n" +
+	"\bretry_at\x18\x03 \x01(\x03R\aretryAt\"d\n" +
 	"\n" +
 	"ItemAnswer\x12\x16\n" +
 	"\x06values\x18\x01 \x03(\tR\x06values\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12*\n" +
-	"\x04file\x18\x03 \x01(\v2\x16.assessmatrix.v1.MediaR\x04file\"\x8b\x02\n" +
-	"\fAttemptEvent\x12\x14\n" +
-	"\x03seq\x18\x01 \x01(\x03B\x020\x02R\x03seq\x12#\n" +
-	"\vserver_time\x18\x02 \x01(\x03B\x020\x02R\n" +
-	"serverTime\x12#\n" +
-	"\vclient_time\x18\x03 \x01(\x03B\x020\x02R\n" +
+	"\x04file\x18\x03 \x01(\v2\x16.assessmatrix.v1.MediaR\x04file\"\xff\x01\n" +
+	"\fAttemptEvent\x12\x10\n" +
+	"\x03seq\x18\x01 \x01(\x03R\x03seq\x12\x1f\n" +
+	"\vserver_time\x18\x02 \x01(\x03R\n" +
+	"serverTime\x12\x1f\n" +
+	"\vclient_time\x18\x03 \x01(\x03R\n" +
 	"clientTime\x12\x12\n" +
 	"\x04kind\x18\x04 \x01(\tR\x04kind\x12\x17\n" +
 	"\aitem_id\x18\x05 \x01(\tR\x06itemId\x12\x16\n" +
@@ -1631,51 +1631,51 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x03max\x18\x02 \x01(\x05R\x03max\x12\x10\n" +
 	"\x03pct\x18\x03 \x01(\x05R\x03pct\x12\x16\n" +
 	"\x06passed\x18\x04 \x01(\bR\x06passed\x12#\n" +
-	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\xa1\x04\n" +
+	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\x91\x04\n" +
 	"\aAttempt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rassignment_id\x18\x02 \x01(\tR\fassignmentId\x12\x17\n" +
 	"\aexam_id\x18\x03 \x01(\tR\x06examId\x12!\n" +
-	"\fexam_version\x18\x04 \x01(\x05R\vexamVersion\x12!\n" +
+	"\fexam_version\x18\x04 \x01(\x05R\vexamVersion\x12\x1d\n" +
 	"\n" +
-	"started_at\x18\x05 \x01(\x03B\x020\x02R\tstartedAt\x12#\n" +
-	"\vdeadline_at\x18\x06 \x01(\x03B\x020\x02R\n" +
-	"deadlineAt\x12%\n" +
-	"\fsubmitted_at\x18\a \x01(\x03B\x020\x02R\vsubmittedAt\x12?\n" +
+	"started_at\x18\x05 \x01(\x03R\tstartedAt\x12\x1f\n" +
+	"\vdeadline_at\x18\x06 \x01(\x03R\n" +
+	"deadlineAt\x12!\n" +
+	"\fsubmitted_at\x18\a \x01(\x03R\vsubmittedAt\x12?\n" +
 	"\aanswers\x18\b \x03(\v2%.assessmatrix.v1.Attempt.AnswersEntryR\aanswers\x12\x18\n" +
 	"\aflagged\x18\t \x03(\tR\aflagged\x12,\n" +
 	"\x05score\x18\n" +
-	" \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\x12\x1d\n" +
-	"\blast_seq\x18\v \x01(\x03B\x020\x02R\alastSeq\x125\n" +
+	" \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\x12\x19\n" +
+	"\blast_seq\x18\v \x01(\x03R\alastSeq\x125\n" +
 	"\x06events\x18\f \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x1aW\n" +
 	"\fAnswersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
 	"\x05value\x18\x02 \x01(\v2\x1b.assessmatrix.v1.ItemAnswerR\x05value:\x028\x01\"\x13\n" +
-	"\x11GetSessionRequest\"\xff\x01\n" +
+	"\x11GetSessionRequest\"\xfb\x01\n" +
 	"\x12GetSessionResponse\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12B\n" +
 	"\n" +
 	"invitation\x18\x02 \x01(\v2\".assessmatrix.v1.InvitationSummaryR\n" +
 	"invitation\x12)\n" +
 	"\x04exam\x18\x03 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\x122\n" +
-	"\aattempt\x18\x04 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12!\n" +
+	"\aattempt\x18\x04 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12\x1d\n" +
 	"\n" +
-	"server_now\x18\x05 \x01(\x03B\x020\x02R\tserverNow\"\x15\n" +
-	"\x13StartAttemptRequest\"m\n" +
+	"server_now\x18\x05 \x01(\x03R\tserverNow\"\x15\n" +
+	"\x13StartAttemptRequest\"i\n" +
 	"\x14StartAttemptResponse\x122\n" +
-	"\aattempt\x18\x01 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12!\n" +
+	"\aattempt\x18\x01 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12\x1d\n" +
 	"\n" +
-	"server_now\x18\x02 \x01(\x03B\x020\x02R\tserverNow\"\x86\x01\n" +
+	"server_now\x18\x02 \x01(\x03R\tserverNow\"\x86\x01\n" +
 	"\x13AppendEventsRequest\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x19\n" +
 	"\bbatch_id\x18\x02 \x01(\tR\abatchId\x125\n" +
-	"\x06events\x18\x03 \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\"}\n" +
-	"\x14AppendEventsResponse\x12\x1d\n" +
-	"\blast_seq\x18\x01 \x01(\x03B\x020\x02R\alastSeq\x12!\n" +
+	"\x06events\x18\x03 \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\"q\n" +
+	"\x14AppendEventsResponse\x12\x19\n" +
+	"\blast_seq\x18\x01 \x01(\x03R\alastSeq\x12\x1d\n" +
 	"\n" +
-	"server_now\x18\x02 \x01(\x03B\x020\x02R\tserverNow\x12#\n" +
-	"\vdeadline_at\x18\x03 \x01(\x03B\x020\x02R\n" +
+	"server_now\x18\x02 \x01(\x03R\tserverNow\x12\x1f\n" +
+	"\vdeadline_at\x18\x03 \x01(\x03R\n" +
 	"deadlineAt\"K\n" +
 	"\x14SubmitAttemptRequest\x12\x1d\n" +
 	"\n" +
