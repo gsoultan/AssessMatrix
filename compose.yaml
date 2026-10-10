@@ -1,0 +1,48 @@
+# One compose file for local development and small self-hosted installs
+# (docs/03 §3: self-host is a first-class artifact). Put secrets in .env;
+# see .env.example.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      AM_OWNER_PASSWORD: ${AM_OWNER_PASSWORD:?set AM_OWNER_PASSWORD in .env}
+      AM_APP_PASSWORD: ${AM_APP_PASSWORD:?set AM_APP_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    build: ./services/core
+    command: ["migrate"]
+    environment:
+      AM_MIGRATE_DATABASE_URL: postgres://am_owner:${AM_OWNER_PASSWORD}@postgres:5432/assessmatrix
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  core:
+    build: ./services/core
+    command: ["serve"]
+    environment:
+      AM_DATABASE_URL: postgres://am_app:${AM_APP_PASSWORD}@postgres:5432/assessmatrix
+      AM_SECRET: ${AM_SECRET:?set AM_SECRET in .env (openssl rand -hex 32)}
+      AM_PUBLIC_URL: ${AM_PUBLIC_URL:-http://localhost:5180}
+      AM_MAILER: ${AM_MAILER:-log}
+      AM_DEV: ${AM_DEV:-0}
+      AM_SMTP_ADDR: ${AM_SMTP_ADDR:-}
+      AM_SMTP_FROM: ${AM_SMTP_FROM:-}
+      AM_SMTP_USER: ${AM_SMTP_USER:-}
+      AM_SMTP_PASS: ${AM_SMTP_PASS:-}
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+volumes:
+  pgdata:
