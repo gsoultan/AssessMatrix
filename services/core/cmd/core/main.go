@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -129,7 +130,8 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	case "smtp":
 		sender = cfg.SMTP
 	case "mailbox":
-		mailbox = &mail.Mailbox{}
+		keep, _ := strconv.Atoi(os.Getenv("AM_DEV_MAILBOX_KEEP"))
+		mailbox = &mail.Mailbox{Keep: keep}
 		sender = mailbox
 	default:
 		sender = mail.Log{L: log}
@@ -179,9 +181,9 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	})
 	if mailbox != nil {
 		// Development only: lets the browser test read the mail a candidate gets.
-		mux.HandleFunc("GET /dev/mailbox", func(w http.ResponseWriter, _ *http.Request) {
+		mux.HandleFunc("GET /dev/mailbox", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(mailbox.List())
+			json.NewEncoder(w).Encode(mailbox.List(r.URL.Query().Get("to")))
 		})
 	}
 	images := srv.MediaHandler()

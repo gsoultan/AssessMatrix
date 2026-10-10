@@ -108,3 +108,19 @@ which).
 - Rate limits on sign-in and link requests are per core instance (docs/12 §4).
 - Item statistics already computed keep counting attempts whose records were purged later; a
   recomputation after a purge counts only what is left.
+
+## 7. Load
+
+`make load` (or `N=… MINUTES=… RAMP=… scripts/load.sh`) runs `services/core/cmd/loadsim`
+against a local core: the whole cohort starts within `RAMP`, autosaves one or two answers every
+5–15 s, retries a failed save with the same batch id as the runner does, and hands in. It then
+reads every attempt's log and counts acknowledged answers that are missing; anything above zero
+fails the run.
+
+| Date | Where | Cohort | Calls | AppendEvents p95 / p99 | Errors | Answers lost |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-10-10 | local, one core, one Postgres | 500 in 1 min, 3 min each | 12,704 | 8 ms / 12 ms | 0 | 0 |
+
+Before the pilot, run it against staging at the partner's cohort size with 2× headroom
+(the core must run with `AM_DEV=1 AM_MAILER=mailbox AM_TRUST_PROXY=1` for the run; reset
+those afterwards).
