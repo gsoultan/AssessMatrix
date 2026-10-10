@@ -24,6 +24,8 @@ set +e
 # Bun runs the test directly — no Node in the toolchain.
 (cd "$APP" && URL="http://localhost:${PORT}" bun e2e.mjs)
 rc=$?
+# Accessibility and the keyboard path through every item type (docs/09 phase 4).
+(cd "$APP" && URL="http://localhost:${PORT}" bun a11y.mjs) || rc=1
 set -e
 
 if [ -n "$started" ]; then

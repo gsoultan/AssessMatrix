@@ -7,3 +7,5 @@ ensure_deps
 cd "$APP"
 bun run build
 ok "built → apps/studio/dist"
+# The candidate runner's size budget (docs/09 phase 4).
+bun budget.mjs
