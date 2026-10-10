@@ -76,6 +76,7 @@ func (s *resultService) GetAttemptLog(ctx context.Context, req *connect.Request[
 		if err != nil {
 			return err
 		}
+		out.PurgedAt = msPtr(a.PurgedAt)
 		out.Events, out.ChainIntact, out.BrokenAtSeq, err = s.loadEvents(ctx, tx, a)
 		if err != nil {
 			return err

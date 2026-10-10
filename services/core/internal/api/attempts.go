@@ -31,14 +31,16 @@ type attemptRow struct {
 	Score                              []byte
 	LastSeq                            int64
 	LastHash                           []byte
+	// Set once the record's events were deleted (retention). The score stays.
+	PurgedAt *time.Time
 }
 
-const attemptColumns = `id, assignment_id, exam_id, person_id, exam_version, started_at, deadline_at, submitted_at, score, last_seq, last_hash`
+const attemptColumns = `id, assignment_id, exam_id, person_id, exam_version, started_at, deadline_at, submitted_at, score, last_seq, last_hash, purged_at`
 
 func scanAttempt(row pgx.Row) (*attemptRow, error) {
 	var a attemptRow
 	err := row.Scan(&a.ID, &a.AssignmentID, &a.ExamID, &a.PersonID, &a.ExamVersion, &a.StartedAt, &a.DeadlineAt,
-		&a.SubmittedAt, &a.Score, &a.LastSeq, &a.LastHash)
+		&a.SubmittedAt, &a.Score, &a.LastSeq, &a.LastHash, &a.PurgedAt)
 	return &a, err
 }
 
@@ -55,6 +57,15 @@ func attemptBy(ctx context.Context, tx pgx.Tx, column, value string, lock bool) 
 		return nil, notFound("attempt")
 	}
 	return a, err
+}
+
+// open refuses any change to an attempt whose record was deleted: its
+// score stands, and nothing can be rebuilt from a log that is gone.
+func (a *attemptRow) open() error {
+	if a.PurgedAt != nil {
+		return failedPrecondition("this attempt's record was deleted at the end of its retention period")
+	}
+	return nil
 }
 
 func (a *attemptRow) deadline() time.Time {
@@ -99,6 +110,10 @@ func (s *Server) genesis(attemptID string) []byte { return s.Keys.ChainHash(nil,
 
 // loadEvents reads the log and checks the chain as it goes.
 func (s *Server) loadEvents(ctx context.Context, tx pgx.Tx, a *attemptRow) (events []*v1.AttemptEvent, intact bool, brokenAt int64, err error) {
+	if a.PurgedAt != nil {
+		// Deleted on purpose, with an audit record; not a broken chain.
+		return nil, true, 0, nil
+	}
 	rows, err := tx.Query(ctx, `SELECT seq, body, hash FROM attempt_events WHERE attempt_id = $1 ORDER BY seq`, a.ID)
 	if err != nil {
 		return nil, false, 0, err
@@ -139,7 +154,7 @@ func (s *Server) attemptProto(a *attemptRow, events []*v1.AttemptEvent, withEven
 	out := &v1.Attempt{
 		Id: a.ID, AssignmentId: a.AssignmentID, ExamId: a.ExamID, ExamVersion: a.ExamVersion,
 		StartedAt: a.StartedAt.UnixMilli(), DeadlineAt: msPtr(a.DeadlineAt), SubmittedAt: msPtr(a.SubmittedAt),
-		Answers: answers, Flagged: flagged, LastSeq: a.LastSeq,
+		Answers: answers, Flagged: flagged, LastSeq: a.LastSeq, PurgedAt: msPtr(a.PurgedAt),
 	}
 	if a.Score != nil {
 		var sc v1.Score

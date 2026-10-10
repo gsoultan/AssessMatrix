@@ -98,6 +98,7 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.PersonServiceAddPersonProcedure,
 		assessmatrixv1connect.PersonServiceEnsurePeopleProcedure,
 		assessmatrixv1connect.PersonServiceDeletePersonProcedure,
+		assessmatrixv1connect.PersonServiceErasePersonProcedure,
 		assessmatrixv1connect.AssignmentServiceListAssignmentsProcedure,
 		assessmatrixv1connect.AssignmentServiceAssignPeopleProcedure,
 		assessmatrixv1connect.AssignmentServiceUnassignProcedure,

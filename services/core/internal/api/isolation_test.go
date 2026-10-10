@@ -145,6 +145,11 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			_, err := b.people.DeletePerson(ctx, connect.NewRequest(&v1.DeletePersonRequest{Id: p2.GetId()}))
 			denied("DeletePerson", err)
 		},
+		"/assessmatrix.v1.PersonService/ErasePerson": func() {
+			// A's candidate with a submitted attempt: the worst thing B could wipe.
+			_, err := b.people.ErasePerson(ctx, connect.NewRequest(&v1.ErasePersonRequest{Id: fa.person.GetId(), Reason: "test"}))
+			denied("ErasePerson", err)
+		},
 		"/assessmatrix.v1.AssignmentService/ListAssignments": func() {
 			r := get(b.assign.ListAssignments(ctx, connect.NewRequest(&v1.ListAssignmentsRequest{ExamId: fa.exam.GetId()})))
 			if len(r.Msg.GetAssignments()) != 0 {

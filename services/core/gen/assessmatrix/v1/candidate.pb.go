@@ -931,8 +931,11 @@ type Attempt struct {
 	Flagged []string               `protobuf:"bytes,9,rep,name=flagged,proto3" json:"flagged,omitempty"`
 	Score   *Score                 `protobuf:"bytes,10,opt,name=score,proto3" json:"score,omitempty"`
 	// The highest seq the server holds.
-	LastSeq       int64           `protobuf:"varint,11,opt,name=last_seq,json=lastSeq,proto3" json:"last_seq,omitempty"`
-	Events        []*AttemptEvent `protobuf:"bytes,12,rep,name=events,proto3" json:"events,omitempty"`
+	LastSeq int64           `protobuf:"varint,11,opt,name=last_seq,json=lastSeq,proto3" json:"last_seq,omitempty"`
+	Events  []*AttemptEvent `protobuf:"bytes,12,rep,name=events,proto3" json:"events,omitempty"`
+	// When the record (answers and signals) was deleted at the end of its
+	// retention period; 0 while it is held.
+	PurgedAt      int64 `protobuf:"varint,13,opt,name=purged_at,json=purgedAt,proto3" json:"purged_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1049,6 +1052,13 @@ func (x *Attempt) GetEvents() []*AttemptEvent {
 		return x.Events
 	}
 	return nil
+}
+
+func (x *Attempt) GetPurgedAt() int64 {
+	if x != nil {
+		return x.PurgedAt
+	}
+	return 0
 }
 
 type GetSessionRequest struct {
@@ -1654,7 +1664,7 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x03max\x18\x02 \x01(\x05R\x03max\x12\x10\n" +
 	"\x03pct\x18\x03 \x01(\x05R\x03pct\x12\x16\n" +
 	"\x06passed\x18\x04 \x01(\bR\x06passed\x12#\n" +
-	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\x91\x04\n" +
+	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\xae\x04\n" +
 	"\aAttempt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rassignment_id\x18\x02 \x01(\tR\fassignmentId\x12\x17\n" +
@@ -1670,7 +1680,8 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x05score\x18\n" +
 	" \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\x12\x19\n" +
 	"\blast_seq\x18\v \x01(\x03R\alastSeq\x125\n" +
-	"\x06events\x18\f \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x1aW\n" +
+	"\x06events\x18\f \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x12\x1b\n" +
+	"\tpurged_at\x18\r \x01(\x03R\bpurgedAt\x1aW\n" +
 	"\fAnswersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
 	"\x05value\x18\x02 \x01(\v2\x1b.assessmatrix.v1.ItemAnswerR\x05value:\x028\x01\"\x13\n" +

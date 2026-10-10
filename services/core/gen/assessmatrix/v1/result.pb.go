@@ -254,7 +254,10 @@ type GetAttemptLogResponse struct {
 	// The first seq at which the chain breaks, when it does.
 	BrokenAtSeq int64 `protobuf:"varint,3,opt,name=broken_at_seq,json=brokenAtSeq,proto3" json:"broken_at_seq,omitempty"`
 	// What the integrity rules found in this log.
-	Flags         []*Flag `protobuf:"bytes,4,rep,name=flags,proto3" json:"flags,omitempty"`
+	Flags []*Flag `protobuf:"bytes,4,rep,name=flags,proto3" json:"flags,omitempty"`
+	// When the record was deleted at the end of its retention period; 0 if
+	// it is still held. A deleted record keeps its score, not its events.
+	PurgedAt      int64 `protobuf:"varint,5,opt,name=purged_at,json=purgedAt,proto3" json:"purged_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -315,6 +318,13 @@ func (x *GetAttemptLogResponse) GetFlags() []*Flag {
 		return x.Flags
 	}
 	return nil
+}
+
+func (x *GetAttemptLogResponse) GetPurgedAt() int64 {
+	if x != nil {
+		return x.PurgedAt
+	}
+	return 0
 }
 
 // One reason a reviewer should look at an attempt, derived deterministically
@@ -1106,12 +1116,13 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\tresponses\x18\x01 \x03(\v2\x19.assessmatrix.v1.ResponseR\tresponses\"5\n" +
 	"\x14GetAttemptLogRequest\x12\x1d\n" +
 	"\n" +
-	"attempt_id\x18\x01 \x01(\tR\tattemptId\"\xc2\x01\n" +
+	"attempt_id\x18\x01 \x01(\tR\tattemptId\"\xdf\x01\n" +
 	"\x15GetAttemptLogResponse\x125\n" +
 	"\x06events\x18\x01 \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x12!\n" +
 	"\fchain_intact\x18\x02 \x01(\bR\vchainIntact\x12\"\n" +
 	"\rbroken_at_seq\x18\x03 \x01(\x03R\vbrokenAtSeq\x12+\n" +
-	"\x05flags\x18\x04 \x03(\v2\x15.assessmatrix.v1.FlagR\x05flags\"\x84\x01\n" +
+	"\x05flags\x18\x04 \x03(\v2\x15.assessmatrix.v1.FlagR\x05flags\x12\x1b\n" +
+	"\tpurged_at\x18\x05 \x01(\x03R\bpurgedAt\"\x84\x01\n" +
 	"\x04Flag\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1a\n" +
 	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x16\n" +

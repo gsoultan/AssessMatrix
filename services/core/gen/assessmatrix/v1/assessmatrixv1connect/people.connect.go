@@ -44,6 +44,9 @@ const (
 	// PersonServiceDeletePersonProcedure is the fully-qualified name of the PersonService's
 	// DeletePerson RPC.
 	PersonServiceDeletePersonProcedure = "/assessmatrix.v1.PersonService/DeletePerson"
+	// PersonServiceErasePersonProcedure is the fully-qualified name of the PersonService's ErasePerson
+	// RPC.
+	PersonServiceErasePersonProcedure = "/assessmatrix.v1.PersonService/ErasePerson"
 )
 
 // PersonServiceClient is a client for the assessmatrix.v1.PersonService service.
@@ -55,6 +58,10 @@ type PersonServiceClient interface {
 	EnsurePeople(context.Context, *connect.Request[v1.EnsurePeopleRequest]) (*connect.Response[v1.EnsurePeopleResponse], error)
 	// Also cancels the person's assignments: no dangling invitations.
 	DeletePerson(context.Context, *connect.Request[v1.DeletePersonRequest]) (*connect.Response[v1.DeletePersonResponse], error)
+	// The right to erasure (UU PDP art. 8): everything held about the person,
+	// attempts and credentials included, is deleted for good. The audit log
+	// keeps that it happened, by id only.
+	ErasePerson(context.Context, *connect.Request[v1.ErasePersonRequest]) (*connect.Response[v1.ErasePersonResponse], error)
 }
 
 // NewPersonServiceClient constructs a client for the assessmatrix.v1.PersonService service. By
@@ -92,6 +99,12 @@ func NewPersonServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(personServiceMethods.ByName("DeletePerson")),
 			connect.WithClientOptions(opts...),
 		),
+		erasePerson: connect.NewClient[v1.ErasePersonRequest, v1.ErasePersonResponse](
+			httpClient,
+			baseURL+PersonServiceErasePersonProcedure,
+			connect.WithSchema(personServiceMethods.ByName("ErasePerson")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -101,6 +114,7 @@ type personServiceClient struct {
 	addPerson    *connect.Client[v1.AddPersonRequest, v1.AddPersonResponse]
 	ensurePeople *connect.Client[v1.EnsurePeopleRequest, v1.EnsurePeopleResponse]
 	deletePerson *connect.Client[v1.DeletePersonRequest, v1.DeletePersonResponse]
+	erasePerson  *connect.Client[v1.ErasePersonRequest, v1.ErasePersonResponse]
 }
 
 // ListPeople calls assessmatrix.v1.PersonService.ListPeople.
@@ -123,6 +137,11 @@ func (c *personServiceClient) DeletePerson(ctx context.Context, req *connect.Req
 	return c.deletePerson.CallUnary(ctx, req)
 }
 
+// ErasePerson calls assessmatrix.v1.PersonService.ErasePerson.
+func (c *personServiceClient) ErasePerson(ctx context.Context, req *connect.Request[v1.ErasePersonRequest]) (*connect.Response[v1.ErasePersonResponse], error) {
+	return c.erasePerson.CallUnary(ctx, req)
+}
+
 // PersonServiceHandler is an implementation of the assessmatrix.v1.PersonService service.
 type PersonServiceHandler interface {
 	ListPeople(context.Context, *connect.Request[v1.ListPeopleRequest]) (*connect.Response[v1.ListPeopleResponse], error)
@@ -132,6 +151,10 @@ type PersonServiceHandler interface {
 	EnsurePeople(context.Context, *connect.Request[v1.EnsurePeopleRequest]) (*connect.Response[v1.EnsurePeopleResponse], error)
 	// Also cancels the person's assignments: no dangling invitations.
 	DeletePerson(context.Context, *connect.Request[v1.DeletePersonRequest]) (*connect.Response[v1.DeletePersonResponse], error)
+	// The right to erasure (UU PDP art. 8): everything held about the person,
+	// attempts and credentials included, is deleted for good. The audit log
+	// keeps that it happened, by id only.
+	ErasePerson(context.Context, *connect.Request[v1.ErasePersonRequest]) (*connect.Response[v1.ErasePersonResponse], error)
 }
 
 // NewPersonServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -165,6 +188,12 @@ func NewPersonServiceHandler(svc PersonServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(personServiceMethods.ByName("DeletePerson")),
 		connect.WithHandlerOptions(opts...),
 	)
+	personServiceErasePersonHandler := connect.NewUnaryHandler(
+		PersonServiceErasePersonProcedure,
+		svc.ErasePerson,
+		connect.WithSchema(personServiceMethods.ByName("ErasePerson")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/assessmatrix.v1.PersonService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PersonServiceListPeopleProcedure:
@@ -175,6 +204,8 @@ func NewPersonServiceHandler(svc PersonServiceHandler, opts ...connect.HandlerOp
 			personServiceEnsurePeopleHandler.ServeHTTP(w, r)
 		case PersonServiceDeletePersonProcedure:
 			personServiceDeletePersonHandler.ServeHTTP(w, r)
+		case PersonServiceErasePersonProcedure:
+			personServiceErasePersonHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -198,4 +229,8 @@ func (UnimplementedPersonServiceHandler) EnsurePeople(context.Context, *connect.
 
 func (UnimplementedPersonServiceHandler) DeletePerson(context.Context, *connect.Request[v1.DeletePersonRequest]) (*connect.Response[v1.DeletePersonResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.PersonService.DeletePerson is not implemented"))
+}
+
+func (UnimplementedPersonServiceHandler) ErasePerson(context.Context, *connect.Request[v1.ErasePersonRequest]) (*connect.Response[v1.ErasePersonResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.PersonService.ErasePerson is not implemented"))
 }

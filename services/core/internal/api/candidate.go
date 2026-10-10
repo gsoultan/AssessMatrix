@@ -487,7 +487,7 @@ func (s *candidateService) ownAttempt(ctx context.Context, tx pgx.Tx, id string)
 	if att.AssignmentID != auth.From(ctx).AssignmentID {
 		return nil, notFound("attempt")
 	}
-	return att, nil
+	return att, att.open()
 }
 
 func validateEvent(ev *v1.AttemptEvent) error {

@@ -232,10 +232,16 @@ function AttemptRecord({ sitting }: { sitting: Sitting }) {
         <p className="text-[12.5px] text-ink-muted">Loading…</p>
       ) : (
         <>
-          <p className="mb-3 flex items-center gap-1.5 text-[12.5px]" style={{ color: log.chainIntact ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
-            {log.chainIntact ? <IconShieldCheck size={15} stroke={1.9} /> : <IconShieldX size={15} stroke={1.9} />}
-            {log.chainIntact ? 'Record intact: every event matches its seal.' : `Record altered from event ${log.brokenAtSeq}.`}
-          </p>
+          {log.purgedAt > 0n ? (
+            <p className="mb-3 text-[12.5px] text-ink-2">
+              Record deleted on {new Date(Number(log.purgedAt)).toLocaleDateString()} at the end of its retention period. The score stands.
+            </p>
+          ) : (
+            <p className="mb-3 flex items-center gap-1.5 text-[12.5px]" style={{ color: log.chainIntact ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
+              {log.chainIntact ? <IconShieldCheck size={15} stroke={1.9} /> : <IconShieldX size={15} stroke={1.9} />}
+              {log.chainIntact ? 'Record intact: every event matches its seal.' : `Record altered from event ${log.brokenAtSeq}.`}
+            </p>
+          )}
           {log.flags.length > 0 ? (
             <ul aria-label="Flags" className="mb-4 flex flex-col gap-2">
               {log.flags.map((f, i) => (

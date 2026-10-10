@@ -134,15 +134,18 @@ func serve(ctx context.Context, log *slog.Logger) error {
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &mail.Worker{DB: database, Sender: sender})
+	retention := &api.RetentionWorker{}
+	river.AddWorker(workers, retention)
 	jobs, err := river.NewClient(riverpgxv5.New(database.Pool), &river.Config{
 		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 10}},
 		Workers: workers,
 		Logger:  log,
+		// Records past their retention period go within the hour (docs/13).
+		PeriodicJobs: []*river.PeriodicJob{river.NewPeriodicJob(river.PeriodicInterval(time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) { return api.RetentionArgs{}, nil },
+			&river.PeriodicJobOpts{RunOnStart: true})},
 	})
 	if err != nil {
-		return err
-	}
-	if err := jobs.Start(ctx); err != nil {
 		return err
 	}
 
@@ -154,6 +157,10 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	}
 	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
 		Media: media.Regional{Store: store, Region: cfg.Media.Region}}
+	retention.Server = srv
+	if err := jobs.Start(ctx); err != nil {
+		return err
+	}
 
 	mux := http.NewServeMux()
 	rpc := srv.Handler()

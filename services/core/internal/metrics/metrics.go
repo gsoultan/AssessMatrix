@@ -38,6 +38,10 @@ var (
 	SignalsDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "am_signals_dropped_total", Help: "Integrity signals dropped because their consent was missing.",
 	})
+	// RecordsPurged counts attempt records deleted, by why (retention or erasure).
+	RecordsPurged = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "am_records_purged_total", Help: "Attempt records deleted: at the end of retention, or on an erasure request.",
+	}, []string{"why"})
 	// SyncLag is how long a candidate's event took to reach the server.
 	SyncLag = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Name:    "am_sync_lag_seconds",
@@ -47,7 +51,7 @@ var (
 )
 
 func init() {
-	Registry.MustRegister(rpcTotal, rpcSeconds, EventsStored, SignalsDropped, SyncLag,
+	Registry.MustRegister(rpcTotal, rpcSeconds, EventsStored, SignalsDropped, SyncLag, RecordsPurged,
 		collectors.NewGoCollector(), collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 }
 
