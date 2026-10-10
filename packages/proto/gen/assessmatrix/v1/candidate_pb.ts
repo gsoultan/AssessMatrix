@@ -389,7 +389,8 @@ export type Score = Message<"assessmatrix.v1.Score"> & {
   passed: boolean;
 
   /**
-   * Essay and scale points, reported separately as awaiting a person.
+   * Essay points awaiting a person, left out of raw, max and pct until
+   * reviewed. Scales are not scored.
    *
    * @generated from field: int32 pending_human = 5;
    */

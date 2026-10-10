@@ -103,7 +103,7 @@ export function refusal(r: ca.Refusal): WireRefusal {
 
 /* ── instruments ──────────────────────────────────────────────────────────── */
 
-const mediaIn = (m: ex.Media | undefined): Media | undefined =>
+export const mediaIn = (m: ex.Media | undefined): Media | undefined =>
   m && m.url ? { id: m.id, url: m.url, alt: m.alt, w: m.w, h: m.h, bytes: n(m.bytes) } : undefined
 
 const mediaOut = (m: Media | undefined): MessageInitShape<typeof ex.MediaSchema> | undefined =>

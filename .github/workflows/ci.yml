@@ -100,6 +100,20 @@ jobs:
       - run: go vet ./...
       - run: go test -race -count=1 ./...
 
+  psychometrics:
+    name: Psychometrics · item statistics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: services/psychometrics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest -v
+
   stack:
     name: Stack · studio against the core and Postgres
     runs-on: ubuntu-latest
@@ -134,6 +148,11 @@ jobs:
             -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
             -c "CREATE ROLE am_app LOGIN PASSWORD 'app'" \
             -c "CREATE DATABASE assessmatrix OWNER am_owner"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install the psychometrics worker's dependencies
+        run: pip install -r services/psychometrics/requirements.txt
       - name: Install Chromium for the Playwright version the studio pins
         working-directory: apps/studio
         run: bunx playwright install --with-deps chromium

@@ -12,7 +12,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
@@ -643,13 +642,10 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		}
 		survey := e.GetKind() == v1.Kind_KIND_SURVEY
 		var score *v1.Score
-		var scoreJSON []byte
+		reviews := domain.Reviews(events)
 		detail := "response recorded"
 		if !survey {
-			score = domain.Score(e, answers)
-			if scoreJSON, err = protojson.Marshal(score); err != nil {
-				return err
-			}
+			score = domain.Score(e, answers, reviews)
 			detail = fmt.Sprintf("%d%%", score.GetPct())
 		}
 		kind := domain.KindAttemptSubmitted
@@ -659,20 +655,19 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		if err := s.appendEvents(ctx, tx, att, []*v1.AttemptEvent{{Kind: kind, ClientTime: now.UnixMilli(), Detail: detail}}); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE attempts SET submitted_at = $2, score = $3 WHERE id = $1`, att.ID, now, scoreJSON); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE attempts SET submitted_at = $2 WHERE id = $1`, att.ID, now); err != nil {
 			return err
 		}
-		var pct *int16
-		var passed *bool
+		if _, err := tx.Exec(ctx, `UPDATE assignments SET status = $2, submitted_at = $3 WHERE id = $1`,
+			att.AssignmentID, int16(v1.AssignStatus_ASSIGN_STATUS_SUBMITTED), now); err != nil {
+			return err
+		}
 		if score != nil {
-			p := int16(score.GetPct())
-			pct, passed = &p, &score.Passed
+			if err := storeScore(ctx, tx, att, e, answers, reviews, score); err != nil {
+				return err
+			}
 		}
-		if _, err := tx.Exec(ctx, `UPDATE assignments SET status = $2, submitted_at = $3, score_pct = $4, passed = $5 WHERE id = $1`,
-			att.AssignmentID, int16(v1.AssignStatus_ASSIGN_STATUS_SUBMITTED), now, pct, passed); err != nil {
-			return err
-		}
-		att.SubmittedAt, att.Score = &now, scoreJSON
+		att.SubmittedAt = &now
 		events, _, _, err = s.loadEvents(ctx, tx, att)
 		if err != nil {
 			return err

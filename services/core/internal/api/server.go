@@ -104,6 +104,9 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.AssignmentServiceRevokeInviteProcedure,
 		assessmatrixv1connect.ResultServiceListResponsesProcedure,
 		assessmatrixv1connect.ResultServiceGetAttemptLogProcedure,
+		assessmatrixv1connect.ResultServiceListReviewsProcedure,
+		assessmatrixv1connect.ResultServiceScoreAnswerProcedure,
+		assessmatrixv1connect.ResultServiceGetItemAnalysisProcedure,
 		assessmatrixv1connect.ProctorServiceWatchExamProcedure,
 	)
 	return p

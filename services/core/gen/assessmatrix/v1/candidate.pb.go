@@ -843,7 +843,8 @@ type Score struct {
 	Max    int32                  `protobuf:"varint,2,opt,name=max,proto3" json:"max,omitempty"`
 	Pct    int32                  `protobuf:"varint,3,opt,name=pct,proto3" json:"pct,omitempty"`
 	Passed bool                   `protobuf:"varint,4,opt,name=passed,proto3" json:"passed,omitempty"`
-	// Essay and scale points, reported separately as awaiting a person.
+	// Essay points awaiting a person, left out of raw, max and pct until
+	// reviewed. Scales are not scored.
 	PendingHuman  int32 `protobuf:"varint,5,opt,name=pending_human,json=pendingHuman,proto3" json:"pending_human,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

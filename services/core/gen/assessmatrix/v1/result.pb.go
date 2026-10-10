@@ -402,11 +402,682 @@ func (x *Flag) GetItemId() string {
 	return ""
 }
 
+type ListReviewsRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ExamId string                 `protobuf:"bytes,1,opt,name=exam_id,json=examId,proto3" json:"exam_id,omitempty"`
+	// Also list essays already scored, to look again.
+	IncludeDone   bool `protobuf:"varint,2,opt,name=include_done,json=includeDone,proto3" json:"include_done,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReviewsRequest) Reset() {
+	*x = ListReviewsRequest{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReviewsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReviewsRequest) ProtoMessage() {}
+
+func (x *ListReviewsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReviewsRequest.ProtoReflect.Descriptor instead.
+func (*ListReviewsRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListReviewsRequest) GetExamId() string {
+	if x != nil {
+		return x.ExamId
+	}
+	return ""
+}
+
+func (x *ListReviewsRequest) GetIncludeDone() bool {
+	if x != nil {
+		return x.IncludeDone
+	}
+	return false
+}
+
+type ReviewTask struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AttemptId string                 `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	// "Response 7": the order of hand-in, so marking is blind to who wrote it.
+	Label  string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	ItemId string `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	// The question's position as the candidate saw it.
+	Number int32  `protobuf:"varint,4,opt,name=number,proto3" json:"number,omitempty"`
+	Stem   string `protobuf:"bytes,5,opt,name=stem,proto3" json:"stem,omitempty"`
+	Text   string `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
+	File   *Media `protobuf:"bytes,7,opt,name=file,proto3" json:"file,omitempty"`
+	// Most the essay can earn.
+	Points        int32  `protobuf:"varint,8,opt,name=points,proto3" json:"points,omitempty"`
+	Reviewed      bool   `protobuf:"varint,9,opt,name=reviewed,proto3" json:"reviewed,omitempty"`
+	Given         int32  `protobuf:"varint,10,opt,name=given,proto3" json:"given,omitempty"`
+	Note          string `protobuf:"bytes,11,opt,name=note,proto3" json:"note,omitempty"`
+	SubmittedAt   int64  `protobuf:"varint,12,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewTask) Reset() {
+	*x = ReviewTask{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewTask) ProtoMessage() {}
+
+func (x *ReviewTask) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewTask.ProtoReflect.Descriptor instead.
+func (*ReviewTask) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ReviewTask) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetNumber() int32 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+func (x *ReviewTask) GetStem() string {
+	if x != nil {
+		return x.Stem
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetFile() *Media {
+	if x != nil {
+		return x.File
+	}
+	return nil
+}
+
+func (x *ReviewTask) GetPoints() int32 {
+	if x != nil {
+		return x.Points
+	}
+	return 0
+}
+
+func (x *ReviewTask) GetReviewed() bool {
+	if x != nil {
+		return x.Reviewed
+	}
+	return false
+}
+
+func (x *ReviewTask) GetGiven() int32 {
+	if x != nil {
+		return x.Given
+	}
+	return 0
+}
+
+func (x *ReviewTask) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetSubmittedAt() int64 {
+	if x != nil {
+		return x.SubmittedAt
+	}
+	return 0
+}
+
+type ListReviewsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tasks         []*ReviewTask          `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReviewsResponse) Reset() {
+	*x = ListReviewsResponse{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReviewsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReviewsResponse) ProtoMessage() {}
+
+func (x *ListReviewsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReviewsResponse.ProtoReflect.Descriptor instead.
+func (*ListReviewsResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListReviewsResponse) GetTasks() []*ReviewTask {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+type ScoreAnswerRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AttemptId string                 `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	ItemId    string                 `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	Points    int32                  `protobuf:"varint,3,opt,name=points,proto3" json:"points,omitempty"`
+	// Shown to the candidate with the score.
+	Note          string `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScoreAnswerRequest) Reset() {
+	*x = ScoreAnswerRequest{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScoreAnswerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScoreAnswerRequest) ProtoMessage() {}
+
+func (x *ScoreAnswerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScoreAnswerRequest.ProtoReflect.Descriptor instead.
+func (*ScoreAnswerRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ScoreAnswerRequest) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *ScoreAnswerRequest) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *ScoreAnswerRequest) GetPoints() int32 {
+	if x != nil {
+		return x.Points
+	}
+	return 0
+}
+
+func (x *ScoreAnswerRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type ScoreAnswerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Score         *Score                 `protobuf:"bytes,1,opt,name=score,proto3" json:"score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScoreAnswerResponse) Reset() {
+	*x = ScoreAnswerResponse{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScoreAnswerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScoreAnswerResponse) ProtoMessage() {}
+
+func (x *ScoreAnswerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScoreAnswerResponse.ProtoReflect.Descriptor instead.
+func (*ScoreAnswerResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ScoreAnswerResponse) GetScore() *Score {
+	if x != nil {
+		return x.Score
+	}
+	return nil
+}
+
+type GetItemAnalysisRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ExamId string                 `protobuf:"bytes,1,opt,name=exam_id,json=examId,proto3" json:"exam_id,omitempty"`
+	// 0: the newest version with an analysis.
+	ExamVersion   int32 `protobuf:"varint,2,opt,name=exam_version,json=examVersion,proto3" json:"exam_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetItemAnalysisRequest) Reset() {
+	*x = GetItemAnalysisRequest{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetItemAnalysisRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetItemAnalysisRequest) ProtoMessage() {}
+
+func (x *GetItemAnalysisRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetItemAnalysisRequest.ProtoReflect.Descriptor instead.
+func (*GetItemAnalysisRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetItemAnalysisRequest) GetExamId() string {
+	if x != nil {
+		return x.ExamId
+	}
+	return ""
+}
+
+func (x *GetItemAnalysisRequest) GetExamVersion() int32 {
+	if x != nil {
+		return x.ExamVersion
+	}
+	return 0
+}
+
+// What the worker found. Its JSON form is what the worker writes.
+type GetItemAnalysisResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ExamVersion int32                  `protobuf:"varint,1,opt,name=exam_version,json=examVersion,proto3" json:"exam_version,omitempty"`
+	// Submitted attempts the statistics are over.
+	N          int32       `protobuf:"varint,2,opt,name=n,proto3" json:"n,omitempty"`
+	ComputedAt int64       `protobuf:"varint,3,opt,name=computed_at,json=computedAt,proto3" json:"computed_at,omitempty"`
+	Items      []*ItemStat `protobuf:"bytes,4,rep,name=items,proto3" json:"items,omitempty"`
+	// KR-20 reliability of the machine-scored part; meaningful only with
+	// enough attempts (see too_few).
+	Kr20 float64 `protobuf:"fixed64,5,opt,name=kr20,proto3" json:"kr20,omitempty"`
+	// Fewer attempts than the worker needs for stable numbers: shown, but
+	// labelled provisional.
+	TooFew bool `protobuf:"varint,6,opt,name=too_few,json=tooFew,proto3" json:"too_few,omitempty"`
+	// Waiting for the worker (nothing computed yet for this version).
+	Pending       bool `protobuf:"varint,7,opt,name=pending,proto3" json:"pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetItemAnalysisResponse) Reset() {
+	*x = GetItemAnalysisResponse{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetItemAnalysisResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetItemAnalysisResponse) ProtoMessage() {}
+
+func (x *GetItemAnalysisResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetItemAnalysisResponse.ProtoReflect.Descriptor instead.
+func (*GetItemAnalysisResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetItemAnalysisResponse) GetExamVersion() int32 {
+	if x != nil {
+		return x.ExamVersion
+	}
+	return 0
+}
+
+func (x *GetItemAnalysisResponse) GetN() int32 {
+	if x != nil {
+		return x.N
+	}
+	return 0
+}
+
+func (x *GetItemAnalysisResponse) GetComputedAt() int64 {
+	if x != nil {
+		return x.ComputedAt
+	}
+	return 0
+}
+
+func (x *GetItemAnalysisResponse) GetItems() []*ItemStat {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *GetItemAnalysisResponse) GetKr20() float64 {
+	if x != nil {
+		return x.Kr20
+	}
+	return 0
+}
+
+func (x *GetItemAnalysisResponse) GetTooFew() bool {
+	if x != nil {
+		return x.TooFew
+	}
+	return false
+}
+
+func (x *GetItemAnalysisResponse) GetPending() bool {
+	if x != nil {
+		return x.Pending
+	}
+	return false
+}
+
+type ItemStat struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ItemId string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	Number int32                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
+	N      int32                  `protobuf:"varint,3,opt,name=n,proto3" json:"n,omitempty"`
+	// Share of full marks: difficulty, higher is easier.
+	PValue float64 `protobuf:"fixed64,4,opt,name=p_value,json=pValue,proto3" json:"p_value,omitempty"`
+	// Corrected item-total correlation: does doing well here go with doing
+	// well on the rest? Below 0.2 deserves a look; negative, a key check.
+	PointBiserial float64       `protobuf:"fixed64,5,opt,name=point_biserial,json=pointBiserial,proto3" json:"point_biserial,omitempty"`
+	Choices       []*ChoiceStat `protobuf:"bytes,6,rep,name=choices,proto3" json:"choices,omitempty"`
+	// Plain-language reading of the numbers, for authors.
+	Notes         []string `protobuf:"bytes,7,rep,name=notes,proto3" json:"notes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemStat) Reset() {
+	*x = ItemStat{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemStat) ProtoMessage() {}
+
+func (x *ItemStat) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemStat.ProtoReflect.Descriptor instead.
+func (*ItemStat) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ItemStat) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *ItemStat) GetNumber() int32 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+func (x *ItemStat) GetN() int32 {
+	if x != nil {
+		return x.N
+	}
+	return 0
+}
+
+func (x *ItemStat) GetPValue() float64 {
+	if x != nil {
+		return x.PValue
+	}
+	return 0
+}
+
+func (x *ItemStat) GetPointBiserial() float64 {
+	if x != nil {
+		return x.PointBiserial
+	}
+	return 0
+}
+
+func (x *ItemStat) GetChoices() []*ChoiceStat {
+	if x != nil {
+		return x.Choices
+	}
+	return nil
+}
+
+func (x *ItemStat) GetNotes() []string {
+	if x != nil {
+		return x.Notes
+	}
+	return nil
+}
+
+type ChoiceStat struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ChoiceId string                 `protobuf:"bytes,1,opt,name=choice_id,json=choiceId,proto3" json:"choice_id,omitempty"`
+	Correct  bool                   `protobuf:"varint,2,opt,name=correct,proto3" json:"correct,omitempty"`
+	// Share of all candidates who picked it.
+	Share float64 `protobuf:"fixed64,3,opt,name=share,proto3" json:"share,omitempty"`
+	// Share within the top and bottom 27% by total score.
+	ShareUpper    float64 `protobuf:"fixed64,4,opt,name=share_upper,json=shareUpper,proto3" json:"share_upper,omitempty"`
+	ShareLower    float64 `protobuf:"fixed64,5,opt,name=share_lower,json=shareLower,proto3" json:"share_lower,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChoiceStat) Reset() {
+	*x = ChoiceStat{}
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChoiceStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChoiceStat) ProtoMessage() {}
+
+func (x *ChoiceStat) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_result_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChoiceStat.ProtoReflect.Descriptor instead.
+func (*ChoiceStat) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ChoiceStat) GetChoiceId() string {
+	if x != nil {
+		return x.ChoiceId
+	}
+	return ""
+}
+
+func (x *ChoiceStat) GetCorrect() bool {
+	if x != nil {
+		return x.Correct
+	}
+	return false
+}
+
+func (x *ChoiceStat) GetShare() float64 {
+	if x != nil {
+		return x.Share
+	}
+	return 0
+}
+
+func (x *ChoiceStat) GetShareUpper() float64 {
+	if x != nil {
+		return x.ShareUpper
+	}
+	return 0
+}
+
+func (x *ChoiceStat) GetShareLower() float64 {
+	if x != nil {
+		return x.ShareLower
+	}
+	return 0
+}
+
 var File_assessmatrix_v1_result_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\n" +
-	"\x1cassessmatrix/v1/result.proto\x12\x0fassessmatrix.v1\x1a\x1fassessmatrix/v1/candidate.proto\"\xfa\x02\n" +
+	"\x1cassessmatrix/v1/result.proto\x12\x0fassessmatrix.v1\x1a\x1fassessmatrix/v1/candidate.proto\x1a\x1aassessmatrix/v1/exam.proto\"\xfa\x02\n" +
 	"\bResponse\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12#\n" +
@@ -436,10 +1107,71 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x1b\n" +
 	"\treason_id\x18\x04 \x01(\tR\breasonId\x12\x17\n" +
-	"\aitem_id\x18\x05 \x01(\tR\x06itemId2\xcf\x01\n" +
+	"\aitem_id\x18\x05 \x01(\tR\x06itemId\"P\n" +
+	"\x12ListReviewsRequest\x12\x17\n" +
+	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12!\n" +
+	"\finclude_done\x18\x02 \x01(\bR\vincludeDone\"\xc7\x02\n" +
+	"\n" +
+	"ReviewTask\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x17\n" +
+	"\aitem_id\x18\x03 \x01(\tR\x06itemId\x12\x16\n" +
+	"\x06number\x18\x04 \x01(\x05R\x06number\x12\x12\n" +
+	"\x04stem\x18\x05 \x01(\tR\x04stem\x12\x12\n" +
+	"\x04text\x18\x06 \x01(\tR\x04text\x12*\n" +
+	"\x04file\x18\a \x01(\v2\x16.assessmatrix.v1.MediaR\x04file\x12\x16\n" +
+	"\x06points\x18\b \x01(\x05R\x06points\x12\x1a\n" +
+	"\breviewed\x18\t \x01(\bR\breviewed\x12\x14\n" +
+	"\x05given\x18\n" +
+	" \x01(\x05R\x05given\x12\x12\n" +
+	"\x04note\x18\v \x01(\tR\x04note\x12!\n" +
+	"\fsubmitted_at\x18\f \x01(\x03R\vsubmittedAt\"H\n" +
+	"\x13ListReviewsResponse\x121\n" +
+	"\x05tasks\x18\x01 \x03(\v2\x1b.assessmatrix.v1.ReviewTaskR\x05tasks\"x\n" +
+	"\x12ScoreAnswerRequest\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x17\n" +
+	"\aitem_id\x18\x02 \x01(\tR\x06itemId\x12\x16\n" +
+	"\x06points\x18\x03 \x01(\x05R\x06points\x12\x12\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\"C\n" +
+	"\x13ScoreAnswerResponse\x12,\n" +
+	"\x05score\x18\x01 \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\"T\n" +
+	"\x16GetItemAnalysisRequest\x12\x17\n" +
+	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12!\n" +
+	"\fexam_version\x18\x02 \x01(\x05R\vexamVersion\"\xe3\x01\n" +
+	"\x17GetItemAnalysisResponse\x12!\n" +
+	"\fexam_version\x18\x01 \x01(\x05R\vexamVersion\x12\f\n" +
+	"\x01n\x18\x02 \x01(\x05R\x01n\x12\x1f\n" +
+	"\vcomputed_at\x18\x03 \x01(\x03R\n" +
+	"computedAt\x12/\n" +
+	"\x05items\x18\x04 \x03(\v2\x19.assessmatrix.v1.ItemStatR\x05items\x12\x12\n" +
+	"\x04kr20\x18\x05 \x01(\x01R\x04kr20\x12\x17\n" +
+	"\atoo_few\x18\x06 \x01(\bR\x06tooFew\x12\x18\n" +
+	"\apending\x18\a \x01(\bR\apending\"\xd6\x01\n" +
+	"\bItemStat\x12\x17\n" +
+	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
+	"\x06number\x18\x02 \x01(\x05R\x06number\x12\f\n" +
+	"\x01n\x18\x03 \x01(\x05R\x01n\x12\x17\n" +
+	"\ap_value\x18\x04 \x01(\x01R\x06pValue\x12%\n" +
+	"\x0epoint_biserial\x18\x05 \x01(\x01R\rpointBiserial\x125\n" +
+	"\achoices\x18\x06 \x03(\v2\x1b.assessmatrix.v1.ChoiceStatR\achoices\x12\x14\n" +
+	"\x05notes\x18\a \x03(\tR\x05notes\"\x9b\x01\n" +
+	"\n" +
+	"ChoiceStat\x12\x1b\n" +
+	"\tchoice_id\x18\x01 \x01(\tR\bchoiceId\x12\x18\n" +
+	"\acorrect\x18\x02 \x01(\bR\acorrect\x12\x14\n" +
+	"\x05share\x18\x03 \x01(\x01R\x05share\x12\x1f\n" +
+	"\vshare_upper\x18\x04 \x01(\x01R\n" +
+	"shareUpper\x12\x1f\n" +
+	"\vshare_lower\x18\x05 \x01(\x01R\n" +
+	"shareLower2\xe9\x03\n" +
 	"\rResultService\x12^\n" +
 	"\rListResponses\x12%.assessmatrix.v1.ListResponsesRequest\x1a&.assessmatrix.v1.ListResponsesResponse\x12^\n" +
-	"\rGetAttemptLog\x12%.assessmatrix.v1.GetAttemptLogRequest\x1a&.assessmatrix.v1.GetAttemptLogResponseB\xd2\x01\n" +
+	"\rGetAttemptLog\x12%.assessmatrix.v1.GetAttemptLogRequest\x1a&.assessmatrix.v1.GetAttemptLogResponse\x12X\n" +
+	"\vListReviews\x12#.assessmatrix.v1.ListReviewsRequest\x1a$.assessmatrix.v1.ListReviewsResponse\x12X\n" +
+	"\vScoreAnswer\x12#.assessmatrix.v1.ScoreAnswerRequest\x1a$.assessmatrix.v1.ScoreAnswerResponse\x12d\n" +
+	"\x0fGetItemAnalysis\x12'.assessmatrix.v1.GetItemAnalysisRequest\x1a(.assessmatrix.v1.GetItemAnalysisResponseB\xd2\x01\n" +
 	"\x13com.assessmatrix.v1B\vResultProtoP\x01ZQgithub.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1;assessmatrixv1\xa2\x02\x03AXX\xaa\x02\x0fAssessmatrix.V1\xca\x02\x0fAssessmatrix\\V1\xe2\x02\x1bAssessmatrix\\V1\\GPBMetadata\xea\x02\x10Assessmatrix::V1b\x06proto3"
 
 var (
@@ -454,35 +1186,56 @@ func file_assessmatrix_v1_result_proto_rawDescGZIP() []byte {
 	return file_assessmatrix_v1_result_proto_rawDescData
 }
 
-var file_assessmatrix_v1_result_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_assessmatrix_v1_result_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_assessmatrix_v1_result_proto_goTypes = []any{
-	(*Response)(nil),              // 0: assessmatrix.v1.Response
-	(*ListResponsesRequest)(nil),  // 1: assessmatrix.v1.ListResponsesRequest
-	(*ListResponsesResponse)(nil), // 2: assessmatrix.v1.ListResponsesResponse
-	(*GetAttemptLogRequest)(nil),  // 3: assessmatrix.v1.GetAttemptLogRequest
-	(*GetAttemptLogResponse)(nil), // 4: assessmatrix.v1.GetAttemptLogResponse
-	(*Flag)(nil),                  // 5: assessmatrix.v1.Flag
-	nil,                           // 6: assessmatrix.v1.Response.AnswersEntry
-	(*Score)(nil),                 // 7: assessmatrix.v1.Score
-	(*AttemptEvent)(nil),          // 8: assessmatrix.v1.AttemptEvent
-	(*ItemAnswer)(nil),            // 9: assessmatrix.v1.ItemAnswer
+	(*Response)(nil),                // 0: assessmatrix.v1.Response
+	(*ListResponsesRequest)(nil),    // 1: assessmatrix.v1.ListResponsesRequest
+	(*ListResponsesResponse)(nil),   // 2: assessmatrix.v1.ListResponsesResponse
+	(*GetAttemptLogRequest)(nil),    // 3: assessmatrix.v1.GetAttemptLogRequest
+	(*GetAttemptLogResponse)(nil),   // 4: assessmatrix.v1.GetAttemptLogResponse
+	(*Flag)(nil),                    // 5: assessmatrix.v1.Flag
+	(*ListReviewsRequest)(nil),      // 6: assessmatrix.v1.ListReviewsRequest
+	(*ReviewTask)(nil),              // 7: assessmatrix.v1.ReviewTask
+	(*ListReviewsResponse)(nil),     // 8: assessmatrix.v1.ListReviewsResponse
+	(*ScoreAnswerRequest)(nil),      // 9: assessmatrix.v1.ScoreAnswerRequest
+	(*ScoreAnswerResponse)(nil),     // 10: assessmatrix.v1.ScoreAnswerResponse
+	(*GetItemAnalysisRequest)(nil),  // 11: assessmatrix.v1.GetItemAnalysisRequest
+	(*GetItemAnalysisResponse)(nil), // 12: assessmatrix.v1.GetItemAnalysisResponse
+	(*ItemStat)(nil),                // 13: assessmatrix.v1.ItemStat
+	(*ChoiceStat)(nil),              // 14: assessmatrix.v1.ChoiceStat
+	nil,                             // 15: assessmatrix.v1.Response.AnswersEntry
+	(*Score)(nil),                   // 16: assessmatrix.v1.Score
+	(*AttemptEvent)(nil),            // 17: assessmatrix.v1.AttemptEvent
+	(*Media)(nil),                   // 18: assessmatrix.v1.Media
+	(*ItemAnswer)(nil),              // 19: assessmatrix.v1.ItemAnswer
 }
 var file_assessmatrix_v1_result_proto_depIdxs = []int32{
-	6, // 0: assessmatrix.v1.Response.answers:type_name -> assessmatrix.v1.Response.AnswersEntry
-	7, // 1: assessmatrix.v1.Response.score:type_name -> assessmatrix.v1.Score
-	0, // 2: assessmatrix.v1.ListResponsesResponse.responses:type_name -> assessmatrix.v1.Response
-	8, // 3: assessmatrix.v1.GetAttemptLogResponse.events:type_name -> assessmatrix.v1.AttemptEvent
-	5, // 4: assessmatrix.v1.GetAttemptLogResponse.flags:type_name -> assessmatrix.v1.Flag
-	9, // 5: assessmatrix.v1.Response.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
-	1, // 6: assessmatrix.v1.ResultService.ListResponses:input_type -> assessmatrix.v1.ListResponsesRequest
-	3, // 7: assessmatrix.v1.ResultService.GetAttemptLog:input_type -> assessmatrix.v1.GetAttemptLogRequest
-	2, // 8: assessmatrix.v1.ResultService.ListResponses:output_type -> assessmatrix.v1.ListResponsesResponse
-	4, // 9: assessmatrix.v1.ResultService.GetAttemptLog:output_type -> assessmatrix.v1.GetAttemptLogResponse
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	15, // 0: assessmatrix.v1.Response.answers:type_name -> assessmatrix.v1.Response.AnswersEntry
+	16, // 1: assessmatrix.v1.Response.score:type_name -> assessmatrix.v1.Score
+	0,  // 2: assessmatrix.v1.ListResponsesResponse.responses:type_name -> assessmatrix.v1.Response
+	17, // 3: assessmatrix.v1.GetAttemptLogResponse.events:type_name -> assessmatrix.v1.AttemptEvent
+	5,  // 4: assessmatrix.v1.GetAttemptLogResponse.flags:type_name -> assessmatrix.v1.Flag
+	18, // 5: assessmatrix.v1.ReviewTask.file:type_name -> assessmatrix.v1.Media
+	7,  // 6: assessmatrix.v1.ListReviewsResponse.tasks:type_name -> assessmatrix.v1.ReviewTask
+	16, // 7: assessmatrix.v1.ScoreAnswerResponse.score:type_name -> assessmatrix.v1.Score
+	13, // 8: assessmatrix.v1.GetItemAnalysisResponse.items:type_name -> assessmatrix.v1.ItemStat
+	14, // 9: assessmatrix.v1.ItemStat.choices:type_name -> assessmatrix.v1.ChoiceStat
+	19, // 10: assessmatrix.v1.Response.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
+	1,  // 11: assessmatrix.v1.ResultService.ListResponses:input_type -> assessmatrix.v1.ListResponsesRequest
+	3,  // 12: assessmatrix.v1.ResultService.GetAttemptLog:input_type -> assessmatrix.v1.GetAttemptLogRequest
+	6,  // 13: assessmatrix.v1.ResultService.ListReviews:input_type -> assessmatrix.v1.ListReviewsRequest
+	9,  // 14: assessmatrix.v1.ResultService.ScoreAnswer:input_type -> assessmatrix.v1.ScoreAnswerRequest
+	11, // 15: assessmatrix.v1.ResultService.GetItemAnalysis:input_type -> assessmatrix.v1.GetItemAnalysisRequest
+	2,  // 16: assessmatrix.v1.ResultService.ListResponses:output_type -> assessmatrix.v1.ListResponsesResponse
+	4,  // 17: assessmatrix.v1.ResultService.GetAttemptLog:output_type -> assessmatrix.v1.GetAttemptLogResponse
+	8,  // 18: assessmatrix.v1.ResultService.ListReviews:output_type -> assessmatrix.v1.ListReviewsResponse
+	10, // 19: assessmatrix.v1.ResultService.ScoreAnswer:output_type -> assessmatrix.v1.ScoreAnswerResponse
+	12, // 20: assessmatrix.v1.ResultService.GetItemAnalysis:output_type -> assessmatrix.v1.GetItemAnalysisResponse
+	16, // [16:21] is the sub-list for method output_type
+	11, // [11:16] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_result_proto_init() }
@@ -491,13 +1244,14 @@ func file_assessmatrix_v1_result_proto_init() {
 		return
 	}
 	file_assessmatrix_v1_candidate_proto_init()
+	file_assessmatrix_v1_exam_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_result_proto_rawDesc), len(file_assessmatrix_v1_result_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

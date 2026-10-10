@@ -419,6 +419,30 @@ try {
     ? ok('the score lands on the assignment row')
     : bad('the assignment did not show the submitted score')
 
+  /* ---------------- scoring: the worker's item analysis ---------------- */
+  await nav(/Scoring/)
+  await page.getByRole('combobox', { name: 'Exam' }).click()
+  await page.getByRole('option', { name: `E2E Core ${run}` }).click()
+  await page.getByText(/Nothing waiting/).waitFor({ timeout: 5000 }).then(
+    () => ok('with no essays, the review queue says nothing is waiting'),
+    () => bad('the essay review queue did not load'),
+  )
+  await page.locator('label', { hasText: /^Item analysis$/ }).click()
+  const analysis = page.getByRole('table', { name: 'Item analysis' })
+  await analysis.waitFor({ timeout: 15000 }).catch(() => {})
+  const row = await analysis.innerText().catch(() => '')
+  ;/^Q1/m.test(row) && /\b1\.00\b/.test(row) && (await page.getByText(/Provisional: 1 fully scored/).count())
+    ? ok('the psychometrics worker analyses the hand-in: Q1 difficulty 1.00, labelled provisional')
+    : bad(`no item analysis from the worker: ${row || (await page.locator('main').innerText())}`)
+
+  await nav(/Assignments/)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(600)
+  await nav(/Library/)
+  await page.getByRole('button', { name: new RegExp(`Actions for E2E Core ${run}`) }).click()
+  await page.waitForTimeout(250)
+  await page.getByRole('menuitem', { name: /Assign people/ }).click()
+  await page.waitForTimeout(500)
   const revoke = page.getByRole('button', { name: /Revoke invitation for Kandidat Uji/ })
   ;(await revoke.count()) === 0 || (await revoke.first().isDisabled())
     ? ok('a submitted invitation cannot be revoked')
