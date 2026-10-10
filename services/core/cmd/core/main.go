@@ -32,6 +32,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/mail"
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
+	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
@@ -205,7 +206,15 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	errc := make(chan error, 1)
+	errc := make(chan error, 2)
+	if cfg.MetricsListen != "off" {
+		// Its own port, so the public proxy never exposes it.
+		m := http.NewServeMux()
+		m.Handle("GET /metrics", metrics.Handler())
+		ms := &http.Server{Addr: cfg.MetricsListen, Handler: m, ReadHeaderTimeout: 5 * time.Second}
+		go func() { errc <- ms.ListenAndServe() }()
+		defer ms.Close()
+	}
 	go func() {
 		log.Info("listening", "addr", cfg.Listen, "mailer", cfg.Mailer)
 		errc <- server.ListenAndServe()

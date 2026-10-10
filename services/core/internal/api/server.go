@@ -23,6 +23,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/limit"
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
+	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
@@ -116,7 +117,8 @@ func Policy() map[string]auth.Access {
 func (s *Server) Handler() http.Handler {
 	s.limits()
 	opts := []connect.HandlerOption{
-		connect.WithInterceptors(s.Auth.Interceptor()),
+		// Metrics outermost, so refusals by the policy are counted too.
+		connect.WithInterceptors(metrics.Interceptor(), s.Auth.Interceptor()),
 		// An instrument with inline images is the largest legitimate request.
 		connect.WithReadMaxBytes(16 << 20),
 	}

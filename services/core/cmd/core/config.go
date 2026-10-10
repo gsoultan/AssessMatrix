@@ -19,6 +19,7 @@ type config struct {
 	AppRole       string // AM_APP_ROLE: granted access by migrate (default am_app)
 	Secret        []byte // AM_SECRET: hex or base64, at least 32 bytes
 	Listen        string // AM_LISTEN (default :8080)
+	MetricsListen string // AM_METRICS_LISTEN: Prometheus /metrics, kept off the public port (default :9090; "off" disables)
 	PublicURL     string // AM_PUBLIC_URL: origin of the studio
 	RunnerURL     string // AM_RUNNER_URL: origin candidates open links on (default AM_PUBLIC_URL)
 	Mailer        string // AM_MAILER: log | smtp | mailbox (mailbox needs AM_DEV=1)
@@ -52,16 +53,17 @@ func env(k, def string) string {
 
 func loadConfig(serving bool) (*config, error) {
 	c := &config{
-		DatabaseURL: os.Getenv("AM_DATABASE_URL"),
-		MigrateURL:  os.Getenv("AM_MIGRATE_DATABASE_URL"),
-		AppRole:     env("AM_APP_ROLE", "am_app"),
-		Listen:      env("AM_LISTEN", ":8080"),
-		PublicURL:   strings.TrimRight(os.Getenv("AM_PUBLIC_URL"), "/"),
-		RunnerURL:   strings.TrimRight(os.Getenv("AM_RUNNER_URL"), "/"),
-		Mailer:      env("AM_MAILER", "log"),
-		TrustProxy:  os.Getenv("AM_TRUST_PROXY") == "1",
-		StaticDir:   os.Getenv("AM_STATIC_DIR"),
-		Dev:         os.Getenv("AM_DEV") == "1",
+		DatabaseURL:   os.Getenv("AM_DATABASE_URL"),
+		MigrateURL:    os.Getenv("AM_MIGRATE_DATABASE_URL"),
+		AppRole:       env("AM_APP_ROLE", "am_app"),
+		Listen:        env("AM_LISTEN", ":8080"),
+		MetricsListen: env("AM_METRICS_LISTEN", ":9090"),
+		PublicURL:     strings.TrimRight(os.Getenv("AM_PUBLIC_URL"), "/"),
+		RunnerURL:     strings.TrimRight(os.Getenv("AM_RUNNER_URL"), "/"),
+		Mailer:        env("AM_MAILER", "log"),
+		TrustProxy:    os.Getenv("AM_TRUST_PROXY") == "1",
+		StaticDir:     os.Getenv("AM_STATIC_DIR"),
+		Dev:           os.Getenv("AM_DEV") == "1",
 		Media: mediaConfig{
 			Store:    env("AM_MEDIA_STORE", "none"),
 			Region:   env("AM_MEDIA_REGION", "id"),
