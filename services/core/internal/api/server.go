@@ -35,6 +35,10 @@ type Server struct {
 	Log  *slog.Logger
 	// PublicURL is where candidates open links, e.g. https://exam.example.id.
 	PublicURL string
+	// RunnerURL is the origin of the candidate runner, which a deployment may
+	// put on its own host so candidate and staff cookies never share one.
+	// Empty means PublicURL.
+	RunnerURL string
 	Now       func() time.Time
 	// Media is where uploaded images go, and the one region it may hold.
 	Media media.Regional

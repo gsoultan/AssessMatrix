@@ -7,8 +7,13 @@ import tailwindcss from '@tailwindcss/vite'
 // and the session cookies stay first-party.
 const core = process.env.CORE_URL ?? 'http://localhost:8080'
 
-export default defineConfig({
+export const base = {
   plugins: [react(), tailwindcss()],
+  build: {
+    // The runner is built separately (vite.runner.config.ts), so it shares no
+    // chunk with the studio and a candidate never downloads studio code.
+    rollupOptions: { input: { studio: 'index.html' } },
+  },
   server: {
     port: 5180,
     proxy: {
@@ -16,4 +21,6 @@ export default defineConfig({
       '/dev/mailbox': core,
     },
   },
-})
+}
+
+export default defineConfig(base)

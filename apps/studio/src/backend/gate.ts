@@ -13,6 +13,8 @@ import type { Refusal } from '../invite'
 import { type Assignment, type Attempt, type Exam, listExams, listPeople, resolveExam } from '../store'
 import { CORE } from './mode'
 import { attemptIn, examIn, refusal } from './convert'
+import { open as openQueue } from './sync'
+import { leave } from './onetab'
 
 /** Where a candidate sits once let in: one invitation, the version it pins, and any work so far. */
 export type Seat = {
@@ -118,6 +120,8 @@ const core: Gate = {
     const serverNow = Number(r.serverNow)
     const exam = examIn(r.exam!)
     const attempt = r.attempt ? attemptIn(r.attempt, serverNow) : null
+    // This device's unsent answers are read before the seat is handed over.
+    if (attempt?.id && !attempt.submittedAt) await openQueue(attempt.id)
     const inv = r.invitation
     const assignment: Assignment = {
       id: r.assignmentId,
@@ -151,6 +155,9 @@ const core: Gate = {
     } catch {
       /* the cookie expires on its own */
     }
+    leave()
+    // The figures the runner kept for offline use go with the session.
+    navigator.serviceWorker?.controller?.postMessage('forget-media')
   },
 }
 

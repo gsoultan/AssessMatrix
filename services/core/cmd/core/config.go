@@ -19,7 +19,8 @@ type config struct {
 	AppRole       string // AM_APP_ROLE: granted access by migrate (default am_app)
 	Secret        []byte // AM_SECRET: hex or base64, at least 32 bytes
 	Listen        string // AM_LISTEN (default :8080)
-	PublicURL     string // AM_PUBLIC_URL: origin candidates open links on
+	PublicURL     string // AM_PUBLIC_URL: origin of the studio
+	RunnerURL     string // AM_RUNNER_URL: origin candidates open links on (default AM_PUBLIC_URL)
 	Mailer        string // AM_MAILER: log | smtp | mailbox (mailbox needs AM_DEV=1)
 	SMTP          mail.SMTP
 	SecureCookies bool   // false only with AM_DEV=1
@@ -56,6 +57,7 @@ func loadConfig(serving bool) (*config, error) {
 		AppRole:     env("AM_APP_ROLE", "am_app"),
 		Listen:      env("AM_LISTEN", ":8080"),
 		PublicURL:   strings.TrimRight(os.Getenv("AM_PUBLIC_URL"), "/"),
+		RunnerURL:   strings.TrimRight(os.Getenv("AM_RUNNER_URL"), "/"),
 		Mailer:      env("AM_MAILER", "log"),
 		TrustProxy:  os.Getenv("AM_TRUST_PROXY") == "1",
 		StaticDir:   os.Getenv("AM_STATIC_DIR"),
@@ -86,6 +88,11 @@ func loadConfig(serving bool) (*config, error) {
 		errs = append(errs, errors.New("AM_PUBLIC_URL is required (the origin invitation links point at)"))
 	} else if !c.Dev && !strings.HasPrefix(c.PublicURL, "https://") {
 		errs = append(errs, errors.New("AM_PUBLIC_URL must be https outside development"))
+	}
+	if c.RunnerURL == "" {
+		c.RunnerURL = c.PublicURL
+	} else if !c.Dev && !strings.HasPrefix(c.RunnerURL, "https://") {
+		errs = append(errs, errors.New("AM_RUNNER_URL must be https outside development"))
 	}
 	secret, err := decodeSecret(os.Getenv("AM_SECRET"))
 	if err != nil {

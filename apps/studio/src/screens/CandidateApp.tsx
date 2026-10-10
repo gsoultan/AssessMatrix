@@ -34,6 +34,7 @@ import { SESSION_HASH, useApp, useResponses } from '../state'
 import { type Refusal, OTP_TRIES, listOutbox } from '../invite'
 import { type Seat, gate as door } from '../backend/gate'
 import { CORE } from '../backend/mode'
+import { claim } from '../backend/onetab'
 import {
   type Assignment,
   type Exam,
@@ -63,10 +64,14 @@ type Gate =
   | { at: 'checking' }
   | { at: 'send'; token: string; email: string; stub?: string }
   | { at: 'code'; token: string; email: string; stub?: string; retryAt: number }
-  | { at: 'refused'; why: Refusal | 'session' | 'offline'; token?: string; email?: string; resent?: boolean }
+  | { at: 'refused'; why: Refusal | 'session' | 'offline' | 'elsewhere'; token?: string; email?: string; resent?: boolean }
 
 /** Why a link did not open, said to the person holding it, with what to do next. */
-const REFUSED: Record<Refusal | 'session' | 'offline', { title: string; body: string }> = {
+const REFUSED: Record<Refusal | 'session' | 'offline' | 'elsewhere', { title: string; body: string }> = {
+  elsewhere: {
+    title: 'Sedang dibuka di tab lain',
+    body: 'Asesmen ini sudah terbuka di tab atau jendela lain pada peramban ini. Lanjutkan di sana, lalu tutup tab ini. Jawaban Anda tidak hilang.',
+  },
   offline: {
     title: 'Tidak dapat terhubung',
     body: 'Periksa koneksi internet Anda, lalu buka kembali tautan dari email. Jawaban yang sudah tersimpan tidak hilang.',
@@ -231,12 +236,17 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
 
   /** Past the gate: this tab now acts for one assignment and nothing else. */
   const admit = useCallback(
-    (s: Seat) => {
+    async (s: Seat) => {
       const as = s.assignment
       // A sitting that has been handed in is over; its session opens nothing.
       if (as.status === 'submitted') {
         void door.end()
         return setGate({ at: 'refused', why: 'submitted' })
+      }
+      // One sitting, one tab. The other tab keeps it; this one says so.
+      if (CORE && !(await claim(as.id))) {
+        setStage('gate')
+        return setGate({ at: 'refused', why: 'elsewhere' })
       }
       session.current = true
       takeSeat(s)
@@ -327,7 +337,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     else setGate({ at: 'refused', why: r.why, token })
   }
 
-  const askNewLink = async (token: string, why: Refusal | 'session' | 'offline', email?: string) => {
+  const askNewLink = async (token: string, why: Refusal | 'session' | 'offline' | 'elsewhere', email?: string) => {
     const r = await door.requestNewLink(token).catch(() => null)
     if (!r) return setGate({ at: 'refused', why: 'offline', token, email })
     syncLocal()

@@ -30,12 +30,12 @@ import {
   backfillVersions,
 } from './store'
 import { tokenFromHash } from './invite'
-import { exportQti, importQti, qtiFileName } from './qti'
 import { CORE } from './backend/mode'
 import { type SaveHow, explain, isSignedOut, repo } from './backend/repo'
 import { type Seat, gate } from './backend/gate'
-import { type Pending, enqueue, flush, forget, pendingCount, pendingEvents, replay } from './backend/sync'
+import { type Pending, enqueue, flush, forget, open as openQueue, pendingCount, pendingEvents, replay } from './backend/sync'
 import { type Staff, staffAuth } from './backend/staff'
+import { whenRefused } from './backend/onetab'
 import { api } from './api/client'
 import { attemptIn } from './backend/convert'
 
@@ -269,6 +269,15 @@ export const useApp = create<AppState>((set, get) => {
 
   const queuedFor = (a: Attempt) => (a.id ? pendingCount(a.id) : a.queued + 1)
 
+  // Another tab tried to open this sitting and was turned away: on the record.
+  whenRefused(() => {
+    const a = get().attempt
+    if (a?.id && !a.submittedAt) {
+      record(a, { kind: 'session.second_tab', detail: 'another tab tried to open this sitting and was refused' })
+      set({ attempt: { ...a, queued: queuedFor(a) } })
+    }
+  })
+
   // Back online: send what is waiting now rather than at the next retry.
   window.addEventListener('online', () => {
     const id = get().attempt?.id
@@ -427,6 +436,8 @@ export const useApp = create<AppState>((set, get) => {
 
     importExam: (file) =>
       run(null, async () => {
+        // Loaded on use: the candidate runner shares this module and never needs it.
+        const { importQti } = await import('./qti')
         const { exam, warnings } = await importQti(file)
         // The server names it; the package fills it.
         const made = await repo.createExam(exam.kind)
@@ -443,6 +454,7 @@ export const useApp = create<AppState>((set, get) => {
       run(undefined, async () => {
         const e = get().exams.find((x) => x.id === id)
         if (!e) return
+        const { exportQti, qtiFileName } = await import('./qti')
         const url = URL.createObjectURL(await exportQti(e))
         const a = document.createElement('a')
         a.href = url
@@ -497,6 +509,12 @@ export const useApp = create<AppState>((set, get) => {
       }
       set({ seat, attempt, sessionLost: false, offline: false })
       if (attempt?.id && attempt.queued > 0) void drain(attempt.id)
+      // Every figure now, while there is a network: the runner's service worker
+      // keeps them, so a later outage does not blank a question.
+      if (CORE)
+        for (const it of allItems(seat.exam))
+          for (const m of [it.image, ...it.choices.map((c) => c.image)])
+            if (m?.url.startsWith('/media/')) void fetch(m.url, { credentials: 'same-origin' }).catch(() => {})
     },
 
     beginAttempt: async (exam, given) => {
@@ -506,6 +524,7 @@ export const useApp = create<AppState>((set, get) => {
           const r = await api.candidate.startAttempt({})
           const serverNow = Number(r.serverNow)
           const a = attemptIn(r.attempt!, serverNow)
+          if (a.id) await openQueue(a.id)
           set({ seat: { ...seat, skew: serverNow - Date.now() } })
           set({ attempt: a.id ? replay(a, pendingEvents(a.id)) : a })
         } catch (err) {
