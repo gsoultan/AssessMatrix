@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Periksa sertifikat · AssessMatrix</title>
+    <style>
+      :root {
+        --bg: #fafaf8; --surface: #ffffff; --ink: #1d1c1a; --ink-2: #4a4843; --muted: #6f6d67;
+        --hair: #e4e2dc; --good: #0b7d0b; --good-wash: #e8f4e8; --bad: #b42318; --bad-wash: #fbeaea; --brand: #2470cc; --on-brand: #ffffff;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141413; --surface: #1d1c1a; --ink: #f2f1ed; --ink-2: #cfcdc6; --muted: #9a988f;
+          --hair: #34322e; --good: #6cc76c; --good-wash: #17301a; --bad: #f08a80; --bad-wash: #3a1916; --brand: #6ea6ea; --on-brand: #0b1a2c;
+          color-scheme: dark;
+        }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+      main { max-width: 560px; margin: 0 auto; padding: 32px 16px 48px; }
+      h1 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+      .sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+      .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 14px; padding: 20px; }
+      .verdict { display: flex; gap: 10px; align-items: center; border-radius: 10px; padding: 12px 14px; font-weight: 600; margin-bottom: 16px; }
+      .ok { background: var(--good-wash); color: var(--good); }
+      .bad { background: var(--bad-wash); color: var(--bad); }
+      .title { font-size: 20px; font-weight: 650; margin: 0 0 4px; }
+      dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 16px 0 0; font-size: 13.5px; }
+      dt { color: var(--muted); }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      form { margin-top: 18px; border-top: 1px solid var(--hair); padding-top: 16px; }
+      label { font-size: 13px; color: var(--ink-2); display: block; margin-bottom: 6px; }
+      .row { display: flex; gap: 8px; }
+      input { flex: 1; min-width: 0; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--hair); background: var(--bg); color: var(--ink); }
+      button, .link { font: inherit; font-size: 13.5px; padding: 8px 14px; border-radius: 8px; border: 0; background: var(--brand); color: var(--on-brand); cursor: pointer; text-decoration: none; }
+      .note { font-size: 13px; margin-top: 8px; }
+      .foot { color: var(--muted); font-size: 12px; margin-top: 18px; }
+      .foot a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Periksa sertifikat</h1>
+      <p class="sub">Sertifikat digital Open Badges 3.0, diperiksa langsung dengan kunci publik penerbitnya.</p>
+      <div id="out" class="card" aria-live="polite">Memeriksa…</div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -6,4 +6,5 @@ bold "AssessMatrix — typecheck"
 ensure_deps
 cd "$APP"
 bunx tsc --noEmit
+(cd ../verify && bunx tsc --noEmit)
 ok "types clean"

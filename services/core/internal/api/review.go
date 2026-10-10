@@ -137,6 +137,13 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		if err := storeScore(ctx, tx, att, e, answers, reviews, out.Score); err != nil {
 			return err
 		}
+		cred, err := s.settleCredential(ctx, tx, att, e, out.Score)
+		if err != nil {
+			return err
+		}
+		if cred != "" {
+			out.CredentialUrl = s.CredentialURL(cred)
+		}
 		return audit(ctx, tx, "attempt.reviewed", att.ID, map[string]any{"item": item.GetId(), "points": m.GetPoints()})
 	})
 	if err != nil {

@@ -393,6 +393,52 @@ try {
     ? ok('the server scores the attempt: 100%, passed')
     : bad(`the score was not 100%: ${await cand.locator('main').innerText()}`)
 
+  /* ---------------- the credential, checked by a stranger ---------------- */
+  const credLink = await cand.getByRole('link', { name: /Lihat dan bagikan sertifikat/ }).getAttribute('href').catch(() => null)
+  credLink && /\/verify\/#[0-9a-f-]{36}$/.test(credLink)
+    ? ok('passing earns an Open Badges credential, linked from the result')
+    : bad(`no credential link on the result: ${credLink}`)
+  ;(await mail(CANDIDATE, 'credential').then((m) => m.Body.includes(credLink), () => false))
+    ? ok('the credential link is mailed to the candidate')
+    : bad('no credential mail')
+  if (credLink) {
+    const strangerCtx = await browser.newContext()
+    const stranger = await strangerCtx.newPage()
+    stranger.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
+    await stranger.goto(credLink.replace(/^https?:\/\/[^/]+/, URL))
+    await stranger.getByText(/Sertifikat sah/).waitFor({ timeout: 8000 }).then(
+      () => ok('anyone can verify it, signature checked in their browser against the issuer key'),
+      async () => bad(`the verify page did not accept the credential: ${await stranger.locator('main').innerText()}`),
+    )
+    await stranger.getByLabel(/Untuk siapa/).fill('someone.else@example.id')
+    await stranger.getByRole('button', { name: 'Cocokkan' }).click()
+    const wrong = await stranger.getByText(/tidak diterbitkan untuk email tersebut/).count()
+    await stranger.getByLabel(/Untuk siapa/).fill(CANDIDATE.toUpperCase())
+    await stranger.getByRole('button', { name: 'Cocokkan' }).click()
+    ;wrong && (await stranger.getByText(/✓ Sertifikat ini diterbitkan untuk email tersebut/).count())
+      ? ok('it names its recipient only as a hash: the right email matches, another does not')
+      : bad('the email check on the verify page is wrong')
+    ;(await stranger.content()).includes(CANDIDATE)
+      ? bad('the verify page shows the email in the clear')
+      : ok('the email never appears in the public credential')
+    // Someone edits the credential on its way: the name of what was passed.
+    await stranger.route('**/credentials/*', async (route) => {
+      const res = await route.fetch()
+      const body = await res.json()
+      const [h, p, sig] = body.jwt.split('.')
+      const vc = JSON.parse(Buffer.from(p, 'base64url').toString())
+      vc.name = 'Doctor of Medicine'
+      body.jwt = [h, Buffer.from(JSON.stringify(vc)).toString('base64url'), sig].join('.')
+      await route.fulfill({ response: res, json: body })
+    })
+    await stranger.reload()
+    await stranger.getByText(/tanda tangan sertifikat ini tidak sah/i).waitFor({ timeout: 8000 }).then(
+      () => ok('an edited credential fails verification'),
+      async () => bad(`an edited credential was accepted: ${await stranger.locator('main').innerText()}`),
+    )
+    await strangerCtx.close()
+  }
+
   /* ---------------- back on the staff side ---------------- */
   // No reload: the stream brings the hand-in.
   await page.getByText(/Handed in/).first().waitFor({ timeout: 8000 }).then(

@@ -704,8 +704,11 @@ func (x *ScoreAnswerRequest) GetNote() string {
 }
 
 type ScoreAnswerResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Score         *Score                 `protobuf:"bytes,1,opt,name=score,proto3" json:"score,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Score *Score                 `protobuf:"bytes,1,opt,name=score,proto3" json:"score,omitempty"`
+	// Set when this review completed a passing result and issued (or
+	// restored) the candidate's credential.
+	CredentialUrl string `protobuf:"bytes,2,opt,name=credential_url,json=credentialUrl,proto3" json:"credential_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -745,6 +748,13 @@ func (x *ScoreAnswerResponse) GetScore() *Score {
 		return x.Score
 	}
 	return nil
+}
+
+func (x *ScoreAnswerResponse) GetCredentialUrl() string {
+	if x != nil {
+		return x.CredentialUrl
+	}
+	return ""
 }
 
 type GetItemAnalysisRequest struct {
@@ -1134,9 +1144,10 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x17\n" +
 	"\aitem_id\x18\x02 \x01(\tR\x06itemId\x12\x16\n" +
 	"\x06points\x18\x03 \x01(\x05R\x06points\x12\x12\n" +
-	"\x04note\x18\x04 \x01(\tR\x04note\"C\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\"j\n" +
 	"\x13ScoreAnswerResponse\x12,\n" +
-	"\x05score\x18\x01 \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\"T\n" +
+	"\x05score\x18\x01 \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\x12%\n" +
+	"\x0ecredential_url\x18\x02 \x01(\tR\rcredentialUrl\"T\n" +
 	"\x16GetItemAnalysisRequest\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12!\n" +
 	"\fexam_version\x18\x02 \x01(\x05R\vexamVersion\"\xe3\x01\n" +

@@ -1103,14 +1103,22 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
                 manusia dan belum termasuk di atas. Skor akhir dapat naik.
               </p>
             )}
-            {attempt.score?.passed && (
+            {(CORE ? !!attempt.credentialUrl : attempt.score?.passed) && (
               <div className="mt-4 rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, var(--color-credential-from) 0%, var(--color-credential-to) 100%)' }}>
-                <p className="text-[10.5px] font-medium uppercase tracking-wider opacity-80">Verifiable credential</p>
+                <p className="text-[10.5px] font-medium uppercase tracking-wider opacity-80">Sertifikat digital</p>
                 <p className="mt-1.5 text-[15px] font-semibold leading-tight">{exam!.title}</p>
                 <p className="mt-0.5 text-[12px] opacity-85">{exam!.issuer} · Open Badges 3.0</p>
-                <button className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-white/15 py-2 text-[12.5px] font-semibold">
-                  <IconCertificate size={14} stroke={2} /> Simpan ke dompet
-                </button>
+                {attempt.credentialUrl && (
+                  <a
+                    href={attempt.credentialUrl}
+                    target="_blank"
+                    rel="noopener"
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-white/15 py-2 text-[12.5px] font-semibold"
+                  >
+                    <IconCertificate size={14} stroke={2} /> Lihat dan bagikan sertifikat
+                  </a>
+                )}
+                {CORE && <p className="mt-2 text-[11.5px] opacity-85">Tautannya juga dikirim ke email Anda.</p>}
               </div>
             )}
           </>

@@ -63,3 +63,21 @@ func TestMaskEmail(t *testing.T) {
 		}
 	}
 }
+
+func TestSealIsBoundToItsLabel(t *testing.T) {
+	k, _ := NewKeys(make([]byte, 32))
+	sealed, err := k.Seal("issuer:a", []byte("private"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := k.Open("issuer:a", sealed); err != nil || string(got) != "private" {
+		t.Fatalf("open: %q %v", got, err)
+	}
+	if _, err := k.Open("issuer:b", sealed); err == nil {
+		t.Fatal("a sealed value must not open under another label")
+	}
+	other, _ := NewKeys(append(make([]byte, 31), 1))
+	if _, err := other.Open("issuer:a", sealed); err == nil {
+		t.Fatal("a sealed value must not open under another server secret")
+	}
+}

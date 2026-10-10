@@ -103,10 +103,14 @@ func newHarness(t *testing.T) *harness {
 	srv.ipLimit, srv.emailLimit = limit.New(1_000_000, time.Minute, 1000), limit.New(1_000_000, time.Minute, 100_000)
 	srv.Media = media.Regional{Store: media.FS{Dir: t.TempDir()}, Region: "id"}
 	// Mounted as cmd/core mounts them: RPCs by prefix, images on their own paths.
-	rpc, images := srv.Handler(), srv.MediaHandler()
+	rpc, images, public := srv.Handler(), srv.MediaHandler(), srv.PublicHandler()
 	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/media") {
 			images.ServeHTTP(w, r)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/credentials/") || strings.HasPrefix(r.URL.Path, "/issuers/") {
+			public.ServeHTTP(w, r)
 			return
 		}
 		rpc.ServeHTTP(w, r)

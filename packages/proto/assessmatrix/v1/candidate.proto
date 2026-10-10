@@ -219,6 +219,9 @@ message SubmitAttemptResponse {
   // Required items still blank, when refused.
   repeated string missing_item_ids = 2;
   Attempt attempt = 3;
+  // Where the Open Badges credential this attempt earned can be checked;
+  // empty when it earned none (yet: an essay may still be waiting).
+  string credential_url = 4;
 }
 
 message EndSessionRequest {}

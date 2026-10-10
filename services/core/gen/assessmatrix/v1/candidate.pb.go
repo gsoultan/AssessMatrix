@@ -1447,8 +1447,11 @@ type SubmitAttemptResponse struct {
 	// Required items still blank, when refused.
 	MissingItemIds []string `protobuf:"bytes,2,rep,name=missing_item_ids,json=missingItemIds,proto3" json:"missing_item_ids,omitempty"`
 	Attempt        *Attempt `protobuf:"bytes,3,opt,name=attempt,proto3" json:"attempt,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Where the Open Badges credential this attempt earned can be checked;
+	// empty when it earned none (yet: an essay may still be waiting).
+	CredentialUrl string `protobuf:"bytes,4,opt,name=credential_url,json=credentialUrl,proto3" json:"credential_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SubmitAttemptResponse) Reset() {
@@ -1500,6 +1503,13 @@ func (x *SubmitAttemptResponse) GetAttempt() *Attempt {
 		return x.Attempt
 	}
 	return nil
+}
+
+func (x *SubmitAttemptResponse) GetCredentialUrl() string {
+	if x != nil {
+		return x.CredentialUrl
+	}
+	return ""
 }
 
 type EndSessionRequest struct {
@@ -1694,11 +1704,12 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x14SubmitAttemptRequest\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x14\n" +
-	"\x05force\x18\x02 \x01(\bR\x05force\"\x85\x01\n" +
+	"\x05force\x18\x02 \x01(\bR\x05force\"\xac\x01\n" +
 	"\x15SubmitAttemptResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12(\n" +
 	"\x10missing_item_ids\x18\x02 \x03(\tR\x0emissingItemIds\x122\n" +
-	"\aattempt\x18\x03 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\"\x13\n" +
+	"\aattempt\x18\x03 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12%\n" +
+	"\x0ecredential_url\x18\x04 \x01(\tR\rcredentialUrl\"\x13\n" +
 	"\x11EndSessionRequest\"\x14\n" +
 	"\x12EndSessionResponse*\xa3\x02\n" +
 	"\aRefusal\x12\x17\n" +
