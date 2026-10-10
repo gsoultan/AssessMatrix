@@ -22,6 +22,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/limit"
+	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
@@ -40,6 +41,8 @@ type harness struct {
 	http  *httptest.Server
 	owner *pgx.Conn
 	clock *clock
+	// lastTenant is the id of the tenant most recently made by tenant().
+	lastTenant string
 }
 
 type clock struct {
@@ -97,13 +100,24 @@ func newHarness(t *testing.T) *harness {
 	}
 	// Tests open many links from one address; the limiter has its own test.
 	srv.ipLimit, srv.emailLimit = limit.New(1_000_000, time.Minute, 1000), limit.New(1_000_000, time.Minute, 100_000)
-	hs := httptest.NewServer(srv.Handler())
+	srv.Media = media.Regional{Store: media.FS{Dir: t.TempDir()}, Region: "id"}
+	// Mounted as cmd/core mounts them: RPCs by prefix, images on their own paths.
+	rpc, images := srv.Handler(), srv.MediaHandler()
+	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/media") {
+			images.ServeHTTP(w, r)
+			return
+		}
+		rpc.ServeHTTP(w, r)
+	}))
 	t.Cleanup(hs.Close)
 	return &harness{t: t, srv: srv, http: hs, owner: owner, clock: clk}
 }
 
 // client is one browser: its own cookie jar.
 type client struct {
+	http      *http.Client
+	base      string
 	auth      assessmatrixv1connect.AuthServiceClient
 	exams     assessmatrixv1connect.ExamServiceClient
 	people    assessmatrixv1connect.PersonServiceClient
@@ -117,6 +131,8 @@ func (h *harness) browser() *client {
 	hc := &http.Client{Jar: jar}
 	u := h.http.URL
 	return &client{
+		http:      hc,
+		base:      u,
 		auth:      assessmatrixv1connect.NewAuthServiceClient(hc, u),
 		exams:     assessmatrixv1connect.NewExamServiceClient(hc, u),
 		people:    assessmatrixv1connect.NewPersonServiceClient(hc, u),
@@ -138,6 +154,7 @@ func (h *harness) tenant(name string) *client {
 	if _, err := h.owner.Exec(ctx, `INSERT INTO staff (tenant_id, email) VALUES ($1, $2)`, tenant, email); err != nil {
 		h.t.Fatal(err)
 	}
+	h.lastTenant = tenant
 	c := h.browser()
 	get(c.auth.RequestStaffCode(ctx, connect.NewRequest(&v1.RequestStaffCodeRequest{Email: email})))
 	code := h.lastCode(email)

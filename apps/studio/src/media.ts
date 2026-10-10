@@ -1,15 +1,18 @@
 /**
- * Image ingest for the prototype.
+ * Image ingest.
  *
- * Production shape is unchanged: an item references media by URL and the bytes
- * live in object storage (docs/03-architecture.md §3). Here the URL happens to
- * be a `data:` URL so the prototype has no backend — swapping to real storage is
- * a change of field *value*, not of schema.
+ * An item references media by URL and the bytes live in object storage
+ * (docs/03-architecture.md §3). Against the core the URL is /media/<id>, served
+ * on the same origin to whoever holds a session in that tenant. A local build
+ * has no server, so the URL is a `data:` URL: a change of field value, not of
+ * schema.
  *
  * Everything is downscaled and re-encoded on the way in. An exam with a dozen
  * untouched phone photos would blow the localStorage quota instantly, and a
  * 4 MB image on a mid-range Android in a regional school is its own failure.
  */
+
+import { CORE } from './backend/mode'
 
 export type Media = {
   id: string
@@ -70,8 +73,25 @@ export async function ingestImage(file: File, alt = ''): Promise<Media> {
   // smears the text and PNG is far too large.
   let url = canvas.toDataURL('image/webp', QUALITY)
   if (!url.startsWith('data:image/webp')) url = canvas.toDataURL('image/jpeg', QUALITY)
+  const bytes = Math.round((url.length - url.indexOf(',') - 1) * 0.75)
 
-  return { id: rid(), url, alt, w, h, bytes: Math.round((url.length - url.indexOf(',') - 1) * 0.75) }
+  // Against the core the bytes go to object storage in the tenant's region,
+  // and the item keeps only their address.
+  if (CORE) return { id: rid(), ...(await upload(url)), alt, w, h, bytes }
+  return { id: rid(), url, alt, w, h, bytes }
+}
+
+async function upload(dataUrl: string): Promise<{ url: string }> {
+  const blob = await (await fetch(dataUrl)).blob()
+  let res: Response
+  try {
+    res = await fetch('/media', { method: 'POST', body: blob, credentials: 'same-origin' })
+  } catch {
+    throw new MediaError('Could not upload the image. Check your connection and try again.')
+  }
+  if (!res.ok) throw new MediaError((await res.text()).trim() || 'Could not upload the image.')
+  const out = (await res.json()) as { url: string }
+  return { url: out.url }
 }
 
 /** Rough footprint of everything we are about to try to persist. */

@@ -22,6 +22,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/limit"
+	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
@@ -35,6 +36,8 @@ type Server struct {
 	// PublicURL is where candidates open links, e.g. https://exam.example.id.
 	PublicURL string
 	Now       func() time.Time
+	// Media is where uploaded images go, and the one region it may hold.
+	Media media.Regional
 
 	// Per-IP limits on the unauthenticated candidate and sign-in endpoints.
 	// The per-row counters (tries, sends, cooldowns) are the real defence;
@@ -103,10 +106,7 @@ func Policy() map[string]auth.Access {
 
 // Handler mounts every service with the auth interceptor in front.
 func (s *Server) Handler() http.Handler {
-	if s.ipLimit == nil {
-		s.ipLimit = limit.New(60, time.Minute, 100_000)
-		s.emailLimit = limit.New(10, time.Hour, 100_000)
-	}
+	s.limits()
 	opts := []connect.HandlerOption{
 		connect.WithInterceptors(s.Auth.Interceptor()),
 		// An instrument with inline images is the largest legitimate request.
@@ -120,6 +120,13 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(assessmatrixv1connect.NewCandidateServiceHandler(&candidateService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewResultServiceHandler(&resultService{s}, opts...))
 	return mux
+}
+
+func (s *Server) limits() {
+	if s.ipLimit == nil {
+		s.ipLimit = limit.New(60, time.Minute, 100_000)
+		s.emailLimit = limit.New(10, time.Hour, 100_000)
+	}
 }
 
 // tx runs fn scoped to the caller's tenant.

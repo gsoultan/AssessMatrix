@@ -7,6 +7,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -65,6 +66,14 @@ func validID(s string) bool {
 	return true
 }
 
+var uploaded = regexp.MustCompile(`^/media/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// MediaURL reports whether u is a place an image may be: one uploaded to this
+// server (/media/<uuid>), an inline data:image URL, or https.
+func MediaURL(u string) bool {
+	return uploaded.MatchString(u) || strings.HasPrefix(u, "data:image/") || strings.HasPrefix(u, "https://")
+}
+
 func validMedia(m *v1.Media, where string) error {
 	if m == nil {
 		return nil
@@ -72,9 +81,8 @@ func validMedia(m *v1.Media, where string) error {
 	if len(m.GetUrl()) > MaxMediaURL {
 		return invalid("%s: image is too large", where)
 	}
-	u := m.GetUrl()
-	if !strings.HasPrefix(u, "data:image/") && !strings.HasPrefix(u, "https://") {
-		return invalid("%s: image must be a data:image URL or https", where)
+	if !MediaURL(m.GetUrl()) {
+		return invalid("%s: image must be an uploaded image, a data:image URL or https", where)
 	}
 	if len(m.GetAlt()) > MaxText {
 		return invalid("%s: alt text is too long", where)

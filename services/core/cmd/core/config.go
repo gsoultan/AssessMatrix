@@ -26,6 +26,20 @@ type config struct {
 	TrustProxy    bool   // AM_TRUST_PROXY=1 behind a proxy that sets X-Forwarded-For
 	StaticDir     string // AM_STATIC_DIR: serve the built web app from here
 	Dev           bool   // AM_DEV=1
+	Media         mediaConfig
+}
+
+// mediaConfig picks where uploaded images go. One store serves one region;
+// tenants of any other region cannot upload here.
+type mediaConfig struct {
+	Store    string // AM_MEDIA_STORE: fs | s3 | none (default none: uploads refused)
+	Region   string // AM_MEDIA_REGION: the region the store is in (default id)
+	Dir      string // AM_MEDIA_DIR, for fs
+	Endpoint string // AM_S3_ENDPOINT host[:port], for s3
+	Bucket   string // AM_S3_BUCKET
+	Key      string // AM_S3_ACCESS_KEY
+	Secret   string // AM_S3_SECRET_KEY
+	Insecure bool   // AM_S3_INSECURE=1: plain http, development only
 }
 
 func env(k, def string) string {
@@ -46,6 +60,16 @@ func loadConfig(serving bool) (*config, error) {
 		TrustProxy:  os.Getenv("AM_TRUST_PROXY") == "1",
 		StaticDir:   os.Getenv("AM_STATIC_DIR"),
 		Dev:         os.Getenv("AM_DEV") == "1",
+		Media: mediaConfig{
+			Store:    env("AM_MEDIA_STORE", "none"),
+			Region:   env("AM_MEDIA_REGION", "id"),
+			Dir:      os.Getenv("AM_MEDIA_DIR"),
+			Endpoint: os.Getenv("AM_S3_ENDPOINT"),
+			Bucket:   os.Getenv("AM_S3_BUCKET"),
+			Key:      os.Getenv("AM_S3_ACCESS_KEY"),
+			Secret:   os.Getenv("AM_S3_SECRET_KEY"),
+			Insecure: os.Getenv("AM_S3_INSECURE") == "1",
+		},
 	}
 	c.SecureCookies = !c.Dev
 	if !serving {
@@ -82,6 +106,22 @@ func loadConfig(serving bool) (*config, error) {
 		}
 	default:
 		errs = append(errs, fmt.Errorf("unknown AM_MAILER %q", c.Mailer))
+	}
+	switch m := c.Media; m.Store {
+	case "none":
+	case "fs":
+		if m.Dir == "" {
+			errs = append(errs, errors.New("AM_MEDIA_DIR is required for AM_MEDIA_STORE=fs"))
+		}
+	case "s3":
+		if m.Endpoint == "" || m.Bucket == "" || m.Key == "" || m.Secret == "" {
+			errs = append(errs, errors.New("AM_S3_ENDPOINT, AM_S3_BUCKET, AM_S3_ACCESS_KEY and AM_S3_SECRET_KEY are required for AM_MEDIA_STORE=s3"))
+		}
+		if m.Insecure && !c.Dev {
+			errs = append(errs, errors.New("AM_S3_INSECURE=1 sends images in the clear and needs AM_DEV=1"))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("unknown AM_MEDIA_STORE %q (want fs, s3 or none)", m.Store))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err

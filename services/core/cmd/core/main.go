@@ -29,6 +29,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/mail"
+	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
@@ -144,7 +145,12 @@ func serve(ctx context.Context, log *slog.Logger) error {
 
 	api.TrustProxy = cfg.TrustProxy
 	authn := &auth.Authenticator{DB: database, Keys: keys, Policy: api.Policy(), SecureCookies: cfg.SecureCookies}
-	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL}
+	store, err := openMedia(ctx, cfg.Media)
+	if err != nil {
+		return err
+	}
+	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL,
+		Media: media.Regional{Store: store, Region: cfg.Media.Region}}
 
 	mux := http.NewServeMux()
 	rpc := srv.Handler()
@@ -165,6 +171,9 @@ func serve(ctx context.Context, log *slog.Logger) error {
 			json.NewEncoder(w).Encode(mailbox.List())
 		})
 	}
+	images := srv.MediaHandler()
+	mux.Handle(api.MediaPrefix, images)
+	mux.Handle("POST /media", images)
 	if cfg.StaticDir != "" {
 		mux.Handle("/", spa(cfg.StaticDir))
 	}
@@ -201,6 +210,22 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	// Stop taking requests first, then let in-flight mail jobs finish.
 	err = errors.Join(server.Shutdown(shutdown), jobs.Stop(shutdown))
 	return err
+}
+
+func openMedia(ctx context.Context, m mediaConfig) (media.Store, error) {
+	switch m.Store {
+	case "fs":
+		return media.FS{Dir: m.Dir}, nil
+	case "s3":
+		s3, err := media.NewS3(m.Endpoint, m.Key, m.Secret, m.Bucket, !m.Insecure)
+		if err != nil {
+			return nil, err
+		}
+		c, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		return s3, s3.Check(c)
+	}
+	return nil, nil
 }
 
 // sameOrigin refuses a browser POST from another origin. SameSite=Strict
