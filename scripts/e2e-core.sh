@@ -41,7 +41,11 @@ AM_LISTEN=":${CORE_PORT}" AM_PUBLIC_URL="$URL" AM_RUNNER_URL="http://localhost:$
 AM_DEV=1 AM_MAILER=mailbox AM_MEDIA_STORE=fs AM_MEDIA_DIR="$WORK/media" \
   "$WORK/core" serve >"$WORK/core.log" 2>&1 &
 CORE_PID=$!
-stop() { kill "$CORE_PID" 2>/dev/null || true; wait "$CORE_PID" 2>/dev/null || true; }
+# The psychometrics worker, as deployed: its own process on the app role.
+AM_DATABASE_URL="$AM_E2E_DATABASE_URL" AM_WORKER_IDLE=1 \
+  python3 "$ROOT/services/psychometrics/worker.py" >"$WORK/worker.log" 2>&1 &
+WORKER_PID=$!
+stop() { kill "$CORE_PID" "$WORKER_PID" 2>/dev/null || true; wait "$CORE_PID" "$WORKER_PID" 2>/dev/null || true; }
 trap 'stop; rm -rf "$WORK"' EXIT
 
 for i in $(seq 1 40); do
@@ -59,5 +63,7 @@ set -e
 if [ "$rc" -ne 0 ]; then
   info "core log (last 40 lines):"
   tail -n 40 "$WORK/core.log"
+  info "worker log (last 20 lines):"
+  tail -n 20 "$WORK/worker.log"
 fi
 exit "$rc"

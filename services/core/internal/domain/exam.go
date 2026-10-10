@@ -211,37 +211,60 @@ func ForCandidate(e *v1.Exam) *v1.Exam {
 	return c
 }
 
-// Score is the auto-score. Essays and scales are never machine-scored; their
-// points are reported as pending human review, as in the prototype.
-func Score(e *v1.Exam, answers map[string]*v1.ItemAnswer) *v1.Score {
+// Score is the attempt's score so far. Choice and short-answer items are
+// machine-scored. Essays are never machine-scored: one a person has reviewed
+// counts with the points they gave; one still waiting is reported as pending
+// and left out of raw, max and pct, so pct is always over what has been
+// scored. Scales measure opinion and are not scored at all.
+func Score(e *v1.Exam, answers map[string]*v1.ItemAnswer, reviews map[string]Review) *v1.Score {
 	var raw, max, pending int32
 	for _, it := range AllItems(e) {
-		if it.GetType() == v1.ItemType_ITEM_TYPE_ESSAY || IsScale(it.GetType()) {
-			pending += it.GetPoints()
+		if IsScale(it.GetType()) {
 			continue
 		}
-		max += it.GetPoints()
-		a := answers[it.GetId()]
-		if it.GetType() == v1.ItemType_ITEM_TYPE_SHORT {
-			given := strings.ToLower(strings.TrimSpace(a.GetText()))
-			if given != "" && slices.ContainsFunc(it.GetCorrect(), func(k string) bool {
-				return strings.ToLower(strings.TrimSpace(k)) == given
-			}) {
-				raw += it.GetPoints()
+		if it.GetType() == v1.ItemType_ITEM_TYPE_ESSAY {
+			if r, ok := reviews[it.GetId()]; ok {
+				raw += min(max32(r.Points, 0), it.GetPoints())
+				max += it.GetPoints()
+			} else {
+				pending += it.GetPoints()
 			}
 			continue
 		}
-		given := slices.Sorted(slices.Values(a.GetValues()))
-		want := slices.Sorted(slices.Values(it.GetCorrect()))
-		if len(given) > 0 && slices.Equal(given, want) {
-			raw += it.GetPoints()
-		}
+		max += it.GetPoints()
+		raw += Earned(it, answers[it.GetId()])
 	}
 	var pct int32
 	if max > 0 {
 		pct = int32((float64(raw)/float64(max))*100 + 0.5)
 	}
 	return &v1.Score{Raw: raw, Max: max, Pct: pct, Passed: pct >= e.GetPassPct(), PendingHuman: pending}
+}
+
+func max32(a, b int32) int32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// Earned is what a machine-scored item's answer earns: all or nothing.
+func Earned(it *v1.Item, a *v1.ItemAnswer) int32 {
+	if it.GetType() == v1.ItemType_ITEM_TYPE_SHORT {
+		given := strings.ToLower(strings.TrimSpace(a.GetText()))
+		if given != "" && slices.ContainsFunc(it.GetCorrect(), func(k string) bool {
+			return strings.ToLower(strings.TrimSpace(k)) == given
+		}) {
+			return it.GetPoints()
+		}
+		return 0
+	}
+	given := slices.Sorted(slices.Values(a.GetValues()))
+	want := slices.Sorted(slices.Values(it.GetCorrect()))
+	if len(given) > 0 && slices.Equal(given, want) {
+		return it.GetPoints()
+	}
+	return 0
 }
 
 // Unanswered lists required questions with no answer.

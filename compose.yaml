@@ -59,6 +59,14 @@ services:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped
 
+  psychometrics:
+    build: ./services/psychometrics
+    environment:
+      AM_DATABASE_URL: postgres://am_app:${AM_APP_PASSWORD}@postgres:5432/assessmatrix
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
 volumes:
   pgdata:
   media:

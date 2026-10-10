@@ -18,8 +18,8 @@ func exam() *v1.Exam {
 }
 
 // Same cases as the prototype's score(): partial multiple-choice earns
-// nothing, short answers ignore case and surrounding space, essays and scales
-// are reported as pending, and rounding is half-up.
+// nothing, short answers ignore case and surrounding space, an unreviewed essay
+// is reported as pending (scales are not scored), and rounding is half-up.
 func TestScoreMatchesPrototype(t *testing.T) {
 	e := exam()
 	cases := []struct {
@@ -36,8 +36,8 @@ func TestScoreMatchesPrototype(t *testing.T) {
 		{"three of four rounds to 75", map[string]*v1.ItemAnswer{"b": {Values: []string{"x", "z"}}, "c": {Text: "Bandung"}}, 3, 75, true},
 	}
 	for _, c := range cases {
-		s := Score(e, c.answers)
-		if s.GetRaw() != c.raw || s.GetMax() != 4 || s.GetPct() != c.pct || s.GetPassed() != c.passed || s.GetPendingHuman() != 5 {
+		s := Score(e, c.answers, nil)
+		if s.GetRaw() != c.raw || s.GetMax() != 4 || s.GetPct() != c.pct || s.GetPassed() != c.passed || s.GetPendingHuman() != 4 {
 			t.Errorf("%s: got %+v", c.name, s)
 		}
 	}
@@ -123,5 +123,26 @@ func TestValidateRejectsBrokenKeys(t *testing.T) {
 	e.Sections[0].Items[0].Image = &v1.Media{Url: "javascript:alert(1)"}
 	if err := ValidateSections(e); err == nil {
 		t.Fatal("a non-image URL must be refused")
+	}
+}
+
+// A reviewed essay counts with the points a person gave, capped at the item's
+// points; until then pct is over the machine-scored part only.
+func TestReviewedEssayCounts(t *testing.T) {
+	e := exam()
+	all := map[string]*v1.ItemAnswer{"a": {Values: []string{"y"}}, "b": {Values: []string{"z", "x"}}, "c": {Text: "bdg"}, "d": {Text: "an essay"}}
+	s := Score(e, all, map[string]Review{"d": {Points: 2}})
+	if s.GetRaw() != 6 || s.GetMax() != 8 || s.GetPct() != 75 || s.GetPendingHuman() != 0 || !s.GetPassed() {
+		t.Fatalf("got %+v, want 6/8 75%% passed, nothing pending", s)
+	}
+	if s := Score(e, all, map[string]Review{"d": {Points: 99}}); s.GetRaw() != 8 {
+		t.Fatalf("points beyond the item's must be capped, got raw %d", s.GetRaw())
+	}
+	ev := []*v1.AttemptEvent{
+		{Kind: KindReviewScored, ItemId: "d", Values: []string{"1"}},
+		{Kind: KindReviewScored, ItemId: "d", Values: []string{"3"}, Detail: "clear argument"},
+	}
+	if r := Reviews(ev)["d"]; r.Points != 3 || r.Note != "clear argument" {
+		t.Fatalf("the latest review must win, got %+v", r)
 	}
 }

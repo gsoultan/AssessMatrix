@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strconv"
 	"time"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
@@ -21,11 +22,40 @@ const (
 	KindIdentityVerified = "identity.verified"
 	KindAttemptSubmitted = "attempt.submitted"
 	KindAttemptExpired   = "attempt.expired"
+	// A person scored an essay: item_id, values[0] the points, detail their
+	// note to the candidate, text the reviewer ("staff:<id>"). The latest for
+	// an item wins, so a second look is a new event, never an edit.
+	KindReviewScored = "review.scored"
 )
 
 // ServerOnly kinds are refused in AppendEvents.
 var ServerOnly = map[string]bool{
 	KindAttemptStarted: true, KindIdentityVerified: true, KindAttemptSubmitted: true, KindAttemptExpired: true,
+	KindReviewScored: true,
+}
+
+// Review is a person's score for one essay.
+type Review struct {
+	Points int32
+	Note   string
+	By     string
+	At     int64
+}
+
+// Reviews folds the log's review events: the latest per item.
+func Reviews(events []*v1.AttemptEvent) map[string]Review {
+	out := map[string]Review{}
+	for _, ev := range events {
+		if ev.GetKind() != KindReviewScored || ev.GetItemId() == "" || len(ev.GetValues()) == 0 {
+			continue
+		}
+		n, err := strconv.ParseInt(ev.GetValues()[0], 10, 32)
+		if err != nil {
+			continue
+		}
+		out[ev.GetItemId()] = Review{Points: int32(n), Note: ev.GetDetail(), By: ev.GetText(), At: ev.GetServerTime()}
+	}
+	return out
 }
 
 // Grace periods for answers that reach the server after the deadline.

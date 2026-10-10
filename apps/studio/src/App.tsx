@@ -29,6 +29,7 @@ import { IntegrationHub } from './screens/IntegrationHub'
 import { EmbedStudio } from './screens/EmbedStudio'
 import { ProctorMonitor } from './screens/ProctorMonitor'
 import { LiveMonitor } from './screens/LiveMonitor'
+import { Scoring } from './screens/Scoring'
 import { EventInspector } from './screens/EventInspector'
 import { AuthorStudio } from './screens/AuthorStudio'
 import { EvidenceProfile } from './screens/EvidenceProfile'
@@ -58,6 +59,8 @@ const ALL_SCREENS = [
   { key: 'hub', group: 'Integrate', name: 'Integration hub', sub: 'The four doors', Icon: IconPlugConnected, El: IntegrationHub },
   { key: 'embed', group: 'Integrate', name: 'Embed studio', sub: 'Preview + preflight', Icon: IconCode, El: EmbedStudio },
   { key: 'events', group: 'Integrate', name: 'Event inspector', sub: 'Webhooks · replay', Icon: IconWebhook, El: EventInspector },
+  // Needs the core: people score essays and the worker analyses items there.
+  ...(CORE ? [{ key: 'scoring', group: 'Operate', name: 'Scoring', sub: 'Essays · item analysis', Icon: IconChecklist, El: Scoring } as const] : []),
   { key: 'monitor', group: 'Operate', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
 ] as const
 

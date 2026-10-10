@@ -6,13 +6,15 @@ import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegen
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { AttemptEvent, ItemAnswer, Score } from "./candidate_pb";
 import { file_assessmatrix_v1_candidate } from "./candidate_pb";
+import type { Media } from "./exam_pb";
+import { file_assessmatrix_v1_exam } from "./exam_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file assessmatrix/v1/result.proto.
  */
 export const file_assessmatrix_v1_result: GenFile = /*@__PURE__*/
-  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcmVzdWx0LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEioQIKCFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSFQoNYXNzaWdubWVudF9pZBgCIAEoCRIRCglwZXJzb25faWQYAyABKAkSFAoMZXhhbV92ZXJzaW9uGAQgASgFEhQKDHN1Ym1pdHRlZF9hdBgFIAEoAxI3CgdhbnN3ZXJzGAYgAygLMiYuYXNzZXNzbWF0cml4LnYxLlJlc3BvbnNlLkFuc3dlcnNFbnRyeRIlCgVzY29yZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIicKFExpc3RSZXNwb25zZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiRQoVTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEiwKCXJlc3BvbnNlcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5SZXNwb25zZSIqChRHZXRBdHRlbXB0TG9nUmVxdWVzdBISCgphdHRlbXB0X2lkGAEgASgJIpkBChVHZXRBdHRlbXB0TG9nUmVzcG9uc2USLQoGZXZlbnRzGAEgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudBIUCgxjaGFpbl9pbnRhY3QYAiABKAgSFQoNYnJva2VuX2F0X3NlcRgDIAEoAxIkCgVmbGFncxgEIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnIloKBEZsYWcSDAoEdHlwZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoCRIOCgZyZWFzb24YAyABKAkSEQoJcmVhc29uX2lkGAQgASgJEg8KB2l0ZW1faWQYBSABKAkyzwEKDVJlc3VsdFNlcnZpY2USXgoNTGlzdFJlc3BvbnNlcxIlLmFzc2Vzc21hdHJpeC52MS5MaXN0UmVzcG9uc2VzUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5MaXN0UmVzcG9uc2VzUmVzcG9uc2USXgoNR2V0QXR0ZW1wdExvZxIlLmFzc2Vzc21hdHJpeC52MS5HZXRBdHRlbXB0TG9nUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5HZXRBdHRlbXB0TG9nUmVzcG9uc2VC0gEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCC1Jlc3VsdFByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw", [file_assessmatrix_v1_candidate]);
+  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcmVzdWx0LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEioQIKCFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSFQoNYXNzaWdubWVudF9pZBgCIAEoCRIRCglwZXJzb25faWQYAyABKAkSFAoMZXhhbV92ZXJzaW9uGAQgASgFEhQKDHN1Ym1pdHRlZF9hdBgFIAEoAxI3CgdhbnN3ZXJzGAYgAygLMiYuYXNzZXNzbWF0cml4LnYxLlJlc3BvbnNlLkFuc3dlcnNFbnRyeRIlCgVzY29yZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIicKFExpc3RSZXNwb25zZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiRQoVTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEiwKCXJlc3BvbnNlcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5SZXNwb25zZSIqChRHZXRBdHRlbXB0TG9nUmVxdWVzdBISCgphdHRlbXB0X2lkGAEgASgJIpkBChVHZXRBdHRlbXB0TG9nUmVzcG9uc2USLQoGZXZlbnRzGAEgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudBIUCgxjaGFpbl9pbnRhY3QYAiABKAgSFQoNYnJva2VuX2F0X3NlcRgDIAEoAxIkCgVmbGFncxgEIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnIloKBEZsYWcSDAoEdHlwZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoCRIOCgZyZWFzb24YAyABKAkSEQoJcmVhc29uX2lkGAQgASgJEg8KB2l0ZW1faWQYBSABKAkiOwoSTGlzdFJldmlld3NSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkSFAoMaW5jbHVkZV9kb25lGAIgASgIIucBCgpSZXZpZXdUYXNrEhIKCmF0dGVtcHRfaWQYASABKAkSDQoFbGFiZWwYAiABKAkSDwoHaXRlbV9pZBgDIAEoCRIOCgZudW1iZXIYBCABKAUSDAoEc3RlbRgFIAEoCRIMCgR0ZXh0GAYgASgJEiQKBGZpbGUYByABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWESDgoGcG9pbnRzGAggASgFEhAKCHJldmlld2VkGAkgASgIEg0KBWdpdmVuGAogASgFEgwKBG5vdGUYCyABKAkSFAoMc3VibWl0dGVkX2F0GAwgASgDIkEKE0xpc3RSZXZpZXdzUmVzcG9uc2USKgoFdGFza3MYASADKAsyGy5hc3Nlc3NtYXRyaXgudjEuUmV2aWV3VGFzayJXChJTY29yZUFuc3dlclJlcXVlc3QSEgoKYXR0ZW1wdF9pZBgBIAEoCRIPCgdpdGVtX2lkGAIgASgJEg4KBnBvaW50cxgDIAEoBRIMCgRub3RlGAQgASgJIjwKE1Njb3JlQW5zd2VyUmVzcG9uc2USJQoFc2NvcmUYASABKAsyFi5hc3Nlc3NtYXRyaXgudjEuU2NvcmUiPwoWR2V0SXRlbUFuYWx5c2lzUmVxdWVzdBIPCgdleGFtX2lkGAEgASgJEhQKDGV4YW1fdmVyc2lvbhgCIAEoBSKpAQoXR2V0SXRlbUFuYWx5c2lzUmVzcG9uc2USFAoMZXhhbV92ZXJzaW9uGAEgASgFEgkKAW4YAiABKAUSEwoLY29tcHV0ZWRfYXQYAyABKAMSKAoFaXRlbXMYBCADKAsyGS5hc3Nlc3NtYXRyaXgudjEuSXRlbVN0YXQSDAoEa3IyMBgFIAEoARIPCgd0b29fZmV3GAYgASgIEg8KB3BlbmRpbmcYByABKAginAEKCEl0ZW1TdGF0Eg8KB2l0ZW1faWQYASABKAkSDgoGbnVtYmVyGAIgASgFEgkKAW4YAyABKAUSDwoHcF92YWx1ZRgEIAEoARIWCg5wb2ludF9iaXNlcmlhbBgFIAEoARIsCgdjaG9pY2VzGAYgAygLMhsuYXNzZXNzbWF0cml4LnYxLkNob2ljZVN0YXQSDQoFbm90ZXMYByADKAkiaQoKQ2hvaWNlU3RhdBIRCgljaG9pY2VfaWQYASABKAkSDwoHY29ycmVjdBgCIAEoCBINCgVzaGFyZRgDIAEoARITCgtzaGFyZV91cHBlchgEIAEoARITCgtzaGFyZV9sb3dlchgFIAEoATLpAwoNUmVzdWx0U2VydmljZRJeCg1MaXN0UmVzcG9uc2VzEiUuYXNzZXNzbWF0cml4LnYxLkxpc3RSZXNwb25zZXNSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLkxpc3RSZXNwb25zZXNSZXNwb25zZRJeCg1HZXRBdHRlbXB0TG9nEiUuYXNzZXNzbWF0cml4LnYxLkdldEF0dGVtcHRMb2dSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLkdldEF0dGVtcHRMb2dSZXNwb25zZRJYCgtMaXN0UmV2aWV3cxIjLmFzc2Vzc21hdHJpeC52MS5MaXN0UmV2aWV3c1JlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuTGlzdFJldmlld3NSZXNwb25zZRJYCgtTY29yZUFuc3dlchIjLmFzc2Vzc21hdHJpeC52MS5TY29yZUFuc3dlclJlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuU2NvcmVBbnN3ZXJSZXNwb25zZRJkCg9HZXRJdGVtQW5hbHlzaXMSJy5hc3Nlc3NtYXRyaXgudjEuR2V0SXRlbUFuYWx5c2lzUmVxdWVzdBooLmFzc2Vzc21hdHJpeC52MS5HZXRJdGVtQW5hbHlzaXNSZXNwb25zZULSAQoTY29tLmFzc2Vzc21hdHJpeC52MUILUmVzdWx0UHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z", [file_assessmatrix_v1_candidate, file_assessmatrix_v1_exam]);
 
 /**
  * @generated from message assessmatrix.v1.Response
@@ -205,6 +207,354 @@ export const FlagSchema: GenMessage<Flag> = /*@__PURE__*/
   messageDesc(file_assessmatrix_v1_result, 5);
 
 /**
+ * @generated from message assessmatrix.v1.ListReviewsRequest
+ */
+export type ListReviewsRequest = Message<"assessmatrix.v1.ListReviewsRequest"> & {
+  /**
+   * @generated from field: string exam_id = 1;
+   */
+  examId: string;
+
+  /**
+   * Also list essays already scored, to look again.
+   *
+   * @generated from field: bool include_done = 2;
+   */
+  includeDone: boolean;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ListReviewsRequest.
+ * Use `create(ListReviewsRequestSchema)` to create a new message.
+ */
+export const ListReviewsRequestSchema: GenMessage<ListReviewsRequest> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 6);
+
+/**
+ * @generated from message assessmatrix.v1.ReviewTask
+ */
+export type ReviewTask = Message<"assessmatrix.v1.ReviewTask"> & {
+  /**
+   * @generated from field: string attempt_id = 1;
+   */
+  attemptId: string;
+
+  /**
+   * "Response 7": the order of hand-in, so marking is blind to who wrote it.
+   *
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: string item_id = 3;
+   */
+  itemId: string;
+
+  /**
+   * The question's position as the candidate saw it.
+   *
+   * @generated from field: int32 number = 4;
+   */
+  number: number;
+
+  /**
+   * @generated from field: string stem = 5;
+   */
+  stem: string;
+
+  /**
+   * @generated from field: string text = 6;
+   */
+  text: string;
+
+  /**
+   * @generated from field: assessmatrix.v1.Media file = 7;
+   */
+  file?: Media | undefined;
+
+  /**
+   * Most the essay can earn.
+   *
+   * @generated from field: int32 points = 8;
+   */
+  points: number;
+
+  /**
+   * @generated from field: bool reviewed = 9;
+   */
+  reviewed: boolean;
+
+  /**
+   * @generated from field: int32 given = 10;
+   */
+  given: number;
+
+  /**
+   * @generated from field: string note = 11;
+   */
+  note: string;
+
+  /**
+   * @generated from field: int64 submitted_at = 12;
+   */
+  submittedAt: bigint;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ReviewTask.
+ * Use `create(ReviewTaskSchema)` to create a new message.
+ */
+export const ReviewTaskSchema: GenMessage<ReviewTask> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 7);
+
+/**
+ * @generated from message assessmatrix.v1.ListReviewsResponse
+ */
+export type ListReviewsResponse = Message<"assessmatrix.v1.ListReviewsResponse"> & {
+  /**
+   * @generated from field: repeated assessmatrix.v1.ReviewTask tasks = 1;
+   */
+  tasks: ReviewTask[];
+};
+
+/**
+ * Describes the message assessmatrix.v1.ListReviewsResponse.
+ * Use `create(ListReviewsResponseSchema)` to create a new message.
+ */
+export const ListReviewsResponseSchema: GenMessage<ListReviewsResponse> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 8);
+
+/**
+ * @generated from message assessmatrix.v1.ScoreAnswerRequest
+ */
+export type ScoreAnswerRequest = Message<"assessmatrix.v1.ScoreAnswerRequest"> & {
+  /**
+   * @generated from field: string attempt_id = 1;
+   */
+  attemptId: string;
+
+  /**
+   * @generated from field: string item_id = 2;
+   */
+  itemId: string;
+
+  /**
+   * @generated from field: int32 points = 3;
+   */
+  points: number;
+
+  /**
+   * Shown to the candidate with the score.
+   *
+   * @generated from field: string note = 4;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ScoreAnswerRequest.
+ * Use `create(ScoreAnswerRequestSchema)` to create a new message.
+ */
+export const ScoreAnswerRequestSchema: GenMessage<ScoreAnswerRequest> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 9);
+
+/**
+ * @generated from message assessmatrix.v1.ScoreAnswerResponse
+ */
+export type ScoreAnswerResponse = Message<"assessmatrix.v1.ScoreAnswerResponse"> & {
+  /**
+   * @generated from field: assessmatrix.v1.Score score = 1;
+   */
+  score?: Score | undefined;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ScoreAnswerResponse.
+ * Use `create(ScoreAnswerResponseSchema)` to create a new message.
+ */
+export const ScoreAnswerResponseSchema: GenMessage<ScoreAnswerResponse> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 10);
+
+/**
+ * @generated from message assessmatrix.v1.GetItemAnalysisRequest
+ */
+export type GetItemAnalysisRequest = Message<"assessmatrix.v1.GetItemAnalysisRequest"> & {
+  /**
+   * @generated from field: string exam_id = 1;
+   */
+  examId: string;
+
+  /**
+   * 0: the newest version with an analysis.
+   *
+   * @generated from field: int32 exam_version = 2;
+   */
+  examVersion: number;
+};
+
+/**
+ * Describes the message assessmatrix.v1.GetItemAnalysisRequest.
+ * Use `create(GetItemAnalysisRequestSchema)` to create a new message.
+ */
+export const GetItemAnalysisRequestSchema: GenMessage<GetItemAnalysisRequest> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 11);
+
+/**
+ * What the worker found. Its JSON form is what the worker writes.
+ *
+ * @generated from message assessmatrix.v1.GetItemAnalysisResponse
+ */
+export type GetItemAnalysisResponse = Message<"assessmatrix.v1.GetItemAnalysisResponse"> & {
+  /**
+   * @generated from field: int32 exam_version = 1;
+   */
+  examVersion: number;
+
+  /**
+   * Submitted attempts the statistics are over.
+   *
+   * @generated from field: int32 n = 2;
+   */
+  n: number;
+
+  /**
+   * @generated from field: int64 computed_at = 3;
+   */
+  computedAt: bigint;
+
+  /**
+   * @generated from field: repeated assessmatrix.v1.ItemStat items = 4;
+   */
+  items: ItemStat[];
+
+  /**
+   * KR-20 reliability of the machine-scored part; meaningful only with
+   * enough attempts (see too_few).
+   *
+   * @generated from field: double kr20 = 5;
+   */
+  kr20: number;
+
+  /**
+   * Fewer attempts than the worker needs for stable numbers: shown, but
+   * labelled provisional.
+   *
+   * @generated from field: bool too_few = 6;
+   */
+  tooFew: boolean;
+
+  /**
+   * Waiting for the worker (nothing computed yet for this version).
+   *
+   * @generated from field: bool pending = 7;
+   */
+  pending: boolean;
+};
+
+/**
+ * Describes the message assessmatrix.v1.GetItemAnalysisResponse.
+ * Use `create(GetItemAnalysisResponseSchema)` to create a new message.
+ */
+export const GetItemAnalysisResponseSchema: GenMessage<GetItemAnalysisResponse> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 12);
+
+/**
+ * @generated from message assessmatrix.v1.ItemStat
+ */
+export type ItemStat = Message<"assessmatrix.v1.ItemStat"> & {
+  /**
+   * @generated from field: string item_id = 1;
+   */
+  itemId: string;
+
+  /**
+   * @generated from field: int32 number = 2;
+   */
+  number: number;
+
+  /**
+   * @generated from field: int32 n = 3;
+   */
+  n: number;
+
+  /**
+   * Share of full marks: difficulty, higher is easier.
+   *
+   * @generated from field: double p_value = 4;
+   */
+  pValue: number;
+
+  /**
+   * Corrected item-total correlation: does doing well here go with doing
+   * well on the rest? Below 0.2 deserves a look; negative, a key check.
+   *
+   * @generated from field: double point_biserial = 5;
+   */
+  pointBiserial: number;
+
+  /**
+   * @generated from field: repeated assessmatrix.v1.ChoiceStat choices = 6;
+   */
+  choices: ChoiceStat[];
+
+  /**
+   * Plain-language reading of the numbers, for authors.
+   *
+   * @generated from field: repeated string notes = 7;
+   */
+  notes: string[];
+};
+
+/**
+ * Describes the message assessmatrix.v1.ItemStat.
+ * Use `create(ItemStatSchema)` to create a new message.
+ */
+export const ItemStatSchema: GenMessage<ItemStat> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 13);
+
+/**
+ * @generated from message assessmatrix.v1.ChoiceStat
+ */
+export type ChoiceStat = Message<"assessmatrix.v1.ChoiceStat"> & {
+  /**
+   * @generated from field: string choice_id = 1;
+   */
+  choiceId: string;
+
+  /**
+   * @generated from field: bool correct = 2;
+   */
+  correct: boolean;
+
+  /**
+   * Share of all candidates who picked it.
+   *
+   * @generated from field: double share = 3;
+   */
+  share: number;
+
+  /**
+   * Share within the top and bottom 27% by total score.
+   *
+   * @generated from field: double share_upper = 4;
+   */
+  shareUpper: number;
+
+  /**
+   * @generated from field: double share_lower = 5;
+   */
+  shareLower: number;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ChoiceStat.
+ * Use `create(ChoiceStatSchema)` to create a new message.
+ */
+export const ChoiceStatSchema: GenMessage<ChoiceStat> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_result, 14);
+
+/**
  * @generated from service assessmatrix.v1.ResultService
  */
 export const ResultService: GenService<{
@@ -225,6 +575,38 @@ export const ResultService: GenService<{
     methodKind: "unary";
     input: typeof GetAttemptLogRequestSchema;
     output: typeof GetAttemptLogResponseSchema;
+  },
+  /**
+   * Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+   *
+   * @generated from rpc assessmatrix.v1.ResultService.ListReviews
+   */
+  listReviews: {
+    methodKind: "unary";
+    input: typeof ListReviewsRequestSchema;
+    output: typeof ListReviewsResponseSchema;
+  },
+  /**
+   * A person's score for one essay. Written to the attempt's log; the
+   * attempt's score and its assignment's are recomputed from it.
+   *
+   * @generated from rpc assessmatrix.v1.ResultService.ScoreAnswer
+   */
+  scoreAnswer: {
+    methodKind: "unary";
+    input: typeof ScoreAnswerRequestSchema;
+    output: typeof ScoreAnswerResponseSchema;
+  },
+  /**
+   * Classical test theory statistics for one version of an exam, computed
+   * by the psychometrics worker outside any request.
+   *
+   * @generated from rpc assessmatrix.v1.ResultService.GetItemAnalysis
+   */
+  getItemAnalysis: {
+    methodKind: "unary";
+    input: typeof GetItemAnalysisRequestSchema;
+    output: typeof GetItemAnalysisResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_assessmatrix_v1_result, 0);

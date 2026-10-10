@@ -177,6 +177,18 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			_, err := b.results.GetAttemptLog(ctx, connect.NewRequest(&v1.GetAttemptLogRequest{AttemptId: attA.GetId()}))
 			denied("GetAttemptLog", err)
 		},
+		"/assessmatrix.v1.ResultService/ListReviews": func() {
+			_, err := b.results.ListReviews(ctx, connect.NewRequest(&v1.ListReviewsRequest{ExamId: fa.exam.GetId(), IncludeDone: true}))
+			denied("ListReviews", err)
+		},
+		"/assessmatrix.v1.ResultService/ScoreAnswer": func() {
+			_, err := b.results.ScoreAnswer(ctx, connect.NewRequest(&v1.ScoreAnswerRequest{AttemptId: attA.GetId(), ItemId: "q4", Points: 1}))
+			denied("ScoreAnswer", err)
+		},
+		"/assessmatrix.v1.ResultService/GetItemAnalysis": func() {
+			_, err := b.results.GetItemAnalysis(ctx, connect.NewRequest(&v1.GetItemAnalysisRequest{ExamId: fa.exam.GetId()}))
+			denied("GetItemAnalysis", err)
+		},
 		"/assessmatrix.v1.ProctorService/WatchExam": func() {
 			st, err := b.proctor.WatchExam(ctx, connect.NewRequest(&v1.WatchExamRequest{ExamId: fa.exam.GetId()}))
 			if err == nil {

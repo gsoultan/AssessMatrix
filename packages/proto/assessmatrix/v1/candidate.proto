@@ -144,7 +144,8 @@ message Score {
   int32 max = 2;
   int32 pct = 3;
   bool passed = 4;
-  // Essay and scale points, reported separately as awaiting a person.
+  // Essay points awaiting a person, left out of raw, max and pct until
+  // reviewed. Scales are not scored.
   int32 pending_human = 5;
 }
 

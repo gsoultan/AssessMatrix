@@ -39,6 +39,15 @@ const (
 	// ResultServiceGetAttemptLogProcedure is the fully-qualified name of the ResultService's
 	// GetAttemptLog RPC.
 	ResultServiceGetAttemptLogProcedure = "/assessmatrix.v1.ResultService/GetAttemptLog"
+	// ResultServiceListReviewsProcedure is the fully-qualified name of the ResultService's ListReviews
+	// RPC.
+	ResultServiceListReviewsProcedure = "/assessmatrix.v1.ResultService/ListReviews"
+	// ResultServiceScoreAnswerProcedure is the fully-qualified name of the ResultService's ScoreAnswer
+	// RPC.
+	ResultServiceScoreAnswerProcedure = "/assessmatrix.v1.ResultService/ScoreAnswer"
+	// ResultServiceGetItemAnalysisProcedure is the fully-qualified name of the ResultService's
+	// GetItemAnalysis RPC.
+	ResultServiceGetItemAnalysisProcedure = "/assessmatrix.v1.ResultService/GetItemAnalysis"
 )
 
 // ResultServiceClient is a client for the assessmatrix.v1.ResultService service.
@@ -46,6 +55,14 @@ type ResultServiceClient interface {
 	ListResponses(context.Context, *connect.Request[v1.ListResponsesRequest]) (*connect.Response[v1.ListResponsesResponse], error)
 	// The full, hash-chained event log of one attempt, with a check of the chain.
 	GetAttemptLog(context.Context, *connect.Request[v1.GetAttemptLogRequest]) (*connect.Response[v1.GetAttemptLogResponse], error)
+	// Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+	ListReviews(context.Context, *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error)
+	// A person's score for one essay. Written to the attempt's log; the
+	// attempt's score and its assignment's are recomputed from it.
+	ScoreAnswer(context.Context, *connect.Request[v1.ScoreAnswerRequest]) (*connect.Response[v1.ScoreAnswerResponse], error)
+	// Classical test theory statistics for one version of an exam, computed
+	// by the psychometrics worker outside any request.
+	GetItemAnalysis(context.Context, *connect.Request[v1.GetItemAnalysisRequest]) (*connect.Response[v1.GetItemAnalysisResponse], error)
 }
 
 // NewResultServiceClient constructs a client for the assessmatrix.v1.ResultService service. By
@@ -71,13 +88,34 @@ func NewResultServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(resultServiceMethods.ByName("GetAttemptLog")),
 			connect.WithClientOptions(opts...),
 		),
+		listReviews: connect.NewClient[v1.ListReviewsRequest, v1.ListReviewsResponse](
+			httpClient,
+			baseURL+ResultServiceListReviewsProcedure,
+			connect.WithSchema(resultServiceMethods.ByName("ListReviews")),
+			connect.WithClientOptions(opts...),
+		),
+		scoreAnswer: connect.NewClient[v1.ScoreAnswerRequest, v1.ScoreAnswerResponse](
+			httpClient,
+			baseURL+ResultServiceScoreAnswerProcedure,
+			connect.WithSchema(resultServiceMethods.ByName("ScoreAnswer")),
+			connect.WithClientOptions(opts...),
+		),
+		getItemAnalysis: connect.NewClient[v1.GetItemAnalysisRequest, v1.GetItemAnalysisResponse](
+			httpClient,
+			baseURL+ResultServiceGetItemAnalysisProcedure,
+			connect.WithSchema(resultServiceMethods.ByName("GetItemAnalysis")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // resultServiceClient implements ResultServiceClient.
 type resultServiceClient struct {
-	listResponses *connect.Client[v1.ListResponsesRequest, v1.ListResponsesResponse]
-	getAttemptLog *connect.Client[v1.GetAttemptLogRequest, v1.GetAttemptLogResponse]
+	listResponses   *connect.Client[v1.ListResponsesRequest, v1.ListResponsesResponse]
+	getAttemptLog   *connect.Client[v1.GetAttemptLogRequest, v1.GetAttemptLogResponse]
+	listReviews     *connect.Client[v1.ListReviewsRequest, v1.ListReviewsResponse]
+	scoreAnswer     *connect.Client[v1.ScoreAnswerRequest, v1.ScoreAnswerResponse]
+	getItemAnalysis *connect.Client[v1.GetItemAnalysisRequest, v1.GetItemAnalysisResponse]
 }
 
 // ListResponses calls assessmatrix.v1.ResultService.ListResponses.
@@ -90,11 +128,34 @@ func (c *resultServiceClient) GetAttemptLog(ctx context.Context, req *connect.Re
 	return c.getAttemptLog.CallUnary(ctx, req)
 }
 
+// ListReviews calls assessmatrix.v1.ResultService.ListReviews.
+func (c *resultServiceClient) ListReviews(ctx context.Context, req *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error) {
+	return c.listReviews.CallUnary(ctx, req)
+}
+
+// ScoreAnswer calls assessmatrix.v1.ResultService.ScoreAnswer.
+func (c *resultServiceClient) ScoreAnswer(ctx context.Context, req *connect.Request[v1.ScoreAnswerRequest]) (*connect.Response[v1.ScoreAnswerResponse], error) {
+	return c.scoreAnswer.CallUnary(ctx, req)
+}
+
+// GetItemAnalysis calls assessmatrix.v1.ResultService.GetItemAnalysis.
+func (c *resultServiceClient) GetItemAnalysis(ctx context.Context, req *connect.Request[v1.GetItemAnalysisRequest]) (*connect.Response[v1.GetItemAnalysisResponse], error) {
+	return c.getItemAnalysis.CallUnary(ctx, req)
+}
+
 // ResultServiceHandler is an implementation of the assessmatrix.v1.ResultService service.
 type ResultServiceHandler interface {
 	ListResponses(context.Context, *connect.Request[v1.ListResponsesRequest]) (*connect.Response[v1.ListResponsesResponse], error)
 	// The full, hash-chained event log of one attempt, with a check of the chain.
 	GetAttemptLog(context.Context, *connect.Request[v1.GetAttemptLogRequest]) (*connect.Response[v1.GetAttemptLogResponse], error)
+	// Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+	ListReviews(context.Context, *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error)
+	// A person's score for one essay. Written to the attempt's log; the
+	// attempt's score and its assignment's are recomputed from it.
+	ScoreAnswer(context.Context, *connect.Request[v1.ScoreAnswerRequest]) (*connect.Response[v1.ScoreAnswerResponse], error)
+	// Classical test theory statistics for one version of an exam, computed
+	// by the psychometrics worker outside any request.
+	GetItemAnalysis(context.Context, *connect.Request[v1.GetItemAnalysisRequest]) (*connect.Response[v1.GetItemAnalysisResponse], error)
 }
 
 // NewResultServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -116,12 +177,36 @@ func NewResultServiceHandler(svc ResultServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(resultServiceMethods.ByName("GetAttemptLog")),
 		connect.WithHandlerOptions(opts...),
 	)
+	resultServiceListReviewsHandler := connect.NewUnaryHandler(
+		ResultServiceListReviewsProcedure,
+		svc.ListReviews,
+		connect.WithSchema(resultServiceMethods.ByName("ListReviews")),
+		connect.WithHandlerOptions(opts...),
+	)
+	resultServiceScoreAnswerHandler := connect.NewUnaryHandler(
+		ResultServiceScoreAnswerProcedure,
+		svc.ScoreAnswer,
+		connect.WithSchema(resultServiceMethods.ByName("ScoreAnswer")),
+		connect.WithHandlerOptions(opts...),
+	)
+	resultServiceGetItemAnalysisHandler := connect.NewUnaryHandler(
+		ResultServiceGetItemAnalysisProcedure,
+		svc.GetItemAnalysis,
+		connect.WithSchema(resultServiceMethods.ByName("GetItemAnalysis")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/assessmatrix.v1.ResultService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ResultServiceListResponsesProcedure:
 			resultServiceListResponsesHandler.ServeHTTP(w, r)
 		case ResultServiceGetAttemptLogProcedure:
 			resultServiceGetAttemptLogHandler.ServeHTTP(w, r)
+		case ResultServiceListReviewsProcedure:
+			resultServiceListReviewsHandler.ServeHTTP(w, r)
+		case ResultServiceScoreAnswerProcedure:
+			resultServiceScoreAnswerHandler.ServeHTTP(w, r)
+		case ResultServiceGetItemAnalysisProcedure:
+			resultServiceGetItemAnalysisHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -137,4 +222,16 @@ func (UnimplementedResultServiceHandler) ListResponses(context.Context, *connect
 
 func (UnimplementedResultServiceHandler) GetAttemptLog(context.Context, *connect.Request[v1.GetAttemptLogRequest]) (*connect.Response[v1.GetAttemptLogResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.ResultService.GetAttemptLog is not implemented"))
+}
+
+func (UnimplementedResultServiceHandler) ListReviews(context.Context, *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.ResultService.ListReviews is not implemented"))
+}
+
+func (UnimplementedResultServiceHandler) ScoreAnswer(context.Context, *connect.Request[v1.ScoreAnswerRequest]) (*connect.Response[v1.ScoreAnswerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.ResultService.ScoreAnswer is not implemented"))
+}
+
+func (UnimplementedResultServiceHandler) GetItemAnalysis(context.Context, *connect.Request[v1.GetItemAnalysisRequest]) (*connect.Response[v1.GetItemAnalysisResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.ResultService.GetItemAnalysis is not implemented"))
 }
