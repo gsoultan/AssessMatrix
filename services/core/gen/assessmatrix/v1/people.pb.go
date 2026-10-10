@@ -513,6 +513,120 @@ func (*DeletePersonResponse) Descriptor() ([]byte, []int) {
 	return file_assessmatrix_v1_people_proto_rawDescGZIP(), []int{9}
 }
 
+type ErasePersonRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Why, for the audit log: e.g. "request from the candidate, ticket 123".
+	// Must not itself contain personal data.
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ErasePersonRequest) Reset() {
+	*x = ErasePersonRequest{}
+	mi := &file_assessmatrix_v1_people_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ErasePersonRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ErasePersonRequest) ProtoMessage() {}
+
+func (x *ErasePersonRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_people_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ErasePersonRequest.ProtoReflect.Descriptor instead.
+func (*ErasePersonRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_people_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ErasePersonRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ErasePersonRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ErasePersonResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Attempts      int32                  `protobuf:"varint,1,opt,name=attempts,proto3" json:"attempts,omitempty"`
+	Credentials   int32                  `protobuf:"varint,2,opt,name=credentials,proto3" json:"credentials,omitempty"`
+	Images        int32                  `protobuf:"varint,3,opt,name=images,proto3" json:"images,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ErasePersonResponse) Reset() {
+	*x = ErasePersonResponse{}
+	mi := &file_assessmatrix_v1_people_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ErasePersonResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ErasePersonResponse) ProtoMessage() {}
+
+func (x *ErasePersonResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_people_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ErasePersonResponse.ProtoReflect.Descriptor instead.
+func (*ErasePersonResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_people_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ErasePersonResponse) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
+}
+
+func (x *ErasePersonResponse) GetCredentials() int32 {
+	if x != nil {
+		return x.Credentials
+	}
+	return 0
+}
+
+func (x *ErasePersonResponse) GetImages() int32 {
+	if x != nil {
+		return x.Images
+	}
+	return 0
+}
+
 var File_assessmatrix_v1_people_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_people_proto_rawDesc = "" +
@@ -544,13 +658,21 @@ const file_assessmatrix_v1_people_proto_rawDesc = "" +
 	"\x06people\x18\x03 \x03(\v2\x17.assessmatrix.v1.PersonR\x06people\"%\n" +
 	"\x13DeletePersonRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x16\n" +
-	"\x14DeletePersonResponse2\xf4\x02\n" +
+	"\x14DeletePersonResponse\"<\n" +
+	"\x12ErasePersonRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"k\n" +
+	"\x13ErasePersonResponse\x12\x1a\n" +
+	"\battempts\x18\x01 \x01(\x05R\battempts\x12 \n" +
+	"\vcredentials\x18\x02 \x01(\x05R\vcredentials\x12\x16\n" +
+	"\x06images\x18\x03 \x01(\x05R\x06images2\xce\x03\n" +
 	"\rPersonService\x12U\n" +
 	"\n" +
 	"ListPeople\x12\".assessmatrix.v1.ListPeopleRequest\x1a#.assessmatrix.v1.ListPeopleResponse\x12R\n" +
 	"\tAddPerson\x12!.assessmatrix.v1.AddPersonRequest\x1a\".assessmatrix.v1.AddPersonResponse\x12[\n" +
 	"\fEnsurePeople\x12$.assessmatrix.v1.EnsurePeopleRequest\x1a%.assessmatrix.v1.EnsurePeopleResponse\x12[\n" +
-	"\fDeletePerson\x12$.assessmatrix.v1.DeletePersonRequest\x1a%.assessmatrix.v1.DeletePersonResponseB\xd2\x01\n" +
+	"\fDeletePerson\x12$.assessmatrix.v1.DeletePersonRequest\x1a%.assessmatrix.v1.DeletePersonResponse\x12X\n" +
+	"\vErasePerson\x12#.assessmatrix.v1.ErasePersonRequest\x1a$.assessmatrix.v1.ErasePersonResponseB\xd2\x01\n" +
 	"\x13com.assessmatrix.v1B\vPeopleProtoP\x01ZQgithub.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1;assessmatrixv1\xa2\x02\x03AXX\xaa\x02\x0fAssessmatrix.V1\xca\x02\x0fAssessmatrix\\V1\xe2\x02\x1bAssessmatrix\\V1\\GPBMetadata\xea\x02\x10Assessmatrix::V1b\x06proto3"
 
 var (
@@ -565,7 +687,7 @@ func file_assessmatrix_v1_people_proto_rawDescGZIP() []byte {
 	return file_assessmatrix_v1_people_proto_rawDescData
 }
 
-var file_assessmatrix_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_assessmatrix_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_assessmatrix_v1_people_proto_goTypes = []any{
 	(*Person)(nil),               // 0: assessmatrix.v1.Person
 	(*PersonDraft)(nil),          // 1: assessmatrix.v1.PersonDraft
@@ -577,26 +699,30 @@ var file_assessmatrix_v1_people_proto_goTypes = []any{
 	(*EnsurePeopleResponse)(nil), // 7: assessmatrix.v1.EnsurePeopleResponse
 	(*DeletePersonRequest)(nil),  // 8: assessmatrix.v1.DeletePersonRequest
 	(*DeletePersonResponse)(nil), // 9: assessmatrix.v1.DeletePersonResponse
+	(*ErasePersonRequest)(nil),   // 10: assessmatrix.v1.ErasePersonRequest
+	(*ErasePersonResponse)(nil),  // 11: assessmatrix.v1.ErasePersonResponse
 }
 var file_assessmatrix_v1_people_proto_depIdxs = []int32{
-	0, // 0: assessmatrix.v1.ListPeopleResponse.people:type_name -> assessmatrix.v1.Person
-	1, // 1: assessmatrix.v1.AddPersonRequest.person:type_name -> assessmatrix.v1.PersonDraft
-	0, // 2: assessmatrix.v1.AddPersonResponse.person:type_name -> assessmatrix.v1.Person
-	1, // 3: assessmatrix.v1.EnsurePeopleRequest.people:type_name -> assessmatrix.v1.PersonDraft
-	0, // 4: assessmatrix.v1.EnsurePeopleResponse.people:type_name -> assessmatrix.v1.Person
-	2, // 5: assessmatrix.v1.PersonService.ListPeople:input_type -> assessmatrix.v1.ListPeopleRequest
-	4, // 6: assessmatrix.v1.PersonService.AddPerson:input_type -> assessmatrix.v1.AddPersonRequest
-	6, // 7: assessmatrix.v1.PersonService.EnsurePeople:input_type -> assessmatrix.v1.EnsurePeopleRequest
-	8, // 8: assessmatrix.v1.PersonService.DeletePerson:input_type -> assessmatrix.v1.DeletePersonRequest
-	3, // 9: assessmatrix.v1.PersonService.ListPeople:output_type -> assessmatrix.v1.ListPeopleResponse
-	5, // 10: assessmatrix.v1.PersonService.AddPerson:output_type -> assessmatrix.v1.AddPersonResponse
-	7, // 11: assessmatrix.v1.PersonService.EnsurePeople:output_type -> assessmatrix.v1.EnsurePeopleResponse
-	9, // 12: assessmatrix.v1.PersonService.DeletePerson:output_type -> assessmatrix.v1.DeletePersonResponse
-	9, // [9:13] is the sub-list for method output_type
-	5, // [5:9] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	0,  // 0: assessmatrix.v1.ListPeopleResponse.people:type_name -> assessmatrix.v1.Person
+	1,  // 1: assessmatrix.v1.AddPersonRequest.person:type_name -> assessmatrix.v1.PersonDraft
+	0,  // 2: assessmatrix.v1.AddPersonResponse.person:type_name -> assessmatrix.v1.Person
+	1,  // 3: assessmatrix.v1.EnsurePeopleRequest.people:type_name -> assessmatrix.v1.PersonDraft
+	0,  // 4: assessmatrix.v1.EnsurePeopleResponse.people:type_name -> assessmatrix.v1.Person
+	2,  // 5: assessmatrix.v1.PersonService.ListPeople:input_type -> assessmatrix.v1.ListPeopleRequest
+	4,  // 6: assessmatrix.v1.PersonService.AddPerson:input_type -> assessmatrix.v1.AddPersonRequest
+	6,  // 7: assessmatrix.v1.PersonService.EnsurePeople:input_type -> assessmatrix.v1.EnsurePeopleRequest
+	8,  // 8: assessmatrix.v1.PersonService.DeletePerson:input_type -> assessmatrix.v1.DeletePersonRequest
+	10, // 9: assessmatrix.v1.PersonService.ErasePerson:input_type -> assessmatrix.v1.ErasePersonRequest
+	3,  // 10: assessmatrix.v1.PersonService.ListPeople:output_type -> assessmatrix.v1.ListPeopleResponse
+	5,  // 11: assessmatrix.v1.PersonService.AddPerson:output_type -> assessmatrix.v1.AddPersonResponse
+	7,  // 12: assessmatrix.v1.PersonService.EnsurePeople:output_type -> assessmatrix.v1.EnsurePeopleResponse
+	9,  // 13: assessmatrix.v1.PersonService.DeletePerson:output_type -> assessmatrix.v1.DeletePersonResponse
+	11, // 14: assessmatrix.v1.PersonService.ErasePerson:output_type -> assessmatrix.v1.ErasePersonResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_people_proto_init() }
@@ -610,7 +736,7 @@ func file_assessmatrix_v1_people_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_people_proto_rawDesc), len(file_assessmatrix_v1_people_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -52,6 +52,9 @@ message GetAttemptLogResponse {
   int64 broken_at_seq = 3;
   // What the integrity rules found in this log.
   repeated Flag flags = 4;
+  // When the record was deleted at the end of its retention period; 0 if
+  // it is still held. A deleted record keeps its score, not its events.
+  int64 purged_at = 5;
 }
 
 // One reason a reviewer should look at an attempt, derived deterministically

@@ -31,6 +31,8 @@ var ErrNotFound = errors.New("media not found")
 type Store interface {
 	Put(ctx context.Context, key, contentType string, body []byte) error
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
+	// Delete removes an object for good; a key it does not hold is not an error.
+	Delete(ctx context.Context, key string) error
 }
 
 // Regional is a store and the one region it serves.
@@ -74,6 +76,14 @@ func (f FS) Get(_ context.Context, key string) (io.ReadCloser, error) {
 		return nil, ErrNotFound
 	}
 	return r, err
+}
+
+func (f FS) Delete(_ context.Context, key string) error {
+	err := os.Remove(f.path(key))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 
 // S3 is any S3-compatible service: AWS, R2, MinIO, or a local provider.
@@ -123,4 +133,10 @@ func (s *S3) Get(ctx context.Context, key string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return o, nil
+}
+
+// Delete removes the object. On a versioned bucket this only hides it; the
+// bucket for media must not keep versions (docs/13-operations.md).
+func (s *S3) Delete(ctx context.Context, key string) error {
+	return s.c.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
 }

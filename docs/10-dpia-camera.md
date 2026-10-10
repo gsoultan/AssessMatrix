@@ -55,7 +55,7 @@ party learns who is sitting an exam. They are fetched only by a tier 2 attempt.
 | False flags (poor light, darker skin tones, glasses, a looking-down habit) | Medium | Medium | Thresholds are long (30 s total, 15 s in one stretch for a missing face); flags ask for review, never fail; the reason names the durations so the candidate can contest them. To do before the pilot: measure the detector's miss rate on a consented, diverse internal sample and record it here |
 | Household members captured | Medium | Low | Only a count of faces is kept; no image of anyone is kept |
 | Collection beyond consent by a modified client | Low | Medium | Server drops unconsented signals (tested: `TestNoSignalWithoutItsConsent`) |
-| Over-retention | Medium | Medium | Retention: attempt records, signals included, at most one year after the exam, then deleted with an audit record (retention job: privacy track) |
+| Over-retention | Medium | Medium | Attempt records, signals included, are deleted at most one year after the exam by an hourly job, with an audit record (`internal/api/retention.go`, tested: `TestRetentionDeletesTheRecordAndKeepsTheScore`). A tenant may shorten the period, never lengthen it past the year the consent text promises (database check) |
 | Pressure to consent | Medium | Medium | The organiser, not us, decides the tier; the consent text says the alternative is to contact the organiser. Organisers must offer a non-camera route on request (to put in the customer terms) |
 | Candidate cannot see what was recorded | Medium | Medium | The attempt record shows every event and flag reason to staff; a candidate-facing view of their own record is still to build (access right, art. 7) |
 
@@ -67,8 +67,10 @@ party learns who is sitting an exam. They are fetched only by a tier 2 attempt.
   not built: today the candidate leaves the attempt and contacts the organiser. To build: a
   "stop the camera" control that ends camera processing, records the withdrawal, and flags the
   attempt for review rather than failing it.
-- **Erasure:** with the attempt, through the retention job, or on request through the
-  organiser (crypto-shredding, privacy track).
+- **Erasure:** at the end of retention (above), or on request through the organiser: the
+  studio's "Erase" on a person deletes them, their attempts, credentials, uploads and mail
+  (`PersonService.ErasePerson`, tested: `TestErasureRemovesEverythingAboutThePerson`).
+  Backups age out on their own schedule (docs/13 §3).
 
 ## 6. Open items before a live tier 2 exam
 
@@ -76,5 +78,5 @@ party learns who is sitting an exam. They are fetched only by a tier 2 attempt.
 - [ ] Detector accuracy across skin tones and lighting measured and recorded (§4).
 - [ ] Mid-attempt withdrawal control (§5).
 - [ ] Candidate view of their own record (§5).
-- [ ] Retention job live, with deletion audit.
+- [x] Retention job live, with deletion audit.
 - [ ] Customer terms: organisers offer a non-camera route on request.

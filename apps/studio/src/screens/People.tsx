@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { TextInput, Textarea, Collapse, Badge, Tooltip } from '@mantine/core'
+import { TextInput, Textarea, Collapse, Badge, Tooltip, Modal } from '@mantine/core'
 import {
   IconSearch,
   IconUserPlus,
@@ -8,6 +8,7 @@ import {
   IconUsers,
   IconCheck,
   IconSend,
+  IconEraser,
 } from '@tabler/icons-react'
 import { useApp } from '../state'
 import { Panel } from '../components/Panel'
@@ -22,6 +23,7 @@ export function People({ isDesktop }: { isDesktop: boolean }) {
   const addPeople = useApp((s) => s.addPeople)
   const removePerson = useApp((s) => s.removePerson)
   const setScreen = useApp((s) => s.setScreen)
+  const [erasing, setErasing] = useState<{ id: string; name: string } | null>(null)
 
   const [q, setQ] = useState('')
   const [group, setGroup] = useState('all')
@@ -237,6 +239,11 @@ export function People({ isDesktop }: { isDesktop: boolean }) {
                         <IconTrash size={14} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
                       </button>
                     </Tooltip>
+                    <Tooltip label="Erase all their data, on their request" withArrow>
+                      <button onClick={() => setErasing({ id: p.id, name: p.name })} aria-label={`Erase ${p.name}`} className="ml-3">
+                        <IconEraser size={14} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
+                      </button>
+                    </Tooltip>
                   </td>
                 </tr>
               ))}
@@ -252,9 +259,14 @@ export function People({ isDesktop }: { isDesktop: boolean }) {
                   <p className="truncate text-[14px] font-semibold text-ink">{p.name}</p>
                   <p className="tnum truncate text-[12px] text-ink-muted">{p.email}</p>
                 </div>
-                <button onClick={() => removePerson(p.id)} aria-label={`Remove ${p.name}`} className="shrink-0">
-                  <IconTrash size={14} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
-                </button>
+                <div className="flex shrink-0 gap-3">
+                  <button onClick={() => removePerson(p.id)} aria-label={`Remove ${p.name}`}>
+                    <IconTrash size={14} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
+                  </button>
+                  <button onClick={() => setErasing({ id: p.id, name: p.name })} aria-label={`Erase ${p.name}`}>
+                    <IconEraser size={14} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
+                  </button>
+                </div>
               </div>
               <p className="tnum mt-2 text-[12px] text-ink-2">
                 {p.group ? `${p.group} · ` : ''}
@@ -274,6 +286,54 @@ export function People({ isDesktop }: { isDesktop: boolean }) {
           <IconSend size={14} stroke={2} /> Assign people to an instrument
         </button>
       )}
+      <EraseDialog who={erasing} onClose={() => setErasing(null)} />
     </div>
+  )
+}
+
+/** The right to erasure (UU PDP art. 8), asked for by the person through the organiser. */
+function EraseDialog({ who, onClose }: { who: { id: string; name: string } | null; onClose: () => void }) {
+  const erasePerson = useApp((s) => s.erasePerson)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const close = () => {
+    setReason('')
+    onClose()
+  }
+  return (
+    <Modal opened={!!who} onClose={close} title={`Erase ${who?.name ?? ''}`} centered>
+      <p className="text-[13px] leading-relaxed text-ink-2">
+        Deletes this person and everything held about them: invitations, attempts with their answers and integrity record,
+        uploaded images, mail, and any credential (its link will stop verifying). Scores leave the exam's results. This cannot be
+        undone. The audit log keeps that it happened, without their name or address.
+      </p>
+      <TextInput
+        className="mt-3"
+        label="Reason, for the audit log"
+        description="No personal data: e.g. “request from the candidate, ticket 123”."
+        value={reason}
+        maxLength={200}
+        onChange={(e) => setReason(e.currentTarget.value)}
+      />
+      <div className="mt-4 flex justify-end gap-2">
+        <button onClick={close} className="h-9 rounded-lg px-4 text-[13px] text-ink-2">
+          Cancel
+        </button>
+        <button
+          disabled={busy || !reason.trim() || !who}
+          onClick={async () => {
+            if (!who) return
+            setBusy(true)
+            const ok = await erasePerson(who.id, reason.trim())
+            setBusy(false)
+            if (ok) close()
+          }}
+          className="h-9 rounded-lg px-4 text-[13px] font-medium text-white disabled:opacity-50"
+          style={{ background: 'var(--color-critical)' }}
+        >
+          Erase for good
+        </button>
+      </div>
+    </Modal>
   )
 }

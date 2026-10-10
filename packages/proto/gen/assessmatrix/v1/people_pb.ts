@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/people.proto.
  */
 export const file_assessmatrix_v1_people: GenFile = /*@__PURE__*/
-  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcGVvcGxlLnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiVAoGUGVyc29uEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFZW1haWwYAyABKAkSDQoFZ3JvdXAYBCABKAkSEgoKY3JlYXRlZF9hdBgFIAEoAyI5CgtQZXJzb25EcmFmdBIMCgRuYW1lGAEgASgJEg0KBWVtYWlsGAIgASgJEg0KBWdyb3VwGAMgASgJIhMKEUxpc3RQZW9wbGVSZXF1ZXN0Ij0KEkxpc3RQZW9wbGVSZXNwb25zZRInCgZwZW9wbGUYASADKAsyFy5hc3Nlc3NtYXRyaXgudjEuUGVyc29uIkAKEEFkZFBlcnNvblJlcXVlc3QSLAoGcGVyc29uGAEgASgLMhwuYXNzZXNzbWF0cml4LnYxLlBlcnNvbkRyYWZ0IjwKEUFkZFBlcnNvblJlc3BvbnNlEicKBnBlcnNvbhgBIAEoCzIXLmFzc2Vzc21hdHJpeC52MS5QZXJzb24iQwoTRW5zdXJlUGVvcGxlUmVxdWVzdBIsCgZwZW9wbGUYASADKAsyHC5hc3Nlc3NtYXRyaXgudjEuUGVyc29uRHJhZnQiXQoURW5zdXJlUGVvcGxlUmVzcG9uc2USCwoDaWRzGAEgAygJEg8KB2NyZWF0ZWQYAiABKAUSJwoGcGVvcGxlGAMgAygLMhcuYXNzZXNzbWF0cml4LnYxLlBlcnNvbiIhChNEZWxldGVQZXJzb25SZXF1ZXN0EgoKAmlkGAEgASgJIhYKFERlbGV0ZVBlcnNvblJlc3BvbnNlMvQCCg1QZXJzb25TZXJ2aWNlElUKCkxpc3RQZW9wbGUSIi5hc3Nlc3NtYXRyaXgudjEuTGlzdFBlb3BsZVJlcXVlc3QaIy5hc3Nlc3NtYXRyaXgudjEuTGlzdFBlb3BsZVJlc3BvbnNlElIKCUFkZFBlcnNvbhIhLmFzc2Vzc21hdHJpeC52MS5BZGRQZXJzb25SZXF1ZXN0GiIuYXNzZXNzbWF0cml4LnYxLkFkZFBlcnNvblJlc3BvbnNlElsKDEVuc3VyZVBlb3BsZRIkLmFzc2Vzc21hdHJpeC52MS5FbnN1cmVQZW9wbGVSZXF1ZXN0GiUuYXNzZXNzbWF0cml4LnYxLkVuc3VyZVBlb3BsZVJlc3BvbnNlElsKDERlbGV0ZVBlcnNvbhIkLmFzc2Vzc21hdHJpeC52MS5EZWxldGVQZXJzb25SZXF1ZXN0GiUuYXNzZXNzbWF0cml4LnYxLkRlbGV0ZVBlcnNvblJlc3BvbnNlQtIBChNjb20uYXNzZXNzbWF0cml4LnYxQgtQZW9wbGVQcm90b1ABWlFnaXRodWIuY29tL2dzb3VsdGFuL2Fzc2Vzc21hdHJpeC9zZXJ2aWNlcy9jb3JlL2dlbi9hc3Nlc3NtYXRyaXgvdjE7YXNzZXNzbWF0cml4djGiAgNBWFiqAg9Bc3Nlc3NtYXRyaXguVjHKAg9Bc3Nlc3NtYXRyaXhcVjHiAhtBc3Nlc3NtYXRyaXhcVjFcR1BCTWV0YWRhdGHqAhBBc3Nlc3NtYXRyaXg6OlYxYgZwcm90bzM");
+  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcGVvcGxlLnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiVAoGUGVyc29uEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFZW1haWwYAyABKAkSDQoFZ3JvdXAYBCABKAkSEgoKY3JlYXRlZF9hdBgFIAEoAyI5CgtQZXJzb25EcmFmdBIMCgRuYW1lGAEgASgJEg0KBWVtYWlsGAIgASgJEg0KBWdyb3VwGAMgASgJIhMKEUxpc3RQZW9wbGVSZXF1ZXN0Ij0KEkxpc3RQZW9wbGVSZXNwb25zZRInCgZwZW9wbGUYASADKAsyFy5hc3Nlc3NtYXRyaXgudjEuUGVyc29uIkAKEEFkZFBlcnNvblJlcXVlc3QSLAoGcGVyc29uGAEgASgLMhwuYXNzZXNzbWF0cml4LnYxLlBlcnNvbkRyYWZ0IjwKEUFkZFBlcnNvblJlc3BvbnNlEicKBnBlcnNvbhgBIAEoCzIXLmFzc2Vzc21hdHJpeC52MS5QZXJzb24iQwoTRW5zdXJlUGVvcGxlUmVxdWVzdBIsCgZwZW9wbGUYASADKAsyHC5hc3Nlc3NtYXRyaXgudjEuUGVyc29uRHJhZnQiXQoURW5zdXJlUGVvcGxlUmVzcG9uc2USCwoDaWRzGAEgAygJEg8KB2NyZWF0ZWQYAiABKAUSJwoGcGVvcGxlGAMgAygLMhcuYXNzZXNzbWF0cml4LnYxLlBlcnNvbiIhChNEZWxldGVQZXJzb25SZXF1ZXN0EgoKAmlkGAEgASgJIhYKFERlbGV0ZVBlcnNvblJlc3BvbnNlIjAKEkVyYXNlUGVyc29uUmVxdWVzdBIKCgJpZBgBIAEoCRIOCgZyZWFzb24YAiABKAkiTAoTRXJhc2VQZXJzb25SZXNwb25zZRIQCghhdHRlbXB0cxgBIAEoBRITCgtjcmVkZW50aWFscxgCIAEoBRIOCgZpbWFnZXMYAyABKAUyzgMKDVBlcnNvblNlcnZpY2USVQoKTGlzdFBlb3BsZRIiLmFzc2Vzc21hdHJpeC52MS5MaXN0UGVvcGxlUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5MaXN0UGVvcGxlUmVzcG9uc2USUgoJQWRkUGVyc29uEiEuYXNzZXNzbWF0cml4LnYxLkFkZFBlcnNvblJlcXVlc3QaIi5hc3Nlc3NtYXRyaXgudjEuQWRkUGVyc29uUmVzcG9uc2USWwoMRW5zdXJlUGVvcGxlEiQuYXNzZXNzbWF0cml4LnYxLkVuc3VyZVBlb3BsZVJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuRW5zdXJlUGVvcGxlUmVzcG9uc2USWwoMRGVsZXRlUGVyc29uEiQuYXNzZXNzbWF0cml4LnYxLkRlbGV0ZVBlcnNvblJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuRGVsZXRlUGVyc29uUmVzcG9uc2USWAoLRXJhc2VQZXJzb24SIy5hc3Nlc3NtYXRyaXgudjEuRXJhc2VQZXJzb25SZXF1ZXN0GiQuYXNzZXNzbWF0cml4LnYxLkVyYXNlUGVyc29uUmVzcG9uc2VC0gEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCC1Blb3BsZVByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message assessmatrix.v1.Person
@@ -223,6 +223,58 @@ export const DeletePersonResponseSchema: GenMessage<DeletePersonResponse> = /*@_
   messageDesc(file_assessmatrix_v1_people, 9);
 
 /**
+ * @generated from message assessmatrix.v1.ErasePersonRequest
+ */
+export type ErasePersonRequest = Message<"assessmatrix.v1.ErasePersonRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * Why, for the audit log: e.g. "request from the candidate, ticket 123".
+   * Must not itself contain personal data.
+   *
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ErasePersonRequest.
+ * Use `create(ErasePersonRequestSchema)` to create a new message.
+ */
+export const ErasePersonRequestSchema: GenMessage<ErasePersonRequest> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_people, 10);
+
+/**
+ * @generated from message assessmatrix.v1.ErasePersonResponse
+ */
+export type ErasePersonResponse = Message<"assessmatrix.v1.ErasePersonResponse"> & {
+  /**
+   * @generated from field: int32 attempts = 1;
+   */
+  attempts: number;
+
+  /**
+   * @generated from field: int32 credentials = 2;
+   */
+  credentials: number;
+
+  /**
+   * @generated from field: int32 images = 3;
+   */
+  images: number;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ErasePersonResponse.
+ * Use `create(ErasePersonResponseSchema)` to create a new message.
+ */
+export const ErasePersonResponseSchema: GenMessage<ErasePersonResponse> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_people, 11);
+
+/**
  * @generated from service assessmatrix.v1.PersonService
  */
 export const PersonService: GenService<{
@@ -262,6 +314,18 @@ export const PersonService: GenService<{
     methodKind: "unary";
     input: typeof DeletePersonRequestSchema;
     output: typeof DeletePersonResponseSchema;
+  },
+  /**
+   * The right to erasure (UU PDP art. 8): everything held about the person,
+   * attempts and credentials included, is deleted for good. The audit log
+   * keeps that it happened, by id only.
+   *
+   * @generated from rpc assessmatrix.v1.PersonService.ErasePerson
+   */
+  erasePerson: {
+    methodKind: "unary";
+    input: typeof ErasePersonRequestSchema;
+    output: typeof ErasePersonResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_assessmatrix_v1_people, 0);

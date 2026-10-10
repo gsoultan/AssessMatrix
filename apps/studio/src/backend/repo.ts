@@ -32,6 +32,8 @@ export type Repo = {
   /** Everyone in the list ends up on the roster once; ids come back in list order. */
   ensurePeople(drafts: PersonDraft[]): Promise<{ ids: string[]; created: number }>
   deletePerson(id: string): Promise<void>
+  /** The right to erasure: the person and everything held about them, attempts and credentials included. */
+  erasePerson(id: string, reason: string): Promise<{ attempts: number; credentials: number; images: number }>
 
   listAssignments(): Promise<Assignment[]>
   /** Assign and mail each new assignee. `sent` is 0 for a draft. */
@@ -127,6 +129,10 @@ const local: Repo = {
   async deletePerson(id) {
     store.deletePerson(id)
   },
+  async erasePerson(id) {
+    store.deletePerson(id)
+    return { attempts: 0, credentials: 0, images: 0 }
+  },
   async listAssignments() {
     return store.listAssignments()
   },
@@ -196,6 +202,10 @@ const core: Repo = {
   },
   async deletePerson(id) {
     await api.people.deletePerson({ id })
+  },
+  async erasePerson(id, reason) {
+    const r = await api.people.erasePerson({ id, reason })
+    return { attempts: r.attempts, credentials: r.credentials, images: r.images }
   },
   async listAssignments() {
     return (await api.assignments.listAssignments({})).assignments.map(assignmentIn)

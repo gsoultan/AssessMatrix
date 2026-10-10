@@ -166,6 +166,9 @@ message Attempt {
   // The highest seq the server holds.
   int64 last_seq = 11;
   repeated AttemptEvent events = 12;
+  // When the record (answers and signals) was deleted at the end of its
+  // retention period; 0 while it is held.
+  int64 purged_at = 13;
 }
 
 message GetSessionRequest {}

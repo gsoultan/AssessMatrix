@@ -27,7 +27,7 @@ func (s *resultService) ListReviews(ctx context.Context, req *connect.Request[v1
 			return err
 		}
 		rows, err := tx.Query(ctx, `SELECT `+attemptColumns+` FROM attempts
-			WHERE exam_id = $1 AND submitted_at IS NOT NULL ORDER BY submitted_at, id LIMIT 50000`, req.Msg.GetExamId())
+			WHERE exam_id = $1 AND submitted_at IS NOT NULL AND purged_at IS NULL ORDER BY submitted_at, id LIMIT 50000`, req.Msg.GetExamId())
 		if err != nil {
 			return err
 		}
@@ -100,6 +100,9 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		}
 		if att.SubmittedAt == nil {
 			return failedPrecondition("this attempt has not been handed in yet")
+		}
+		if err := att.open(); err != nil {
+			return err
 		}
 		e, err := examAt(ctx, tx, att.ExamID, att.ExamVersion)
 		if err != nil {

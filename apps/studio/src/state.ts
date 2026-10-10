@@ -128,6 +128,8 @@ type AppState = {
   /** Rows already parsed and validated from a file. Returns how many were new. */
   addPeople: (drafts: PersonDraft[]) => Promise<number>
   removePerson: (id: string) => Promise<void>
+  /** Erase everything about a person; returns false if the core refused. */
+  erasePerson: (id: string, reason: string) => Promise<boolean>
   /**
    * Assign, and email each new assignee their link. `sent` is 0 for a draft:
    * an invitation to something that cannot be opened is held, not mailed.
@@ -367,6 +369,14 @@ export const useApp = create<AppState>((set, get) => {
       run(undefined, async () => {
         await repo.deletePerson(id)
         await refreshDelivery()
+      }),
+
+    erasePerson: (id, reason) =>
+      run(false, async () => {
+        const r = await repo.erasePerson(id, reason)
+        await refreshDelivery()
+        set({ notice: `Erased: ${r.attempts} attempt(s), ${r.credentials} credential(s), ${r.images} image(s).` })
+        return true
       }),
 
     assign: (examId, personIds, dueAt) =>
