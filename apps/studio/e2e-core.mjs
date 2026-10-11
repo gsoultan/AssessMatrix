@@ -464,6 +464,13 @@ try {
   ;(await page.getByText('Submitted').count()) && (await page.getByText(/^100%$/).count())
     ? ok('the score lands on the assignment row')
     : bad('the assignment did not show the submitted score')
+  await page.getByRole('button', { name: 'View answers from Kandidat Uji' }).click()
+  await page.getByRole('dialog').getByText(/^Correct$/).first().waitFor({ timeout: 8000 }).then(
+    () => ok("the candidate's answers are read back from the server, question by question"),
+    async () => bad(`the answer sheet did not load: ${(await page.getByRole('dialog').innerText()).slice(0, 120)}`),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 
   /* ---------------- scoring: the worker's item analysis ---------------- */
   await nav(/Scoring/)

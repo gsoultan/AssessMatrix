@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from 'react'
-import { Select, TextInput, Textarea, Badge, Tooltip, Collapse } from '@mantine/core'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Select, TextInput, Textarea, Badge, Tooltip, Collapse, Drawer } from '@mantine/core'
 import {
   IconSend,
   IconCheck,
@@ -12,8 +12,10 @@ import {
   IconBan,
   IconHistory,
   IconInbox,
+  IconListDetails,
 } from '@tabler/icons-react'
-import { useApp } from '../state'
+import { useApp, useResponses } from '../state'
+import { AnswerSheet } from '../components/AnswerSheet'
 import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { RosterImport } from '../components/RosterImport'
@@ -26,7 +28,9 @@ import {
   ASSIGN_STATUS,
   KINDS,
   allItems,
+  getAttempt,
   isScored,
+  resolveExam,
 } from '../store'
 
 const STATUS_STYLE: Record<AssignStatus, { bg: string; fg: string }> = {
@@ -97,6 +101,34 @@ const invitedNote = (r: { invited: number; created: number; sent: number }, live
   return live ? `${who} ${r.sent} ${r.sent === 1 ? 'email' : 'emails'} sent.` : `${who} Emails are held until this is published.`
 }
 
+/**
+ * One candidate's submitted answers. Locally the attempt is in this browser;
+ * against the core it is that assignment's response. An anonymous
+ * instrument has no such view: its answers are not tied to anyone.
+ */
+function CandidateAnswers({ exam, a }: { exam: Exam; a: Assignment }) {
+  const responses = useResponses(exam.id)
+  const load = useApp((s) => s.loadResponses)
+  // The list may have been read before this person handed in; read it again on opening.
+  const [fresh, setFresh] = useState(!CORE)
+  useEffect(() => {
+    if (CORE) void load(exam.id).finally(() => setFresh(true))
+  }, [exam.id, load])
+  const attempt = CORE ? responses.find((r) => r.assignmentId === a.id) : getAttempt(exam.id, a.id)
+  if (!attempt?.submittedAt)
+    return <p className="py-6 text-center text-[13px] text-ink-muted">{fresh ? 'No submitted answers found.' : 'Loading…'}</p>
+  const sat = resolveExam(exam, attempt.examVersion ?? a.examVersion)
+  return (
+    <>
+      <p className="tnum mb-3 text-[12.5px] text-ink-2">
+        Submitted {new Date(attempt.submittedAt).toLocaleString()} · v{sat.version}
+        {attempt.score && ` · ${attempt.score.raw} / ${attempt.score.max} points (${attempt.score.pct}%)`}
+      </p>
+      <AnswerSheet exam={sat} attempt={attempt} />
+    </>
+  )
+}
+
 export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const exams = useApp((s) => s.exams)
   const people = useApp((s) => s.people)
@@ -122,6 +154,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const [due, setDue] = useState('')
   const [note, setNote] = useState('')
   const [historyOf, setHistoryOf] = useState('')
+  const [answersOf, setAnswersOf] = useState('')
   const [adhocOpen, setAdhocOpen] = useState(false)
   const [adhoc, setAdhoc] = useState('')
 
@@ -415,6 +448,16 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                         <td className="px-4 py-3 sm:px-5">
                           <p className="text-[13px] font-medium text-ink">{p?.name ?? 'Unknown'}</p>
                           <p className="tnum text-[11px] text-ink-muted">{p?.email}</p>
+                          {r.status === 'submitted' && !exam.anonymous && (
+                            <button
+                              onClick={() => setAnswersOf(r.id)}
+                              aria-label={`View answers from ${name}`}
+                              className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-medium"
+                              style={{ color: 'var(--color-brand-text)' }}
+                            >
+                              <IconListDetails size={13} stroke={1.9} /> View answers
+                            </button>
+                          )}
                         </td>
                         <td className="px-3 py-3">
                           <StatusPill status={r.status} />
@@ -529,6 +572,15 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                         {r.scorePct}% · {r.passed ? 'lulus' : 'belum lulus'}
                       </p>
                     )}
+                    {r.status === 'submitted' && !exam.anonymous && (
+                      <button
+                        onClick={() => setAnswersOf(r.id)}
+                        aria-label={`View answers from ${p?.name}`}
+                        className="hair mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2"
+                      >
+                        <IconListDetails size={12} stroke={1.9} /> View answers
+                      </button>
+                    )}
                     <div className="mt-2.5 flex items-center gap-2">
                       <button
                         onClick={() => resend(r, p?.name ?? 'them')}
@@ -555,6 +607,22 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
           )}
         </Panel>
       </div>
+
+      <Drawer
+        opened={!!answersOf}
+        onClose={() => setAnswersOf('')}
+        position="right"
+        size="lg"
+        title={
+          <span className="text-[14px] font-semibold">
+            Answers · {personOf(rows.find((r) => r.id === answersOf)?.personId ?? '')?.name ?? ''}
+          </span>
+        }
+      >
+        {exam && rows.find((r) => r.id === answersOf) && (
+          <CandidateAnswers exam={exam} a={rows.find((r) => r.id === answersOf)!} />
+        )}
+      </Drawer>
 
       {!CORE && (
       <Panel

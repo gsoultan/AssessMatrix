@@ -446,6 +446,14 @@ try {
   ;(await page.getByText(/^100%$/).count())
     ? ok('the score lands back on the roster row')
     : bad('score did not reach the assignment')
+  await page.getByRole('button', { name: 'View answers from Budi Santoso' }).click()
+  await page.waitForTimeout(400)
+  const sheet = page.getByRole('dialog')
+  ;(await sheet.getByText(/^Correct$/).count()) === total && (await sheet.getByText(/Answered:/).count()) > 0
+    ? ok(`each candidate's answers can be read, question by question (${total} marked correct)`)
+    : bad(`the answer sheet did not show every question as correct: ${(await sheet.innerText()).slice(0, 120)}`)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 
   /* ---------------- questionnaire, opened straight from the library ---------------- */
   await nav(/Library/)

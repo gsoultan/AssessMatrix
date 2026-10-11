@@ -20,7 +20,9 @@ engine underneath is identical: sections, delivery, autosave, media, event log.
   `Name <email>`, or `Name, email, group`); duplicate emails are skipped, never doubled.
 - **Assignments** — the delivery step. Pick an instrument, pick people, and each assignment
   mints its own invitation token — **one person, one link, never a shared URL** — then tracks
-  them from invited → in progress → submitted, with the score landing back on the row.
+  them from invited → in progress → submitted, with the score landing back on the row. A
+  submitted row has **View answers**: every question, what that person answered, right or wrong
+  against the key of the version they sat, and the points. Anonymous instruments have none.
 - **Candidate preview** — the **candidate application**, as an administrator sees it: pick any
   exam (drafts too) and sit it exactly as a candidate would, under a bar that says it is a
   preview. A real candidate never sees this list: their invitation link opens one assessment,
