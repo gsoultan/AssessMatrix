@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Select, TextInput, Textarea, Badge, Tooltip, Collapse, Drawer } from '@mantine/core'
+import { TextInput, Textarea, Badge, Tooltip, Collapse, Drawer } from '@mantine/core'
 import {
   IconSend,
   IconCheck,
@@ -13,6 +13,8 @@ import {
   IconHistory,
   IconInbox,
   IconListDetails,
+  IconArrowLeft,
+  IconChevronRight,
 } from '@tabler/icons-react'
 import { useApp, useResponses } from '../state'
 import { AnswerSheet } from '../components/AnswerSheet'
@@ -20,12 +22,10 @@ import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { RosterImport } from '../components/RosterImport'
 import { type LinkState, EVENT_LABEL, linkState, listOutbox } from '../invite'
-import { StatTile } from '../components/Viz'
 import {
   type AssignStatus,
   type Assignment,
   type Exam,
-  ASSIGN_STATUS,
   KINDS,
   allItems,
   getAttempt,
@@ -33,21 +33,62 @@ import {
   resolveExam,
 } from '../store'
 
-const STATUS_STYLE: Record<AssignStatus, { bg: string; fg: string }> = {
+/**
+ * What the table shows. The stored status has no step between "invited" and
+ * "started"; the invitation's own history does: the link was opened, a code
+ * was asked for or verified, and nothing was started yet.
+ */
+type Seen = AssignStatus | 'opened'
+
+const OPENED_KINDS = new Set(['link.opened', 'code.sent', 'code.wrong', 'link.redeemed'])
+
+function seen(a: Assignment): Seen {
+  if (a.status !== 'invited') return a.status
+  const since = a.sentAt ?? 0
+  return a.redeemedAt || a.history.some((h) => OPENED_KINDS.has(h.kind) && h.t >= since) ? 'opened' : 'invited'
+}
+
+const SEEN_LABEL: Record<Seen, string> = {
+  invited: 'Invited',
+  opened: 'Opened',
+  started: 'In progress',
+  submitted: 'Completed',
+  expired: 'Expired',
+}
+
+const SEEN_HINT: Record<Seen, string> = {
+  invited: 'Invitation sent; the link has not been opened yet',
+  opened: 'Opened the link, but has not started the test',
+  started: 'Started the test and has not handed it in yet',
+  submitted: 'Handed in',
+  expired: 'The link ran out before they finished',
+}
+
+const STATUS_STYLE: Record<Seen, { bg: string; fg: string }> = {
   invited: { bg: 'var(--color-sunken)', fg: 'var(--color-ink-2)' },
+  opened: { bg: 'var(--color-wash-warn)', fg: 'var(--color-serious)' },
   started: { bg: 'var(--color-wash)', fg: 'var(--color-brand-text)' },
   submitted: { bg: 'var(--color-wash-good)', fg: 'var(--color-good-text)' },
   expired: { bg: 'var(--color-wash-warn)', fg: 'var(--color-serious)' },
 }
 
-function StatusPill({ status }: { status: AssignStatus }) {
+const STATUS_DOT: Record<Seen, string> = {
+  invited: 'var(--color-ink-muted)',
+  opened: 'var(--color-serious)',
+  started: 'var(--color-s1)',
+  submitted: 'var(--color-good-fill)',
+  expired: 'var(--color-serious)',
+}
+
+function StatusPill({ status }: { status: Seen }) {
   const s = STATUS_STYLE[status]
   return (
     <span
+      title={SEEN_HINT[status]}
       className="inline-flex items-center rounded px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide"
       style={{ background: s.bg, color: s.fg }}
     >
-      {ASSIGN_STATUS.find((x) => x.v === status)?.label}
+      {SEEN_LABEL[status]}
     </span>
   )
 }
@@ -129,6 +170,118 @@ function CandidateAnswers({ exam, a }: { exam: Exam; a: Assignment }) {
   )
 }
 
+type Stage = 'all' | 'open' | 'done' | 'none'
+
+const STAGES: { v: Stage; label: string; hint: string }[] = [
+  { v: 'all', label: 'All', hint: '' },
+  { v: 'open', label: 'Open', hint: 'Someone invited has not handed in yet' },
+  { v: 'done', label: 'All completed', hint: 'Every invited person has handed in' },
+  { v: 'none', label: 'No one invited', hint: 'Nobody has been invited yet' },
+]
+
+/** Assignments starts here: every instrument, with how far its invitations have got. Pick one to assign people. */
+function InstrumentList({ exams, assignments, onOpen }: { exams: Exam[]; assignments: Assignment[]; onOpen: (id: string) => void }) {
+  const [stage, setStage] = useState<Stage>('all')
+  const [find, setFind] = useState('')
+  const rows = exams.map((e) => {
+    const mine = assignments.filter((a) => a.examId === e.id)
+    const done = mine.filter((a) => a.status === 'submitted').length
+    const going = mine.filter((a) => a.status === 'started').length
+    const opened = mine.filter((a) => seen(a) === 'opened').length
+    const stageOf: Stage = mine.length === 0 ? 'none' : done === mine.length ? 'done' : 'open'
+    return { e, total: mine.length, done, going, opened, stage: stageOf }
+  })
+  const t = find.trim().toLowerCase()
+  const shown = rows.filter((r) => (stage === 'all' || r.stage === stage) && (!t || r.e.title.toLowerCase().includes(t)))
+
+  return (
+    <div className="p-4 sm:p-6">
+      <header className="mb-4">
+        <h1 className="text-[15px] font-semibold tracking-tight">Assignments</h1>
+        <p className="mt-0.5 max-w-[72ch] text-[12.5px] leading-snug text-ink-muted">
+          Pick an instrument to invite people to it and follow their progress. Each person gets their own link by
+          email.
+        </p>
+      </header>
+      {exams.length === 0 ? (
+        <p className="hair rounded-xl bg-surface py-12 text-center text-[13px] text-ink-muted">
+          Nothing to assign yet — create an instrument in the Library first.
+        </p>
+      ) : (
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Filter instruments" className="flex flex-wrap gap-1">
+              {STAGES.map((st) => {
+                const on = stage === st.v
+                const n = st.v === 'all' ? rows.length : rows.filter((r) => r.stage === st.v).length
+                return (
+                  <button
+                    key={st.v}
+                    onClick={() => setStage(st.v)}
+                    aria-pressed={on}
+                    title={st.hint || undefined}
+                    className="hair inline-flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-[12px] font-medium"
+                    style={on ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
+                  >
+                    {st.label} <span className="tnum text-ink-muted">{n}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <TextInput
+              size="xs"
+              className="ml-auto w-full sm:w-[220px]"
+              placeholder="Find an instrument"
+              aria-label="Find an instrument"
+              leftSection={<IconSearch size={13} stroke={1.8} />}
+              value={find}
+              onChange={(e) => setFind(e.currentTarget.value)}
+            />
+          </div>
+          <div className="hair divide-y divide-hair rounded-xl bg-surface">
+            {shown.length === 0 && <p className="py-10 text-center text-[12.5px] text-ink-muted">No instrument matches.</p>}
+            {shown.map(({ e, total, done, going, opened }) => (
+              <button
+                key={e.id}
+                onClick={() => onOpen(e.id)}
+                aria-label={`Open ${e.title}`}
+                className="flex w-full items-center gap-4 px-4 py-3.5 text-left hover:bg-ink/[0.03] sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13.5px] font-medium text-ink">{e.title}</p>
+                  <p className="tnum truncate text-[12px] text-ink-muted">
+                    {KINDS.find((k) => k.v === e.kind)?.label} · {e.status === 'published' ? 'Published' : 'Draft'} ·{' '}
+                    {allItems(e).length} questions
+                  </p>
+                </div>
+                <div className="hidden w-[260px] shrink-0 sm:block">
+                  {total === 0 ? (
+                    <p className="text-right text-[12px] text-ink-muted">No one invited yet</p>
+                  ) : (
+                    <>
+                      <p className="tnum text-right text-[12px] text-ink-2">
+                        <strong className="font-semibold text-ink">{done}</strong> of {total} completed
+                        {going > 0 && <span className="text-ink-muted"> · {going} in progress</span>}
+                        {opened > 0 && <span className="text-ink-muted"> · {opened} opened</span>}
+                      </p>
+                      <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--color-track)' }}>
+                        <div style={{ width: `${(done / total) * 100}%`, background: 'var(--color-good-fill)' }} />
+                        <div style={{ width: `${(going / total) * 100}%`, background: 'var(--color-s1)' }} />
+                        <div style={{ width: `${(opened / total) * 100}%`, background: 'var(--color-serious)', opacity: 0.55 }} />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <IconChevronRight size={16} stroke={2} className="shrink-0 text-ink-muted" />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const exams = useApp((s) => s.exams)
   const people = useApp((s) => s.people)
@@ -139,14 +292,14 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const unassignOne = useApp((s) => s.unassignOne)
   const sendInvite = useApp((s) => s.sendInvite)
   const revokeInviteFor = useApp((s) => s.revokeInviteFor)
-  const currentExamId = useApp((s) => s.currentExamId)
+  const assignTarget = useApp((s) => s.assignTarget)
   const setScreen = useApp((s) => s.setScreen)
 
   const active = useMemo(() => exams.filter((e) => e.status !== 'archived'), [exams])
-  const [examId, setExamId] = useState<string>(
-    () => currentExamId ?? active[0]?.id ?? '',
-  )
-  const exam: Exam | undefined = active.find((e) => e.id === examId) ?? active[0]
+  // The list of instruments comes first; one is open only when picked, or when
+  // the Library's "Assign people" asked for it.
+  const [examId, setExamId] = useState<string>(() => assignTarget ?? '')
+  const exam: Exam | undefined = active.find((e) => e.id === examId)
 
   const [picked, setPicked] = useState<string[]>([])
   const [group, setGroup] = useState('all')
@@ -155,6 +308,8 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const [note, setNote] = useState('')
   const [historyOf, setHistoryOf] = useState('')
   const [answersOf, setAnswersOf] = useState('')
+  const [show, setShow] = useState<Seen | 'all'>('all')
+  const [find, setFind] = useState('')
   const [adhocOpen, setAdhocOpen] = useState(false)
   const [adhoc, setAdhoc] = useState('')
 
@@ -193,47 +348,51 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
     setNote(n ? `New link emailed to ${name}. The previous one no longer works.` : 'Nothing sent — publish the instrument first.')
   }
 
-  const count = (s: AssignStatus) => rows.filter((r) => r.status === s).length
+  const count = (s: Seen) => rows.filter((r) => seen(r) === s).length
+  const shown = rows.filter(
+    (r) =>
+      (show === 'all' || seen(r) === show) &&
+      (() => {
+        const t = find.trim().toLowerCase()
+        const p = personOf(r.personId)
+        return !t || !!p?.name.toLowerCase().includes(t) || !!p?.email.toLowerCase().includes(t)
+      })(),
+  )
 
-  if (!exam)
-    return (
-      <div className="p-6">
-        <p className="hair rounded-xl bg-surface py-12 text-center text-[13px] text-ink-muted">
-          Nothing to assign yet — create an instrument in the Library first.
-        </p>
-      </div>
-    )
+  const open = (id: string) => {
+    setExamId(id)
+    setPicked([])
+    setNote('')
+    setHistoryOf('')
+    setAnswersOf('')
+    setShow('all')
+    setFind('')
+  }
+
+  if (!exam) return <InstrumentList exams={active} assignments={assignments} onOpen={open} />
 
   return (
     <div className="p-4 sm:p-6">
-      <header className="mb-4">
-        <h1 className="text-[15px] font-semibold tracking-tight">Assignments</h1>
-        <p className="mt-0.5 max-w-[72ch] text-[12.5px] leading-snug text-ink-muted">
-          Give named people a way in. Each assignment mints its own invitation link — one person,
-          one token, never a shared URL — and tracks them from invited through to submitted.
-        </p>
-      </header>
-
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Select
-          size="xs"
-          label="Instrument"
-          className="min-w-[280px] flex-1"
-          value={exam.id}
-          allowDeselect={false}
-          onChange={(v) => v && setExamId(v)}
-          data={active.map((e) => ({
-            value: e.id,
-            label: `${e.title} — ${KINDS.find((k) => k.v === e.kind)?.label}${e.status === 'draft' ? ' (draft)' : ''}`,
-          }))}
-        />
+      <button
+        onClick={() => open('')}
+        className="mb-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-2"
+      >
+        <IconArrowLeft size={14} stroke={2} /> All instruments
+      </button>
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+            {KINDS.find((k) => k.v === exam.kind)?.label} · v{exam.publishedVersion ?? exam.version}
+          </p>
+          <h1 className="text-[17px] font-semibold tracking-tight">{exam.title}</h1>
+        </div>
         <button
           onClick={() => setScreen('people')}
           className="hair inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-surface px-3 text-[12.5px] font-medium text-ink-2"
         >
           <IconUsers size={14} stroke={1.9} /> Manage roster
         </button>
-      </div>
+      </header>
 
       {exam.status !== 'published' && (
         <p
@@ -249,12 +408,21 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
         </p>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile label="Assigned" value={String(rows.length)} />
-        <StatTile label="Not started" value={String(count('invited'))} />
-        <StatTile label="In progress" value={String(count('started'))} />
-        <StatTile label="Submitted" value={String(count('submitted'))} />
-      </div>
+      {rows.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="tnum text-[12.5px] text-ink-2">
+              <strong className="font-semibold text-ink">{count('submitted')}</strong> of {rows.length} completed
+            </p>
+            <p className="tnum text-[12px] text-ink-muted">{Math.round((count('submitted') / rows.length) * 100)}%</p>
+          </div>
+          <div className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--color-track)' }}>
+            <div style={{ width: `${(count('submitted') / rows.length) * 100}%`, background: 'var(--color-good-fill)' }} />
+            <div style={{ width: `${(count('started') / rows.length) * 100}%`, background: 'var(--color-s1)' }} />
+            <div style={{ width: `${(count('opened') / rows.length) * 100}%`, background: 'var(--color-serious)', opacity: 0.55 }} />
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <Panel
@@ -418,10 +586,47 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
           }
           pad={rows.length === 0}
         >
+          {rows.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-hair px-4 py-2.5 sm:px-5">
+              <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1">
+                {(['all', 'invited', 'opened', 'started', 'submitted', 'expired'] as const)
+                  .filter((v) => v === 'all' || v !== 'expired' || count('expired') > 0)
+                  .map((v) => {
+                    const on = show === v
+                    const n = v === 'all' ? rows.length : count(v)
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => setShow(v)}
+                        aria-pressed={on}
+                        title={v === 'all' ? undefined : SEEN_HINT[v]}
+                        className="hair inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium"
+                        style={on ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
+                      >
+                        {v !== 'all' && <span className="h-2 w-2 rounded-full" style={{ background: STATUS_DOT[v] }} />}
+                        {v === 'all' ? 'All' : SEEN_LABEL[v]}
+                        <span className="tnum text-ink-muted">{n}</span>
+                      </button>
+                    )
+                  })}
+              </div>
+              <TextInput
+                size="xs"
+                className="ml-auto w-full sm:w-[200px]"
+                placeholder="Find a person"
+                aria-label="Find a person"
+                leftSection={<IconSearch size={13} stroke={1.8} />}
+                value={find}
+                onChange={(e) => setFind(e.currentTarget.value)}
+              />
+            </div>
+          )}
           {rows.length === 0 ? (
             <p className="py-10 text-center text-[12.5px] text-ink-muted">
               Pick people on the left and invite them. Each is emailed their own link.
             </p>
+          ) : shown.length === 0 ? (
+            <p className="py-10 text-center text-[12.5px] text-ink-muted">No one here matches.</p>
           ) : isDesktop ? (
             <div className="scroll-thin overflow-x-auto">
               <table className="w-full min-w-[620px] text-left">
@@ -437,7 +642,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => {
+                  {shown.map((r) => {
                     const p = personOf(r.personId)
                     const name = p?.name ?? 'Unknown'
                     const state = linkState(r)
@@ -460,7 +665,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                           )}
                         </td>
                         <td className="px-3 py-3">
-                          <StatusPill status={r.status} />
+                          <StatusPill status={seen(r)} />
                           <LinkLine a={r} />
                         </td>
                         <td className="tnum px-3 py-3 text-[12px] text-ink-muted">v{r.examVersion}</td>
@@ -549,7 +754,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
             </div>
           ) : (
             <div className="flex flex-col gap-2 p-4">
-              {rows.map((r) => {
+              {shown.map((r) => {
                 const p = personOf(r.personId)
                 return (
                   <div key={r.id} className="hair rounded-xl bg-surface p-3.5">
@@ -558,7 +763,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                         <p className="truncate text-[13.5px] font-medium text-ink">{p?.name}</p>
                         <p className="tnum truncate text-[11.5px] text-ink-muted">{p?.email}</p>
                       </div>
-                      <StatusPill status={r.status} />
+                      <StatusPill status={seen(r)} />
                     </div>
                     <LinkLine a={r} />
                     <details className="mt-1.5">

@@ -18,9 +18,12 @@ engine underneath is identical: sections, delivery, autosave, media, event log.
   optional answer key, and settings tucked behind a toggle because you set them once.
 - **People** — the roster you assign from. Add someone inline, or paste a list (bare email,
   `Name <email>`, or `Name, email, group`); duplicate emails are skipped, never doubled.
-- **Assignments** — the delivery step. Pick an instrument, pick people, and each assignment
-  mints its own invitation token — **one person, one link, never a shared URL** — then tracks
-  them from invited → in progress → submitted, with the score landing back on the row. A
+- **Assignments** — the delivery step. It opens on a list of instruments, each with how many
+  people have completed it; filter by Open / All completed / No one invited, or search. Click one
+  to invite people to it. Each assignment mints its own invitation token — **one person, one
+  link, never a shared URL** — and the row tracks them as **Invited → Opened → In progress →
+  Completed** (or **Expired**). *Opened* means they followed the link but have not started.
+  Filter the invited list by status or search by name, with the score landing back on the row. A
   submitted row has **View answers**: every question, what that person answered, right or wrong
   against the key of the version they sat, and the points. Anonymous instruments have none.
 - **Candidate preview** — the **candidate application**, as an administrator sees it: pick any

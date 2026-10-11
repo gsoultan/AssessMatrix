@@ -120,7 +120,7 @@ export type AssignStatus = 'invited' | 'started' | 'submitted' | 'expired'
 export const ASSIGN_STATUS: { v: AssignStatus; label: string }[] = [
   { v: 'invited', label: 'Invited' },
   { v: 'started', label: 'In progress' },
-  { v: 'submitted', label: 'Submitted' },
+  { v: 'submitted', label: 'Completed' },
   { v: 'expired', label: 'Expired' },
 ]
 

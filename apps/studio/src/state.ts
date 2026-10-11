@@ -91,6 +91,8 @@ type AppState = {
   previewExamId: string | null
   openInEditor: (id: string) => void
   openAssignments: (id: string) => void
+  /** The instrument "Assign people" was asked for; null opens Assignments on its list. */
+  assignTarget: string | null
   previewAsCandidate: (id: string) => void
   takePreview: () => string | null
 
@@ -317,6 +319,7 @@ export const useApp = create<AppState>((set, get) => {
     candidateView: arrivedAsCandidate(),
     currentExamId: null,
     previewExamId: null,
+    assignTarget: null,
 
     setScreen: (key) => {
       // Leaving the candidate app is leaving the candidate's session behind.
@@ -325,10 +328,10 @@ export const useApp = create<AppState>((set, get) => {
         set({ seat: null, attempt: null })
         history.replaceState(null, '', location.pathname + location.search)
       }
-      set({ screen: key })
+      set({ screen: key, assignTarget: null })
     },
     openInEditor: (id) => set({ currentExamId: id, screen: 'builder' }),
-    openAssignments: (id) => set({ currentExamId: id, screen: 'assignments' }),
+    openAssignments: (id) => set({ currentExamId: id, assignTarget: id, screen: 'assignments' }),
     previewAsCandidate: (id) => set({ previewExamId: id, screen: 'player' }),
     takePreview: () => {
       const id = get().previewExamId

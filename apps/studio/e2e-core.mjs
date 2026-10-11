@@ -461,7 +461,7 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(500)
-  ;(await page.getByText('Submitted').count()) && (await page.getByText(/^100%$/).count())
+  ;(await page.getByText('Completed').count()) && (await page.getByText(/^100%$/).count())
     ? ok('the score lands on the assignment row')
     : bad('the assignment did not show the submitted score')
   await page.getByRole('button', { name: 'View answers from Kandidat Uji' }).click()
