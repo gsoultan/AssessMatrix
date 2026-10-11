@@ -26,7 +26,8 @@ services:
       - pgdata:/var/lib/postgresql/data
       - walarchive:/archive
       - ./deploy/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
-    ports: ["127.0.0.1:5432:5432"]
+    # AM_PG_PORT in .env when 5432 is taken (a Homebrew Postgres, say).
+    ports: ["127.0.0.1:${AM_PG_PORT:-5432}:5432"]
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
