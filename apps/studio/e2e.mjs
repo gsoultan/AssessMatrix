@@ -23,7 +23,7 @@ page.on('console', (c) => c.type() === 'error' && errors.push(c.text()))
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
 
 const nav = async (name) => {
-  const exit = page.getByRole('button', { name: /^Exit$/ })
+  const exit = page.getByRole('button', { name: /^Exit preview$/ })
   if (await exit.count()) { await exit.click(); await page.waitForTimeout(250) }
   await page.getByRole('button', { name }).first().click()
   await page.waitForTimeout(400)
@@ -67,12 +67,9 @@ const xlsx = (rows) => {
   return Buffer.concat([...locals, cd, end])
 }
 
-/** The candidate picker keeps open-access instruments behind a demo disclosure. */
-const openDemoList = async () => {
-  const sum = page.getByText('Demo — buka tanpa undangan')
-  if (await sum.count()) await sum.click()
-  await page.waitForTimeout(250)
-}
+/** What the studio's candidate preview says about one instrument. */
+const previewRow = async (title) =>
+  page.locator('div', { has: page.getByRole('button', { name: `Preview ${title}` }) }).last().innerText()
 
 /** Answer whatever control this question offers. */
 const answerHere = async (text = 'lag') => {
@@ -192,20 +189,18 @@ try {
   await page.getByRole('button', { name: /Save draft/ }).click()
   await page.waitForTimeout(350)
 
-  await nav(/Take exam/i)
-  await openDemoList()
-  ;(await page.getByRole('button', { name: /E2E Draft Quiz/ }).count()) === 0
-    ? ok('a draft is not offered to candidates')
-    : bad('a draft was sittable')
+  await nav(/^Candidate preview$/)
+  ;(await previewRow('E2E Draft Quiz')).includes('candidates cannot open it yet')
+    ? ok('a draft can be previewed, and says candidates cannot open it')
+    : bad('the preview list did not mark the draft as closed to candidates')
 
   await nav(/Library/)
   await page.getByRole('button', { name: /Actions for E2E Draft Quiz/ }).click()
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /^Publish$/ }).click()
   await page.waitForTimeout(400)
-  await nav(/Take exam/i)
-  await openDemoList()
-  ;(await page.getByRole('button', { name: /E2E Draft Quiz/ }).count())
+  await nav(/^Candidate preview$/)
+  ;(await previewRow('E2E Draft Quiz')).includes('candidates can open it by invitation')
     ? ok('publishing makes it available to candidates')
     : bad('publishing did not expose it')
 
@@ -463,13 +458,17 @@ try {
     ? ok('questionnaire shows no pass threshold')
     : bad('pass threshold leaked into an ungraded instrument')
 
+  ;(await page.getByText(/Penyimpanan luring/).count())
+    ? ok('the start page checks the device itself when there is no camera to ask about')
+    : bad('the start page did not check the device')
   await page.getByRole('button', { name: /Mulai mengisi/ }).click()
-  await page.waitForTimeout(300)
+  await page.waitForTimeout(400)
   ;(await page.getByText(/UU PDP No. 27\/2022/).count()) === 0
     ? ok('untiered questionnaire skips the consent gate')
     : bad('consent gate appeared on a Tier 0 questionnaire')
-  await page.getByRole('button', { name: /Mulai sekarang/ }).click()
-  await page.waitForTimeout(400)
+  ;(await page.getByText(/Pertanyaan 1 dari \d+/i).count())
+    ? ok('one press on the start page opens the first question')
+    : bad('the start page needed more than one press')
 
   const qTotal = Number((await page.getByText(/Pertanyaan 1 dari \d+/i).first().innerText()).match(/dari (\d+)/i)[1])
 
@@ -500,7 +499,7 @@ try {
     ? ok('questionnaire submitted — thanked, not graded')
     : bad('questionnaire produced a grade instead of a thank-you')
 
-  await nav(/Aggregate results/)
+  await nav(/^Responses$/)
   const mean = await page.getByText(/mean \d/).first().count()
   const answered = await page.getByText(/1 of 1 answered/).first().count()
   mean > 0 && answered > 0

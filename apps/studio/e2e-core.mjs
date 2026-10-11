@@ -526,7 +526,7 @@ try {
     await p.waitForTimeout(300)
     if (await p.getByRole('button', { name: /Setuju dan lanjut/ }).count()) await p.getByRole('button', { name: /Setuju dan lanjut/ }).click()
     await p.waitForTimeout(300)
-    await p.getByRole('button', { name: /Mulai sekarang/ }).click()
+    if (await p.getByRole('button', { name: /Mulai sekarang/ }).count()) await p.getByRole('button', { name: /Mulai sekarang/ }).click()
     await p.waitForTimeout(600)
     // A wrong answer reaches the server while the network is up...
     await p.locator('main button[aria-pressed]', { hasText: 'panic' }).first().click()

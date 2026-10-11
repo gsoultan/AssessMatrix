@@ -57,7 +57,7 @@ make e2e      # browser smoke test of create-exam → take-exam → score
 make          # list everything
 ```
 
-`Create exam` → `Take exam` is a **working loop**: author sections and items, publish, sit a
+`Create exam` → `Candidate preview` is a **working loop**: author sections and items, publish, sit a
 live attempt with a running timer and per-keystroke autosave, submit, get auto-scored, and
 resume after a reload. Exams and attempts persist in `localStorage`; `src/store.ts` is shaped
 so swapping it for Connect RPC calls should not require touching a screen.

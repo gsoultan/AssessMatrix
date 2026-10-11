@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type React from 'react'
 import { Drawer, Burger, useMantineColorScheme } from '@mantine/core'
 import { useDisclosure, useMediaQuery } from '@mantine/hooks'
@@ -21,6 +21,8 @@ import {
   IconMoon,
   IconLogout,
   IconX,
+  IconChevronDown,
+  IconDeviceLaptop,
 } from '@tabler/icons-react'
 
 import { CandidateApp } from './screens/CandidateApp'
@@ -46,22 +48,28 @@ import { CORE, SHOW_MOCKS } from './backend/mode'
 // The monitor is real against the core (LiveMonitor); only the local build's is a mock.
 const MOCKS = new Set(['author', 'aitask', 'profile', 'hub', 'embed', 'events', ...(CORE ? [] : ['monitor'])])
 
+/**
+ * The everyday work comes first, one line each, in the order it is done:
+ * build it, choose who sits it, invite them, see the results. Everything that
+ * is a design mock-up sits under "More", folded away, so the menu a person
+ * meets is short.
+ */
 const ALL_SCREENS = [
-  { key: 'library', group: 'Build', name: 'Library', sub: 'All exams, quizzes, surveys', Icon: IconLibrary, El: Library },
-  { key: 'builder', group: 'Build', name: 'Editor', sub: 'Sections · questions · publish', Icon: IconEdit, El: ExamBuilder },
-  { key: 'author', group: 'Build', name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },
-  { key: 'people', group: 'Deliver', name: 'People', sub: 'Roster of candidates', Icon: IconUsers, El: People },
-  { key: 'assignments', group: 'Deliver', name: 'Assignments', sub: 'Invite and track', Icon: IconSend, El: Assignments },
-  { key: 'player', group: 'Candidate', name: 'Take exam', sub: 'The candidate experience', Icon: IconChecklist, El: CandidateApp },
-  { key: 'responses', group: 'Candidate', name: 'Responses', sub: 'Aggregate results', Icon: IconChartBar, El: Responses },
-  { key: 'aitask', group: 'Candidate', name: 'AI-in-the-loop task', sub: 'Score the collaboration', Icon: IconSparkles, El: AiTask },
-  { key: 'profile', group: 'Candidate', name: 'Evidence profile', sub: 'Skill graph · credentials', Icon: IconCertificate, El: EvidenceProfile },
-  { key: 'hub', group: 'Integrate', name: 'Integration hub', sub: 'The four doors', Icon: IconPlugConnected, El: IntegrationHub },
-  { key: 'embed', group: 'Integrate', name: 'Embed studio', sub: 'Preview + preflight', Icon: IconCode, El: EmbedStudio },
-  { key: 'events', group: 'Integrate', name: 'Event inspector', sub: 'Webhooks · replay', Icon: IconWebhook, El: EventInspector },
+  { key: 'library', name: 'Library', sub: 'Exams, quizzes and surveys', Icon: IconLibrary, El: Library },
+  { key: 'builder', name: 'Editor', sub: 'Sections · questions · publish', Icon: IconEdit, El: ExamBuilder },
+  { key: 'people', name: 'People', sub: 'Who can be invited', Icon: IconUsers, El: People },
+  { key: 'assignments', name: 'Assignments', sub: 'Invite and track', Icon: IconSend, El: Assignments },
+  { key: 'responses', name: 'Responses', sub: 'Results', Icon: IconChartBar, El: Responses },
   // Needs the core: people score essays and the worker analyses items there.
-  ...(CORE ? [{ key: 'scoring', group: 'Operate', name: 'Scoring', sub: 'Essays · item analysis', Icon: IconChecklist, El: Scoring } as const] : []),
-  { key: 'monitor', group: 'Operate', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
+  ...(CORE ? [{ key: 'scoring', name: 'Scoring', sub: 'Essays · item analysis', Icon: IconChecklist, El: Scoring } as const] : []),
+  { key: 'monitor', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
+  { key: 'player', name: 'Candidate preview', sub: 'See it as a candidate does', Icon: IconDeviceLaptop, El: CandidateApp },
+  { key: 'author', more: true, name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },
+  { key: 'aitask', more: true, name: 'AI-in-the-loop task', sub: 'Score the collaboration', Icon: IconSparkles, El: AiTask },
+  { key: 'profile', more: true, name: 'Evidence profile', sub: 'Skill graph · credentials', Icon: IconCertificate, El: EvidenceProfile },
+  { key: 'hub', more: true, name: 'Integration hub', sub: 'The four doors', Icon: IconPlugConnected, El: IntegrationHub },
+  { key: 'embed', more: true, name: 'Embed studio', sub: 'Preview + preflight', Icon: IconCode, El: EmbedStudio },
+  { key: 'events', more: true, name: 'Event inspector', sub: 'Webhooks · replay', Icon: IconWebhook, El: EventInspector },
 ] as const
 
 type Key = (typeof ALL_SCREENS)[number]['key']
@@ -74,6 +82,8 @@ const SCREENS = ALL_SCREENS.filter((s) => SHOW_MOCKS || !MOCKS.has(s.key))
  */
 const HIDDEN_FROM_NAV = new Set<Key>(['builder'])
 const NAV = SCREENS.filter((s) => !HIDDEN_FROM_NAV.has(s.key))
+const MAIN_NAV = NAV.filter((s) => !('more' in s))
+const MORE_NAV = NAV.filter((s) => 'more' in s)
 
 export function App() {
   const staff = useApp((s) => s.staff)
@@ -121,7 +131,11 @@ function Shell() {
   // nothing is highlighted and you lose your place.
   const navActive: Key = active === 'builder' ? 'library' : active
 
-  const groups = [...new Set(NAV.map((s) => s.group))]
+  const inMore = MORE_NAV.some((s) => s.key === active)
+  const [moreOpen, setMoreOpen] = useState(inMore)
+  useEffect(() => {
+    if (inMore) setMoreOpen(true)
+  }, [inMore])
 
   const themeToggle = (
     <button
@@ -144,37 +158,43 @@ function Shell() {
     </button>
   )
 
+  const item = (s: (typeof NAV)[number]) => {
+    const on = s.key === navActive
+    return (
+      <button
+        key={s.key}
+        onClick={() => {
+          setActive(s.key)
+          close()
+        }}
+        aria-current={on ? 'page' : undefined}
+        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+          on ? 'font-semibold text-ink' : 'font-medium text-ink-2 hover:bg-ink/[0.04]'
+        }`}
+        style={on ? { background: 'var(--color-wash)' } : undefined}
+      >
+        <s.Icon size={17} stroke={1.7} className="shrink-0" color={on ? 'var(--color-s1)' : 'var(--color-ink-muted)'} />
+        <span className="min-w-0 truncate">{s.name}</span>
+      </button>
+    )
+  }
+
   const nav = (
-    <nav className="flex flex-col gap-5 p-3">
-      {groups.map((g) => (
-        <div key={g}>
-          <p className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-muted">{g}</p>
-          <div className="flex flex-col gap-0.5">
-            {NAV.filter((s) => s.group === g).map((s) => {
-              const on = s.key === navActive
-              return (
-                <button
-                  key={s.key}
-                  onClick={() => {
-                    setActive(s.key)
-                    close()
-                  }}
-                  className={`flex items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors ${
-                    on ? 'text-ink' : 'text-ink-2 hover:bg-ink/[0.04]'
-                  }`}
-                  style={on ? { background: 'var(--color-wash)' } : undefined}
-                >
-                  <s.Icon size={17} stroke={1.7} className="mt-px shrink-0" color={on ? 'var(--color-s1)' : 'var(--color-ink-muted)'} />
-                  <span className="min-w-0">
-                    <span className={`block truncate text-[13px] ${on ? 'font-semibold' : 'font-medium'}`}>{s.name}</span>
-                    <span className="block truncate text-[11.5px] text-ink-muted">{s.sub}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ))}
+    <nav className="flex flex-col gap-0.5 p-3">
+      {MAIN_NAV.map(item)}
+      {MORE_NAV.length > 0 && (
+        <>
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-left text-[11px] font-medium uppercase tracking-wider text-ink-muted"
+          >
+            More
+            <IconChevronDown size={13} stroke={2} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {moreOpen && MORE_NAV.map(item)}
+        </>
+      )}
     </nav>
   )
 

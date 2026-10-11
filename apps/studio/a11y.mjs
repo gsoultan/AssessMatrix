@@ -120,9 +120,12 @@ async function sit(title, start) {
     await pressByKeyboard('Setuju dan lanjut')
     await page.waitForTimeout(400)
   }
-  await scan(`${title}: before starting`)
-  await pressByKeyboard('Mulai sekarang')
-  await page.waitForTimeout(500)
+  // Only an exam that uses the camera has a device check of its own; the rest start from the start page.
+  if (await page.getByRole('button', { name: /Mulai sekarang/ }).count()) {
+    await scan(`${title}: before starting`)
+    await pressByKeyboard('Mulai sekarang')
+    await page.waitForTimeout(500)
+  }
 
   const total = Number((await page.getByText(/Pertanyaan 1 dari \d+/i).first().innerText()).match(/dari (\d+)/i)[1])
   const types = new Set()

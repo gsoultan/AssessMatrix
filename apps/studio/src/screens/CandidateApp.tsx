@@ -212,6 +212,105 @@ function Row({ k, v }: { k: string; v: string }) {
   )
 }
 
+/** What the device check found. Compact on the start page, one card per check on its own step. */
+function DeviceChecks({ checks, compact = false }: { checks: Check[] | null; compact?: boolean }) {
+  const rows = checks ?? [{ Icon: IconDatabase, label: 'Memeriksa perangkat…', v: '', ok: true }]
+  if (compact)
+    return (
+      <div className="hair mt-4 divide-y divide-hair rounded-xl bg-surface">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-2.5 px-4 py-2.5">
+            <r.Icon size={16} stroke={1.7} className="shrink-0 text-ink-muted" />
+            <p className="min-w-0 flex-1 truncate text-[13px] text-ink">
+              {r.label}
+              {r.v && <span className="text-ink-muted"> · {r.v}</span>}
+            </p>
+            {r.ok ? (
+              <IconCheck size={15} stroke={2.4} aria-label="baik" style={{ color: 'var(--color-good)' }} />
+            ) : (
+              <IconAlertTriangle size={15} stroke={2} aria-label="perlu perhatian" style={{ color: 'var(--color-serious)' }} />
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  return (
+    <div className="mt-5 flex flex-col gap-2">
+      {rows.map((r) => (
+        <div key={r.label} className="hair flex items-center gap-3 rounded-xl bg-surface px-4 py-3.5">
+          <r.Icon size={18} stroke={1.7} className="shrink-0 text-ink-muted" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium text-ink">{r.label}</p>
+            <p className="text-[12.5px] text-ink-muted">{r.v}</p>
+          </div>
+          {r.ok ? (
+            <IconCheck size={17} stroke={2.4} style={{ color: 'var(--color-good)' }} />
+          ) : (
+            <IconAlertTriangle size={17} stroke={2} style={{ color: 'var(--color-serious)' }} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * The studio's way into the candidate app: pick an instrument and see it the
+ * way a candidate does, start page first. Staff-facing, so it is in English
+ * and sits inside the studio; the preview itself is the real candidate app.
+ */
+function PreviewPicker({ exams, onOpen }: { exams: Exam[]; onOpen: (e: Exam) => void }) {
+  const shown = exams.filter((e) => e.status !== 'archived')
+  const steps = [
+    ['Invite', 'From Assignments, each person gets their own link by email.'],
+    ['Confirm', 'Opening the link sends a 6-digit code to that address.'],
+    ['Start', 'The code opens the start page. One button begins the test.'],
+  ] as const
+  return (
+    <div className="mx-auto max-w-[760px] p-4 sm:p-6">
+      <h1 className="text-[15px] font-semibold tracking-tight">Candidate preview</h1>
+      <p className="mt-1 max-w-[560px] text-[13px] leading-snug text-ink-muted">
+        Open any exam the way a candidate sees it, from the start page to the result. Nothing is emailed and no
+        candidate is involved.
+      </p>
+
+      <ol className="mt-5 grid gap-2 sm:grid-cols-3">
+        {steps.map(([t, d], i) => (
+          <li key={t} className="hair rounded-xl bg-surface p-3.5">
+            <p className="text-[12.5px] font-semibold text-ink">
+              <span className="tnum text-ink-muted">{i + 1}.</span> {t}
+            </p>
+            <p className="mt-1 text-[12px] leading-snug text-ink-2">{d}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div className="hair mt-5 divide-y divide-hair rounded-xl bg-surface">
+        {shown.length === 0 && <p className="px-4 py-8 text-center text-[13px] text-ink-muted">Nothing to preview yet. Create an exam in the Library.</p>}
+        {shown.map((e) => (
+          <div key={e.id} className="flex items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13.5px] font-medium text-ink">{e.title}</p>
+              <p className="tnum truncate text-[12px] text-ink-muted">
+                {isLive(e) ? 'Published · candidates can open it by invitation' : 'Draft · candidates cannot open it yet'} ·{' '}
+                {allItems(e).length} questions
+              </p>
+            </div>
+            <button
+              onClick={() => onOpen(e)}
+              aria-label={`Preview ${e.title}`}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-on-brand"
+              style={{ background: 'var(--color-s1)' }}
+            >
+              <IconEye size={14} stroke={2} /> Preview
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ── the candidate application ────────────────────────────────────────────── */
 
 export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
@@ -229,6 +328,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const finalizeAttempt = useApp((s) => s.finalizeAttempt)
 
   const takePreview = useApp((s) => s.takePreview)
+  const previewWanted = useApp((s) => s.previewExamId)
   const takeInviteToken = useApp((s) => s.takeInviteToken)
   const inviteToken = useApp((s) => s.inviteToken)
   const syncDelivery = useApp((s) => s.syncDelivery)
@@ -236,6 +336,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const seat = useApp((s) => s.seat)
   const sessionLost = useApp((s) => s.sessionLost)
   const offline = useApp((s) => s.offline)
+  const setScreen = useApp((s) => s.setScreen)
   const [assignment, setAssignment] = useState<Assignment | null>(null)
   const [gate, setGate] = useState<Gate>({ at: 'checking' })
   const [code, setCode] = useState('')
@@ -259,7 +360,6 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const [confirming, setConfirming] = useState(false)
   const [dismissedWarn, setDismissedWarn] = useState(0)
   const [showLog, setShowLog] = useState(false)
-  const [exited, setExited] = useState(false)
   const timer = useRef<number | null>(null)
   /** What the readiness screen found on this device. */
   const [checks, setChecks] = useState<Check[] | null>(null)
@@ -301,7 +401,6 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   useEffect(() => {
     const token = takeInviteToken()
     if (!token) return
-    setExited(false)
     setStage('gate')
     setGate({ at: 'checking' })
     setCode('')
@@ -436,9 +535,12 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     }
   }, [live, tier, signal])
 
-  // The readiness screen checks this device for real, and warms the face check up.
+  // The device is checked for real: on the start page itself when there is no
+  // camera to ask about, and on its own step after consent when there is — the
+  // camera is never opened before the candidate has agreed to it.
+  const checking = stage === 'ready' || (stage === 'invite' && tier < 2)
   useEffect(() => {
-    if (stage !== 'ready') return
+    if (!checking) return
     let stale = false
     setChecks(null)
     void readiness(tier).then((c) => !stale && setChecks(c))
@@ -446,7 +548,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     return () => {
       stale = true
     }
-  }, [stage, tier])
+  }, [checking, tier])
 
   /** A revoked or replaced invitation ends here, with the work still on the device. */
   const endedView = useCallback(() => {
@@ -533,6 +635,14 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     setStage('attempt')
   }
 
+  /** From the start page: consent if the tier asks for any, the camera check if it needs one, else straight in. */
+  const proceed = () => {
+    setDeclined(false)
+    if (consents.length) setStage('consent')
+    else if (tier >= 2) setStage('ready')
+    else void begin()
+  }
+
   const answered = (it: Item) =>
     (attempt?.answers[it.id]?.length ?? 0) > 0 || !!attempt?.text[it.id]?.trim()
   const answeredCount = items.filter(answered).length
@@ -560,17 +670,27 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       ? listOutbox().find((m) => m.kind === 'code' && m.assignmentId === gate.stub)?.code
       : undefined
 
-  /* ── dev affordance: a preview BAR above the app, not a chip floating over
-        it. A control that obscures the thing it is previewing is a bad control,
-        and on mobile the floating version covered the sync status. ── */
+  /** Leave the preview. A candidate's session started here (a local build's emailed link) is ended on the way out. */
+  const exitPreview = () => {
+    if (assignment || location.hash === SESSION_HASH) return setScreen('library')
+    session.current = false
+    setExam(null)
+    setConfirming(false)
+    setStage('pick')
+  }
+
+  /* ── a preview BAR above the app, not a chip floating over it. A control that
+        obscures the thing it is previewing is a bad control, and on mobile the
+        floating version covered the sync status. ── */
   const previewBar = (
     <div
+      data-chrome
       className="flex shrink-0 items-center gap-2 px-4 py-1.5"
       style={{ background: 'var(--color-ink)', color: 'var(--color-plane)' }}
     >
       <IconEye size={13} stroke={1.9} className="shrink-0 opacity-70" />
       <span className="min-w-0 flex-1 truncate text-[11.5px] opacity-80">
-        Candidate preview — a real participant sees only what is below this bar
+        Candidate preview{exam ? ` · ${exam.title}` : ''} — candidates see only what is below this bar
       </span>
       {stubCode && (
         <span className="tnum shrink-0 text-[11.5px]" title="No mail is sent in the prototype. This is what the candidate's inbox would show.">
@@ -578,35 +698,34 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           <span data-testid="stub-code" className="font-semibold">{stubCode}</span>
         </span>
       )}
+      {exam && !assignment && stage !== 'invite' && (
+        <button
+          onClick={() => {
+            discardAttempt(exam.id)
+            open(exam)
+          }}
+          className="shrink-0 rounded px-2 py-0.5 text-[11.5px] font-medium"
+          style={{ background: 'rgb(255 255 255 / 0.16)' }}
+        >
+          Restart
+        </button>
+      )}
       <button
-        onClick={() => setExited(true)}
+        onClick={exitPreview}
         className="shrink-0 rounded px-2 py-0.5 text-[11.5px] font-medium"
         style={{ background: 'rgb(255 255 255 / 0.16)' }}
       >
-        Exit
+        Exit preview
       </button>
     </div>
   )
 
-  if (exited)
-    return (
-      <div className="p-6">
-        <div className="hair mx-auto mt-10 max-w-[420px] rounded-xl bg-surface p-6 text-center">
-          <p className="text-[14px] font-semibold text-ink">Candidate preview closed</p>
-          <p className="mt-1.5 text-[12.5px] leading-snug text-ink-muted">
-            This screen renders full-bleed, with no product chrome — which is what a real
-            participant gets when they open their invitation link.
-          </p>
-          <button
-            onClick={() => setExited(false)}
-            className="mt-4 rounded-lg px-4 py-2 text-[13px] font-semibold text-on-brand"
-            style={{ background: 'var(--color-s1)' }}
-          >
-            Reopen
-          </button>
-        </div>
-      </div>
-    )
+  // In the studio, with nothing chosen yet: the administrator picks what to preview.
+  const arriving = !!previewWanted || !!inviteToken || location.hash === SESSION_HASH
+  if (!standalone && !arriving && (stage === 'pick' || (!exam && stage !== 'gate'))) return <PreviewPicker exams={exams} onOpen={(e) => {
+    setAssignment(null)
+    open(e)
+  }} />
 
   const warnAt = attempt && exam?.timed ? (attempt.secondsLeft <= 60 ? 60 : attempt.secondsLeft <= 300 ? 300 : 0) : 0
   const showWarn = warnAt > 0 && dismissedWarn !== warnAt && stage === 'attempt'
@@ -722,57 +841,19 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       </Screen>
     )
   else if (stage === 'pick' || !exam)
+    // Someone with no link. There is nothing to choose: an invitation opens one assessment.
     body = (
       <Screen>
-        <p className="text-[12px] font-medium uppercase tracking-wider text-ink-muted">Undangan</p>
-        <Title>Asesmen untuk Anda</Title>
+        <span className="grid h-12 w-12 place-items-center rounded-xl" style={{ background: 'var(--color-wash)' }}>
+          <IconMail size={24} stroke={1.7} style={{ color: 'var(--color-s1)' }} />
+        </span>
+        <div className="mt-4">
+          <Title>Buka tautan dari email undangan Anda</Title>
+        </div>
         <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
-          Dalam produk sungguhan Anda tiba di sini lewat tautan undangan pribadi dan langsung
-          melihat satu asesmen — tanpa daftar.
+          Setiap peserta menerima tautan pribadi lewat email. Buka tautan itu di perangkat yang akan Anda pakai, dan
+          asesmen Anda langsung terbuka di sini.
         </p>
-
-        <p className="hair mt-5 rounded-xl bg-surface px-4 py-6 text-center text-[13px] leading-relaxed text-ink-muted">
-          Undangan hanya dapat dibuka dari tautan di email — tidak ada daftar untuk dipilih.
-          {!CORE && (
-            <>
-              {' '}Di prototipe ini, email tersebut ada di panel <strong className="font-medium text-ink">Outbox</strong>{' '}
-              pada layar <strong className="font-medium text-ink">Assignments</strong>.
-            </>
-          )}
-        </p>
-
-        {(!CORE || exams.some(isLive)) && (
-        <details className="mt-6">
-          <summary className="cursor-pointer text-[12.5px] font-medium text-ink-muted">
-            Demo — buka tanpa undangan
-          </summary>
-          <div className="mt-2.5 flex flex-col gap-2">
-            {exams.filter(isLive).length === 0 && (
-              <p className="hair rounded-xl bg-surface px-4 py-6 text-center text-[12.5px] text-ink-muted">
-                Belum ada asesmen yang dipublikasikan.
-              </p>
-            )}
-            {exams.filter(isLive).map((e) => (
-              <button
-                key={e.id}
-                onClick={() => {
-                  setAssignment(null)
-                  open(e)
-                }}
-                className="hair flex items-center gap-3 rounded-xl bg-surface p-3.5 text-left"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13.5px] font-medium text-ink">{e.title}</p>
-                  <p className="tnum truncate text-[12px] text-ink-muted">
-                    {e.issuer} · {allItems(e).length} pertanyaan
-                  </p>
-                </div>
-                <IconArrowRight size={16} stroke={2} className="shrink-0 text-ink-muted" />
-              </button>
-            ))}
-          </div>
-        </details>
-        )}
       </Screen>
     )
   else if (stage === 'invite') {
@@ -830,6 +911,14 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           {exam.anonymous && <Row k="Anonim" v="Ya" />}
         </dl>
 
+        <ul className="mt-4 flex flex-col gap-1.5 text-[12.5px] leading-snug text-ink-2">
+          <li>• Jawaban tersimpan otomatis setiap kali Anda mengetik atau memilih, juga saat koneksi terputus.</li>
+          {exam.timed && <li>• Waktu berjalan sejak Anda menekan Mulai sampai Anda mengumpulkan.</li>}
+          <li>• Gunakan satu tab saja.</li>
+        </ul>
+
+        {tier < 2 && <DeviceChecks checks={checks} compact />}
+
         <div className="mt-4 rounded-xl border border-hair p-4">
           <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
             <IconShieldLock size={15} stroke={1.9} className="text-ink-muted" />
@@ -848,12 +937,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
             clock, so with work in progress the only way forward is to continue it. */}
         {!(assignment && resumable) && (
           <div className="mt-6">
-            <Primary
-              onClick={() => {
-                setDeclined(false)
-                setStage(consents.length ? 'consent' : 'ready')
-              }}
-            >
+            <Primary onClick={proceed}>
               {resumable ? 'Mulai ulang dari awal' : survey ? 'Mulai mengisi' : 'Mulai'}
               <IconArrowRight size={17} stroke={2.2} />
             </Primary>
@@ -889,7 +973,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           </p>
         )}
         <div className="mt-6">
-          <Primary onClick={() => setStage('ready')}>
+          <Primary onClick={() => (tier >= 2 ? setStage('ready') : void begin())}>
             Setuju dan lanjut <IconArrowRight size={17} stroke={2.2} />
           </Primary>
         </div>
@@ -905,22 +989,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
         <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">
           Kami periksa sekarang supaya tidak ada kejutan saat pengerjaan berjalan.
         </p>
-        <div className="mt-5 flex flex-col gap-2">
-          {(checks ?? [{ Icon: IconDatabase, label: 'Memeriksa perangkat…', v: '', ok: true }]).map((r) => (
-            <div key={r.label} className="hair flex items-center gap-3 rounded-xl bg-surface px-4 py-3.5">
-              <r.Icon size={18} stroke={1.7} className="shrink-0 text-ink-muted" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-medium text-ink">{r.label}</p>
-                <p className="text-[12.5px] text-ink-muted">{r.v}</p>
-              </div>
-              {r.ok ? (
-                <IconCheck size={17} stroke={2.4} style={{ color: 'var(--color-good)' }} />
-              ) : (
-                <IconAlertTriangle size={17} stroke={2} style={{ color: 'var(--color-serious)' }} />
-              )}
-            </div>
-          ))}
-        </div>
+        <DeviceChecks checks={checks} />
 
         <div className="mt-4 rounded-xl p-4" style={{ background: 'var(--color-wash)' }}>
           <p className="text-[13px] font-semibold text-ink">Jaringan lambat atau terputus bukan masalah</p>
@@ -929,12 +998,6 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
             saat koneksi kembali.
           </p>
         </div>
-
-        <ul className="mt-4 flex flex-col gap-1.5 text-[12.5px] leading-snug text-ink-2">
-          <li>• Jawaban tersimpan otomatis setiap kali Anda mengetik atau memilih.</li>
-          {exam.timed && <li>• Waktu berjalan dari sekarang sampai Anda mengumpulkan.</li>}
-          <li>• Gunakan satu tab saja — tab kedua akan ditolak dan dicatat.</li>
-        </ul>
 
         <div className="mt-6">
           <Primary onClick={begin}>
