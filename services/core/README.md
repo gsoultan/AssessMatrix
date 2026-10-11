@@ -15,7 +15,7 @@ invitations, candidate sessions, attempts and results. It implements the
 | The server clock ends an exam, and offline work done in time is kept | `domain.Counts` | `TestDeadlineIsServerTime`, `TestCountsLateAnswers` |
 | Invitation rules from `docs/08` | `internal/api/candidate.go`, `invite.go` | `invite_test.go`, including the revoked-link and 25-wrong-guesses tests |
 | An image is readable only inside its tenant, and stored only in the tenant's region | `media` rows under row-level security decide every read of `/media/{id}`; uploads are sniffed (WebP, JPEG, PNG only) and refused when the tenant's region is not the store's | `media_test.go` |
-| Mail goes out only if the change commits, and a link or code is at rest only until sent | Outbox row and River job in the same transaction; the body is cleared on send | Manual check today; see `internal/mail` |
+| Mail goes out only if the change commits, and a link or code is at rest only until sent | Outbox row and River job in the same transaction; the body is cleared on send | `outbox_test.go`: a rolled-back change queues nothing; a sent invitation is delivered once and leaves no link in the clear |
 
 Links, codes and session cookies are stored only as HMAC-SHA-256 under keys
 derived from `AM_SECRET`, one key per purpose.
