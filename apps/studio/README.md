@@ -20,7 +20,8 @@ engine underneath is identical: sections, delivery, autosave, media, event log.
   `Name <email>`, or `Name, email, group`); duplicate emails are skipped, never doubled.
 - **Assignments** — the delivery step. It opens on a list of instruments, each with how many
   people have completed it; filter by Open / All completed / No one invited, or search. Click one
-  to invite people to it. Each assignment mints its own invitation token — **one person, one
+  to open its page: **Invite people** opens a side panel to pick from the roster (or paste
+  addresses), and the page below has two tabs, **People** and **Outbox**. Each assignment mints its own invitation token — **one person, one
   link, never a shared URL** — and the row tracks them as **Invited → Opened → In progress →
   Completed** (or **Expired**). *Opened* means they followed the link but have not started.
   Filter the invited list by status or search by name, with the score landing back on the row. A

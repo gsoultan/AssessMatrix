@@ -240,10 +240,25 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(450)
+  const tab = async (name) => {
+    await page.getByRole('tab', { name: new RegExp(`^${name}`) }).click()
+    await page.waitForTimeout(250)
+  }
+  const inviteMore = async () => {
+    await page.getByRole('button', { name: /^Invite people$/ }).first().click()
+    await page.waitForTimeout(400)
+  }
+  ;(await page.getByRole('dialog', { name: /Invite people/ }).count())
+    ? ok('"Assign people" from the Library opens the invite panel straight away')
+    : bad('the invite panel did not open from the Library')
   await page.getByRole('button', { name: /^Select Budi Santoso$/ }).click()
   await page.waitForTimeout(150)
   await page.getByRole('button', { name: /^Invite 1 person$/ }).click()
   await page.waitForTimeout(600)
+  ;(await page.getByRole('dialog', { name: /Invite people/ }).count()) === 0
+    ? ok('the invite panel closes once the invitation is sent')
+    : bad('the invite panel stayed open after inviting')
+  await tab('Outbox')
   const budiLink = page.getByRole('link', { name: 'Open the link emailed to budi.santoso@example.id' })
   ;(await budiLink.count())
     ? ok('inviting a person emails them their own link')
@@ -251,11 +266,12 @@ try {
   ;(await page.getByRole('button', { name: /Copy invitation/ }).count()) === 0
     ? ok('there is no way to copy a link back out of an assignment')
     : bad('a link can still be copied from the assignment')
+  const budiHref = await budiLink.first().getAttribute('href')
+  await tab('People')
   ;(await page.getByText(/^v2$/).count())
     ? ok('an invitation pins the version it was issued against')
     : bad('invitation did not record a version')
 
-  const budiHref = await budiLink.first().getAttribute('href')
   const budiToken = budiHref.split('#/i/')[1]
   const stored = await page.evaluate(() =>
     Object.keys(localStorage).filter((k) => k !== 'am.outbox.v1').map((k) => localStorage.getItem(k)).join('\n'),
@@ -265,6 +281,7 @@ try {
     : bad('the raw link token is stored, or is not 256 bits')
 
   // invite an address that was never on the roster
+  await inviteMore()
   await page.getByRole('button', { name: /Invite someone not on the roster/ }).click()
   await page.waitForTimeout(300)
   await page.getByPlaceholder(/Agus Wibowo/).fill('Agus Wibowo <agus.wibowo@example.id>')
@@ -278,6 +295,7 @@ try {
     : bad('ad-hoc invitee missing')
 
   // bulk, from a CSV: header in any order, an extra column that must not be kept, a bad row
+  await inviteMore()
   await page.getByLabel('Upload a CSV or Excel roster').setInputFiles({
     name: 'kandidat.csv',
     mimeType: 'text/csv',
@@ -292,6 +310,7 @@ try {
     : bad('CSV preview did not count new and rejected rows')
   await page.getByRole('button', { name: /^Invite 2 people$/ }).click()
   await page.waitForTimeout(600)
+  await tab('Outbox')
   ;(await page.getByText(/Invited 2, 2 added to the roster/).count()) &&
   (await page.getByRole('link', { name: 'Open the link emailed to eko.prasetyo@example.id' }).count())
     ? ok('a CSV invites everyone usable in it, and each gets an email')
@@ -301,6 +320,7 @@ try {
     : ok('columns other than name, email and group are dropped, not stored')
 
   // bulk, from an Excel workbook
+  await inviteMore()
   await page.getByLabel('Upload a CSV or Excel roster').setInputFiles({
     name: 'kandidat.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -312,6 +332,7 @@ try {
   await page.waitForTimeout(400)
   await page.getByRole('button', { name: /^Invite 1 person$/ }).last().click()
   await page.waitForTimeout(600)
+  await tab('Outbox')
   ;(await page.getByRole('link', { name: 'Open the link emailed to rina.kusuma@example.id' }).count())
     ? ok('an .xlsx roster is read and its people invited')
     : bad('.xlsx import did not invite')
@@ -330,6 +351,7 @@ try {
 
   // revoke, then resend
   const agusHref = await page.getByRole('link', { name: 'Open the link emailed to agus.wibowo@example.id' }).getAttribute('href')
+  await tab('People')
   await page.getByRole('button', { name: 'Revoke invitation for Agus Wibowo' }).click()
   await page.waitForTimeout(400)
   ;(await holderSees(agusHref)).includes('Undangan ini telah ditarik')
@@ -342,6 +364,7 @@ try {
     : bad('the previous link survived a resend')
 
   /* ---------------- sit it through the invitation ---------------- */
+  await tab('Outbox')
   await budiLink.first().click()
   await page.waitForTimeout(700)
   const gateText = await page.locator('main').innerText()

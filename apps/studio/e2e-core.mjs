@@ -461,6 +461,9 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(500)
+  // "Assign people" opens the invite panel; close it to read the table.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
   ;(await page.getByText('Completed').count()) && (await page.getByText(/^100%$/).count())
     ? ok('the score lands on the assignment row')
     : bad('the assignment did not show the submitted score')
@@ -496,6 +499,8 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(500)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
   const revoke = page.getByRole('button', { name: /Revoke invitation for Kandidat Uji/ })
   ;(await revoke.count()) === 0 || (await revoke.first().isDisabled())
     ? ok('a submitted invitation cannot be revoked')
