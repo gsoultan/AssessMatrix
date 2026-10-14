@@ -92,14 +92,39 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 		if version == 0 {
 			version = e.GetVersion()
 		}
+		// Or an earlier published one, asked for by number. Only a frozen
+		// version can be sat: the working copy may still change under them.
+		if want := m.GetExamVersion(); want != 0 {
+			if want < 1 || want > e.GetPublishedVersion() {
+				return invalidArg(errors.New("that version has not been published"))
+			}
+			if _, err := examAt(ctx, tx, e.GetId(), want); err != nil {
+				return err
+			}
+			version = want
+		}
+		now := s.now()
 		var fresh []string
 		for _, pid := range m.GetPersonIds() {
+			// A new sitting only once the last one is closed; otherwise a no-op.
+			sitting := int32(1)
+			last, err := scanAssignment(tx.QueryRow(ctx, `SELECT `+assignmentColumns+` FROM assignments
+				WHERE exam_id = $1 AND person_id = $2 ORDER BY sitting DESC LIMIT 1 FOR UPDATE`, e.GetId(), pid))
+			switch {
+			case errors.Is(err, pgx.ErrNoRows):
+			case err != nil:
+				return err
+			case !last.closed(now):
+				continue
+			default:
+				sitting = last.Sitting + 1
+			}
 			var id string
 			// The person must exist in this tenant; RLS makes another tenant's
 			// person invisible, so the FK alone cannot be relied on to say so.
-			err := tx.QueryRow(ctx, `INSERT INTO assignments (tenant_id, exam_id, exam_version, person_id, due_at)
-				SELECT am_tenant(), $1, $2, p.id, $4 FROM people p WHERE p.id = $3
-				ON CONFLICT (exam_id, person_id) DO NOTHING RETURNING id`, e.GetId(), version, pid, due).Scan(&id)
+			err = tx.QueryRow(ctx, `INSERT INTO assignments (tenant_id, exam_id, exam_version, person_id, due_at, sitting)
+				SELECT am_tenant(), $1, $2, p.id, $4, $5 FROM people p WHERE p.id = $3
+				ON CONFLICT (exam_id, person_id, sitting) DO NOTHING RETURNING id`, e.GetId(), version, pid, due, sitting).Scan(&id)
 			if errors.Is(err, pgx.ErrNoRows) {
 				var exists bool
 				if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM people WHERE id = $1)`, pid).Scan(&exists); err != nil {
@@ -108,7 +133,7 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 				if !exists {
 					return notFound("person")
 				}
-				continue // already assigned: a no-op
+				continue // another request added this sitting first
 			}
 			if err != nil {
 				return err
@@ -125,7 +150,7 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 		if out.Assignments, err = s.list(ctx, tx, `WHERE id = ANY($1)`, fresh); err != nil {
 			return err
 		}
-		return audit(ctx, tx, "assignments.created", e.GetId(), map[string]any{"count": len(fresh), "sent": out.Sent})
+		return audit(ctx, tx, "assignments.created", e.GetId(), map[string]any{"count": len(fresh), "sent": out.Sent, "version": version})
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "AssignPeople", err)

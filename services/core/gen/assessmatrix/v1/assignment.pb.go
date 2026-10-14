@@ -232,16 +232,18 @@ type Assignment struct {
 	StartedAt   int64        `protobuf:"varint,8,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
 	SubmittedAt int64        `protobuf:"varint,9,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
 	// Set once a scored attempt is submitted.
-	ScorePct      *int32         `protobuf:"varint,10,opt,name=score_pct,json=scorePct,proto3,oneof" json:"score_pct,omitempty"`
-	Passed        *bool          `protobuf:"varint,11,opt,name=passed,proto3,oneof" json:"passed,omitempty"`
-	SentAt        int64          `protobuf:"varint,12,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
-	ExpiresAt     int64          `protobuf:"varint,13,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	RedeemedAt    int64          `protobuf:"varint,14,opt,name=redeemed_at,json=redeemedAt,proto3" json:"redeemed_at,omitempty"`
-	RevokedAt     int64          `protobuf:"varint,15,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
-	LinkState     LinkState      `protobuf:"varint,16,opt,name=link_state,json=linkState,proto3,enum=assessmatrix.v1.LinkState" json:"link_state,omitempty"`
-	OtpSends      int32          `protobuf:"varint,17,opt,name=otp_sends,json=otpSends,proto3" json:"otp_sends,omitempty"`
-	SelfServes    int32          `protobuf:"varint,18,opt,name=self_serves,json=selfServes,proto3" json:"self_serves,omitempty"`
-	History       []*InviteEvent `protobuf:"bytes,19,rep,name=history,proto3" json:"history,omitempty"`
+	ScorePct   *int32         `protobuf:"varint,10,opt,name=score_pct,json=scorePct,proto3,oneof" json:"score_pct,omitempty"`
+	Passed     *bool          `protobuf:"varint,11,opt,name=passed,proto3,oneof" json:"passed,omitempty"`
+	SentAt     int64          `protobuf:"varint,12,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	ExpiresAt  int64          `protobuf:"varint,13,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	RedeemedAt int64          `protobuf:"varint,14,opt,name=redeemed_at,json=redeemedAt,proto3" json:"redeemed_at,omitempty"`
+	RevokedAt  int64          `protobuf:"varint,15,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	LinkState  LinkState      `protobuf:"varint,16,opt,name=link_state,json=linkState,proto3,enum=assessmatrix.v1.LinkState" json:"link_state,omitempty"`
+	OtpSends   int32          `protobuf:"varint,17,opt,name=otp_sends,json=otpSends,proto3" json:"otp_sends,omitempty"`
+	SelfServes int32          `protobuf:"varint,18,opt,name=self_serves,json=selfServes,proto3" json:"self_serves,omitempty"`
+	History    []*InviteEvent `protobuf:"bytes,19,rep,name=history,proto3" json:"history,omitempty"`
+	// 1 for a person's first sitting of this instrument, 2 for the next, and so on.
+	Sitting       int32 `protobuf:"varint,20,opt,name=sitting,proto3" json:"sitting,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -409,6 +411,13 @@ func (x *Assignment) GetHistory() []*InviteEvent {
 	return nil
 }
 
+func (x *Assignment) GetSitting() int32 {
+	if x != nil {
+		return x.Sitting
+	}
+	return 0
+}
+
 type ListAssignmentsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Empty lists every assignment in the tenant.
@@ -503,7 +512,9 @@ type AssignPeopleRequest struct {
 	ExamId    string                 `protobuf:"bytes,1,opt,name=exam_id,json=examId,proto3" json:"exam_id,omitempty"`
 	PersonIds []string               `protobuf:"bytes,2,rep,name=person_ids,json=personIds,proto3" json:"person_ids,omitempty"`
 	// 0 for no due date.
-	DueAt         int64 `protobuf:"varint,3,opt,name=due_at,json=dueAt,proto3" json:"due_at,omitempty"`
+	DueAt int64 `protobuf:"varint,3,opt,name=due_at,json=dueAt,proto3" json:"due_at,omitempty"`
+	// The published version to sit; 0 for the live one (the working one for a draft).
+	ExamVersion   int32 `protobuf:"varint,4,opt,name=exam_version,json=examVersion,proto3" json:"exam_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -555,6 +566,13 @@ func (x *AssignPeopleRequest) GetPersonIds() []string {
 func (x *AssignPeopleRequest) GetDueAt() int64 {
 	if x != nil {
 		return x.DueAt
+	}
+	return 0
+}
+
+func (x *AssignPeopleRequest) GetExamVersion() int32 {
+	if x != nil {
+		return x.ExamVersion
 	}
 	return 0
 }
@@ -879,7 +897,7 @@ const file_assessmatrix_v1_assignment_proto_rawDesc = "" +
 	"\x02at\x18\x02 \x01(\x03R\x02at\x12\x12\n" +
 	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x16\n" +
 	"\x06detail\x18\x04 \x01(\tR\x06detail\x12\x14\n" +
-	"\x05count\x18\x05 \x01(\x05R\x05count\"\xa7\x05\n" +
+	"\x05count\x18\x05 \x01(\x05R\x05count\"\xc1\x05\n" +
 	"\n" +
 	"Assignment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
@@ -908,19 +926,21 @@ const file_assessmatrix_v1_assignment_proto_rawDesc = "" +
 	"\totp_sends\x18\x11 \x01(\x05R\botpSends\x12\x1f\n" +
 	"\vself_serves\x18\x12 \x01(\x05R\n" +
 	"selfServes\x126\n" +
-	"\ahistory\x18\x13 \x03(\v2\x1c.assessmatrix.v1.InviteEventR\ahistoryB\f\n" +
+	"\ahistory\x18\x13 \x03(\v2\x1c.assessmatrix.v1.InviteEventR\ahistory\x12\x18\n" +
+	"\asitting\x18\x14 \x01(\x05R\asittingB\f\n" +
 	"\n" +
 	"_score_pctB\t\n" +
 	"\a_passed\"1\n" +
 	"\x16ListAssignmentsRequest\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\"X\n" +
 	"\x17ListAssignmentsResponse\x12=\n" +
-	"\vassignments\x18\x01 \x03(\v2\x1b.assessmatrix.v1.AssignmentR\vassignments\"d\n" +
+	"\vassignments\x18\x01 \x03(\v2\x1b.assessmatrix.v1.AssignmentR\vassignments\"\x87\x01\n" +
 	"\x13AssignPeopleRequest\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12\x1d\n" +
 	"\n" +
 	"person_ids\x18\x02 \x03(\tR\tpersonIds\x12\x15\n" +
-	"\x06due_at\x18\x03 \x01(\x03R\x05dueAt\"i\n" +
+	"\x06due_at\x18\x03 \x01(\x03R\x05dueAt\x12!\n" +
+	"\fexam_version\x18\x04 \x01(\x05R\vexamVersion\"i\n" +
 	"\x14AssignPeopleResponse\x12=\n" +
 	"\vassignments\x18\x01 \x03(\v2\x1b.assessmatrix.v1.AssignmentR\vassignments\x12\x12\n" +
 	"\x04sent\x18\x02 \x01(\x05R\x04sent\"!\n" +

@@ -498,6 +498,58 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
 
+  /* ---------------- a second sitting, on an earlier version ---------------- */
+  await page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: /^All/ }).click()
+  await page.getByRole('button', { name: /^Invite people$/ }).first().click()
+  await page.waitForTimeout(400)
+  const panel = page.getByRole('dialog', { name: /Invite people/ })
+  ;(await panel.getByRole('button', { name: /^Select Budi Santoso$/ }).count()) && (await panel.getByText(/Sitting 2 · last one completed/).count())
+    ? ok('someone who completed an instrument can be invited to sit it again')
+    : bad('a person who completed could not be invited again')
+  ;(await panel.getByRole('button', { name: /^Select Agus Wibowo$/ }).count()) === 0
+    ? ok('someone whose invitation is still open cannot be given a second one')
+    : bad('a person with an open invitation was offered another')
+  await panel.getByLabel('Version').click()
+  await page.getByRole('option', { name: /^v1 ·/ }).click()
+  await panel.getByRole('button', { name: /^Select Budi Santoso$/ }).click()
+  await panel.getByRole('button', { name: /^Invite 1 person$/ }).click()
+  await page.waitForTimeout(600)
+  const second = page.locator('tr', { has: page.getByRole('button', { name: 'Invitation history for Budi Santoso (sitting 2)' }) })
+  const secondText = (await second.count()) ? await second.innerText() : ''
+  ;/Sitting 2/.test(secondText) && /v1/.test(secondText) && /Invited/i.test(secondText)
+    ? ok('the second sitting is its own row, on the version picked')
+    : bad(`no second sitting on v1: ${secondText.replace(/\s+/g, ' ').slice(0, 120)}`)
+  ;(await page.getByRole('button', { name: 'View answers from Budi Santoso' }).count()) === 1
+    ? ok('the first sitting and its answers are left as they were')
+    : bad('the first sitting changed when a second was added')
+
+  /* ---------------- versions, from the library ---------------- */
+  await nav(/Library/)
+  await page.getByRole('button', { name: /Actions for E2E — Rekrutmen Backend/ }).click()
+  await page.waitForTimeout(250)
+  await page.getByRole('menuitem', { name: /^Versions$/ }).click()
+  await page.waitForTimeout(500)
+  const vlist = page.getByRole('list', { name: 'Published versions' })
+  ;(await vlist.getByRole('listitem').filter({ hasText: /^v2\s*Live/ }).count()) && (await vlist.getByText(/^v1$/).count())
+    ? ok('the library lists every published version, with the live one marked')
+    : bad(`versions list is wrong: ${(await page.getByRole('dialog').innerText()).slice(0, 160)}`)
+  await page.getByRole('button', { name: 'Questions in v1' }).click()
+  await page.waitForTimeout(200)
+  ;(await vlist.locator('ol li').count()) > 0
+    ? ok("an earlier version's questions can be read")
+    : bad("an earlier version's questions did not show")
+  ;(await page.getByRole('button', { name: 'Restore v2 as draft' }).count()) === 0
+    ? ok('the version being edited has nothing to restore')
+    : bad('the live, unchanged version offered a restore')
+  await page.getByRole('button', { name: 'Restore v1 as draft' }).click()
+  await page.getByRole('button', { name: /^Restore as draft$/ }).click()
+  await page.waitForTimeout(600)
+  await nav(/Library/)
+  await page.waitForTimeout(300)
+  ;(await page.getByText(/v2 live · v3 draft/).count())
+    ? ok('restoring an old version makes it the next draft, and the live one stays live')
+    : bad('restoring did not branch a new draft')
+
   /* ---------------- questionnaire, opened straight from the library ---------------- */
   await nav(/Library/)
   await page.getByRole('button', { name: /Preview Kuesioner Pengalaman Onboarding/ }).click()
