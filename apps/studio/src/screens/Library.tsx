@@ -21,9 +21,12 @@ import {
   IconFileImport,
   IconFileExport,
   IconVersions,
+  IconShare,
 } from '@tabler/icons-react'
 import { useApp, useResponseCount } from '../state'
 import { VersionsDrawer } from '../components/VersionsDrawer'
+import { CORE } from '../backend/mode'
+import { ShareDialog } from '../components/ShareDialog'
 import {
   type Exam,
   type Kind,
@@ -83,6 +86,10 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
   const setScreen = useApp((s) => s.setScreen)
   const importExam = useApp((s) => s.importExam)
   const exportExam = useApp((s) => s.exportExam)
+  // Sharing to other tenants: the core, and its administrators, only.
+  const role = useApp((s) => s.staff?.role)
+  const canShare = CORE && role === 'admin'
+  const [sharing, setSharing] = useState<Exam | null>(null)
 
   const [kind, setKind] = useState<Kind | 'all'>('all')
   const [view, setView] = useState<'active' | 'archived'>('active')
@@ -238,6 +245,15 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             <Menu.Item leftSection={<IconFileExport size={14} stroke={1.9} />} onClick={() => exportExam(e.id)}>
               Export QTI
             </Menu.Item>
+            {canShare && (
+              <Menu.Item
+                leftSection={<IconShare size={14} stroke={1.9} />}
+                disabled={!e.publishedVersion}
+                onClick={() => setSharing(e)}
+              >
+                Share with tenants
+              </Menu.Item>
+            )}
             <Menu.Divider />
             <Menu.Item leftSection={<IconArchive size={14} stroke={1.9} />} onClick={() => removeExam(e.id)}>
               Archive
@@ -260,6 +276,7 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
       e.timed ? `${totalMinutes(e)} min` : 'untimed',
       e.kind === 'exam' ? `Tier ${e.tier}` : null,
       e.anonymous ? 'anonymous' : null,
+      e.sharedFrom ? `from ${e.sharedFrom.tenantName} v${e.sharedFrom.version}` : null,
     ]
       .filter(Boolean)
       .join(' · ')
@@ -278,6 +295,7 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
         {qtiPicker}
         <VersionsDrawer exam={exams.find((x) => x.id === versionsOf)} onClose={() => setVersionsOf('')} />
       </header>
+      {canShare && <ShareDialog exam={sharing} onClose={() => setSharing(null)} />}
 
       <div className="mb-3 flex items-center gap-2">
         <div className="hair inline-flex rounded-lg bg-surface p-0.5">

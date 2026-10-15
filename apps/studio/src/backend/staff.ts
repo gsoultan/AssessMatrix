@@ -4,14 +4,22 @@
  */
 import { ConnectError, Code } from '@connectrpc/connect'
 import { api } from '../api/client'
+import { Role, type Staff as StaffMsg } from '@assessmatrix/proto/auth_pb'
 
-export type Staff = { id: string; email: string; name: string; tenantName: string }
+/** admin: who has access, new tenants, sharing. member: the everyday work. */
+export type StaffRole = 'admin' | 'member'
 
-const staffIn = (s: { id: string; email: string; name: string; tenantName: string }): Staff => ({
+export type Staff = { id: string; email: string; name: string; tenantId: string; tenantName: string; role: StaffRole }
+
+export const roleIn = (r: Role): StaffRole => (r === Role.ADMIN ? 'admin' : 'member')
+
+export const staffIn = (s: StaffMsg): Staff => ({
   id: s.id,
   email: s.email,
   name: s.name,
+  tenantId: s.tenantId,
   tenantName: s.tenantName,
+  role: roleIn(s.role),
 })
 
 export const staffAuth = {
