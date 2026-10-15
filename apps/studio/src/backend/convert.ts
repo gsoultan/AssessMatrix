@@ -143,6 +143,9 @@ export function examIn(e: ex.Exam): Exam {
     anonymous: e.anonymous,
     sections: e.sections.map((s) => ({ id: s.id, name: s.name, minutes: s.minutes, items: s.items.map(itemIn) })),
     updatedAt: n(e.updatedAt),
+    ...(e.sharedFrom
+      ? { sharedFrom: { examId: e.sharedFrom.examId, version: e.sharedFrom.version, tenantName: e.sharedFrom.tenantName } }
+      : {}),
   }
 }
 

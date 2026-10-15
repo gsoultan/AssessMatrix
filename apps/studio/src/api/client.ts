@@ -14,6 +14,7 @@ import { ProctorService } from '@assessmatrix/proto/proctor_pb'
 import { ResultService } from '@assessmatrix/proto/result_pb'
 import { SetupService } from '@assessmatrix/proto/setup_pb'
 import { WebhookService } from '@assessmatrix/proto/webhook_pb'
+import { TenantService } from '@assessmatrix/proto/tenant_pb'
 
 const transport = createConnectTransport({
   baseUrl: '/',
@@ -31,4 +32,5 @@ export const api = {
   proctor: createClient(ProctorService, transport),
   setup: createClient(SetupService, transport),
   webhooks: createClient(WebhookService, transport),
+  tenants: createClient(TenantService, transport),
 }
