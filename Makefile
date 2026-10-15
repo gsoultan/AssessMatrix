@@ -1,6 +1,6 @@
 # AssessMatrix — run `make` to see everything available.
 .DEFAULT_GOAL := help
-.PHONY: help up down dev check build preview e2e e2e-core load clean core-test proto
+.PHONY: help up down dev check build preview e2e e2e-core e2e-setup load clean core-test proto
 
 help: ## Show this help
 	@echo "AssessMatrix"
@@ -33,6 +33,9 @@ e2e: ## Smoke-test the create → take → score loop in a browser
 
 e2e-core: ## The same loop against the Go core and Postgres (needs AM_E2E_* URLs)
 	@./scripts/e2e-core.sh
+
+e2e-setup: ## First run on a fresh install through /setup (needs AM_E2E_SETUP_* URLs of a throwaway database)
+	@./scripts/e2e-setup.sh
 
 load: ## Cohort load test against a local core: N candidates, nothing lost (needs AM_E2E_* URLs)
 	@./scripts/load.sh

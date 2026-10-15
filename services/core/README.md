@@ -30,6 +30,7 @@ psql -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
 
 export AM_MIGRATE_DATABASE_URL=postgres://am_owner:owner@localhost/assessmatrix
 go run ./cmd/core migrate
+# Either create the first organisation here, or skip this and use /setup (below).
 go run ./cmd/core tenant "Your Org" you@example.id
 
 AM_DATABASE_URL=postgres://am_app:app@localhost/assessmatrix \
@@ -42,6 +43,20 @@ Or `docker compose up` from the repo root, after copying `.env.example` to `.env
 With `AM_DEV=1 AM_MAILER=mailbox`, mail is kept in memory and readable at
 `GET /dev/mailbox`. Production uses `AM_MAILER=smtp`; `log` redacts and drops.
 
+## First run: /setup
+
+On a database with no organisation, `serve` logs a warning with the setup URL and a
+`setup_code`. Open `<AM_PUBLIC_URL>/setup` (the sign-in page sends you there too), enter the
+code, and name the organisation and its first administrator; you are signed in as that
+administrator straight away. `core setup-code` prints the same code; it is derived from
+`AM_SECRET`, so every replica agrees on it.
+
+Setup works once. The database makes that so: `am_setup_first_tenant` locks `tenants` and
+refuses when any organisation exists, so two racing setups end with one winner, and the code
+is worthless afterwards. The serving role cannot create organisations any other way
+(`am_create_tenant` is revoked from it). Proven by `TestFirstRunSetupHappensOnce` and
+`scripts/e2e-setup.sh`.
+
 ## Test it
 
 ```bash
@@ -50,14 +65,16 @@ export AM_TEST_MIGRATE_DATABASE_URL=postgres://am_owner:owner@localhost/assessma
 go test -race ./...
 ```
 
-Without those variables the database tests skip locally and fail in CI.
+The setup test also needs an empty database next to it, named with `_setup` appended
+(`CREATE DATABASE assessmatrix_test_setup OWNER am_owner`). Without those variables the
+database tests skip locally and fail in CI.
 
 ## Configuration
 
 | Variable | Meaning |
 | :--- | :--- |
 | `AM_DATABASE_URL` | The application role. Must own nothing and lack `BYPASSRLS` |
-| `AM_MIGRATE_DATABASE_URL` | The schema owner, for `migrate` and `tenant` only |
+| `AM_MIGRATE_DATABASE_URL` | The schema owner, for `migrate` and `tenant`. Given to `serve` too, it applies pending migrations before serving and then closes that connection (a single-machine convenience; keep a separate `migrate` step where you can) |
 | `AM_APP_ROLE` | Role `migrate` grants to (default `am_app`) |
 | `AM_SECRET` | 32+ random bytes, hex or base64. Rotating it invalidates every link, code and session |
 | `AM_PUBLIC_URL` | The studio's origin. Must be https outside development |

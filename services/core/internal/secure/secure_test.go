@@ -81,3 +81,28 @@ func TestSealIsBoundToItsLabel(t *testing.T) {
 		t.Fatal("a sealed value must not open under another server secret")
 	}
 }
+
+func TestSetupCodeIsStablePerSecretAndForgiving(t *testing.T) {
+	a, _ := NewKeys([]byte(strings.Repeat("a", 32)))
+	a2, _ := NewKeys([]byte(strings.Repeat("a", 32)))
+	b, _ := NewKeys([]byte(strings.Repeat("b", 32)))
+	code := a.SetupCode()
+	if len(code) != 14 || code[4] != '-' || code[9] != '-' {
+		t.Fatalf("setup code %q is not XXXX-XXXX-XXXX", code)
+	}
+	if strings.ContainsAny(code, "01ILO") {
+		t.Fatalf("setup code %q has a character that reads as another", code)
+	}
+	if a2.SetupCode() != code {
+		t.Fatal("two replicas with one secret must agree on the setup code")
+	}
+	if b.SetupCode() == code {
+		t.Fatal("another secret gave the same setup code")
+	}
+	if !a.SetupCodeMatches(strings.ToLower(strings.ReplaceAll(code, "-", " "))) {
+		t.Fatal("the code typed in lower case with spaces was refused")
+	}
+	if a.SetupCodeMatches(b.SetupCode()) || a.SetupCodeMatches("") {
+		t.Fatal("a wrong or empty code was accepted")
+	}
+}

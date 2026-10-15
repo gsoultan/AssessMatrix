@@ -80,6 +80,10 @@ func Policy() map[string]auth.Access {
 		// Clearing your own cookie needs no proof of who you are.
 		assessmatrixv1connect.CandidateServiceEndSessionProcedure,
 		assessmatrixv1connect.AuthServiceSignOutProcedure,
+		// First-run setup proves itself with the setup code, and the
+		// database refuses it once an organisation exists.
+		assessmatrixv1connect.SetupServiceGetSetupStatusProcedure,
+		assessmatrixv1connect.SetupServiceCompleteSetupProcedure,
 	)
 	set(auth.Candidate,
 		assessmatrixv1connect.CandidateServiceGetSessionProcedure,
@@ -142,6 +146,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(assessmatrixv1connect.NewCandidateServiceHandler(&candidateService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewResultServiceHandler(&resultService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewProctorServiceHandler(&proctorService{s}, opts...))
+	mux.Handle(assessmatrixv1connect.NewSetupServiceHandler(&setupService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewWebhookServiceHandler(&webhookService{s}, opts...))
 	return mux
 }

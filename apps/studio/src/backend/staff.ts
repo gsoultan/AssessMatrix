@@ -7,7 +7,7 @@ import { api } from '../api/client'
 
 export type Staff = { id: string; email: string; name: string; tenantName: string }
 
-const staffIn = (s: { id: string; email: string; name: string; tenantName: string }): Staff => ({
+export const staffIn = (s: { id: string; email: string; name: string; tenantName: string }): Staff => ({
   id: s.id,
   email: s.email,
   name: s.name,
