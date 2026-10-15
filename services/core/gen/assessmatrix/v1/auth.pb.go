@@ -21,13 +21,68 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// What a staff member may do in one tenant.
+type Role int32
+
+const (
+	Role_ROLE_UNSPECIFIED Role = 0
+	// Everything a member can do, plus who has access, new tenants and sharing
+	// instruments with other tenants.
+	Role_ROLE_ADMIN Role = 1
+	// Build, invite, score: the everyday work.
+	Role_ROLE_MEMBER Role = 2
+)
+
+// Enum value maps for Role.
+var (
+	Role_name = map[int32]string{
+		0: "ROLE_UNSPECIFIED",
+		1: "ROLE_ADMIN",
+		2: "ROLE_MEMBER",
+	}
+	Role_value = map[string]int32{
+		"ROLE_UNSPECIFIED": 0,
+		"ROLE_ADMIN":       1,
+		"ROLE_MEMBER":      2,
+	}
+)
+
+func (x Role) Enum() *Role {
+	p := new(Role)
+	*p = x
+	return p
+}
+
+func (x Role) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Role) Descriptor() protoreflect.EnumDescriptor {
+	return file_assessmatrix_v1_auth_proto_enumTypes[0].Descriptor()
+}
+
+func (Role) Type() protoreflect.EnumType {
+	return &file_assessmatrix_v1_auth_proto_enumTypes[0]
+}
+
+func (x Role) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Role.Descriptor instead.
+func (Role) EnumDescriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_auth_proto_rawDescGZIP(), []int{0}
+}
+
 type Staff struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	TenantId      string                 `protobuf:"bytes,4,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	TenantName    string                 `protobuf:"bytes,5,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Email      string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Name       string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	TenantId   string                 `protobuf:"bytes,4,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	TenantName string                 `protobuf:"bytes,5,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
+	// Their role in this tenant.
+	Role          Role `protobuf:"varint,6,opt,name=role,proto3,enum=assessmatrix.v1.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -95,6 +150,13 @@ func (x *Staff) GetTenantName() string {
 		return x.TenantName
 	}
 	return ""
+}
+
+func (x *Staff) GetRole() Role {
+	if x != nil {
+		return x.Role
+	}
+	return Role_ROLE_UNSPECIFIED
 }
 
 type RequestStaffCodeRequest struct {
@@ -437,14 +499,15 @@ var File_assessmatrix_v1_auth_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x1aassessmatrix/v1/auth.proto\x12\x0fassessmatrix.v1\"\x7f\n" +
+	"\x1aassessmatrix/v1/auth.proto\x12\x0fassessmatrix.v1\"\xaa\x01\n" +
 	"\x05Staff\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1b\n" +
 	"\ttenant_id\x18\x04 \x01(\tR\btenantId\x12\x1f\n" +
 	"\vtenant_name\x18\x05 \x01(\tR\n" +
-	"tenantName\"/\n" +
+	"tenantName\x12)\n" +
+	"\x04role\x18\x06 \x01(\x0e2\x15.assessmatrix.v1.RoleR\x04role\"/\n" +
 	"\x17RequestStaffCodeRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"\x1a\n" +
 	"\x18RequestStaffCodeResponse\"B\n" +
@@ -458,7 +521,12 @@ const file_assessmatrix_v1_auth_proto_rawDesc = "" +
 	"\x0eWhoAmIResponse\x12,\n" +
 	"\x05staff\x18\x01 \x01(\v2\x16.assessmatrix.v1.StaffR\x05staff\"\x10\n" +
 	"\x0eSignOutRequest\"\x11\n" +
-	"\x0fSignOutResponse2\xf5\x02\n" +
+	"\x0fSignOutResponse*=\n" +
+	"\x04Role\x12\x14\n" +
+	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x0e\n" +
+	"\n" +
+	"ROLE_ADMIN\x10\x01\x12\x0f\n" +
+	"\vROLE_MEMBER\x10\x022\xf5\x02\n" +
 	"\vAuthService\x12g\n" +
 	"\x10RequestStaffCode\x12(.assessmatrix.v1.RequestStaffCodeRequest\x1a).assessmatrix.v1.RequestStaffCodeResponse\x12d\n" +
 	"\x0fVerifyStaffCode\x12'.assessmatrix.v1.VerifyStaffCodeRequest\x1a(.assessmatrix.v1.VerifyStaffCodeResponse\x12I\n" +
@@ -478,34 +546,37 @@ func file_assessmatrix_v1_auth_proto_rawDescGZIP() []byte {
 	return file_assessmatrix_v1_auth_proto_rawDescData
 }
 
+var file_assessmatrix_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_assessmatrix_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_assessmatrix_v1_auth_proto_goTypes = []any{
-	(*Staff)(nil),                    // 0: assessmatrix.v1.Staff
-	(*RequestStaffCodeRequest)(nil),  // 1: assessmatrix.v1.RequestStaffCodeRequest
-	(*RequestStaffCodeResponse)(nil), // 2: assessmatrix.v1.RequestStaffCodeResponse
-	(*VerifyStaffCodeRequest)(nil),   // 3: assessmatrix.v1.VerifyStaffCodeRequest
-	(*VerifyStaffCodeResponse)(nil),  // 4: assessmatrix.v1.VerifyStaffCodeResponse
-	(*WhoAmIRequest)(nil),            // 5: assessmatrix.v1.WhoAmIRequest
-	(*WhoAmIResponse)(nil),           // 6: assessmatrix.v1.WhoAmIResponse
-	(*SignOutRequest)(nil),           // 7: assessmatrix.v1.SignOutRequest
-	(*SignOutResponse)(nil),          // 8: assessmatrix.v1.SignOutResponse
+	(Role)(0),                        // 0: assessmatrix.v1.Role
+	(*Staff)(nil),                    // 1: assessmatrix.v1.Staff
+	(*RequestStaffCodeRequest)(nil),  // 2: assessmatrix.v1.RequestStaffCodeRequest
+	(*RequestStaffCodeResponse)(nil), // 3: assessmatrix.v1.RequestStaffCodeResponse
+	(*VerifyStaffCodeRequest)(nil),   // 4: assessmatrix.v1.VerifyStaffCodeRequest
+	(*VerifyStaffCodeResponse)(nil),  // 5: assessmatrix.v1.VerifyStaffCodeResponse
+	(*WhoAmIRequest)(nil),            // 6: assessmatrix.v1.WhoAmIRequest
+	(*WhoAmIResponse)(nil),           // 7: assessmatrix.v1.WhoAmIResponse
+	(*SignOutRequest)(nil),           // 8: assessmatrix.v1.SignOutRequest
+	(*SignOutResponse)(nil),          // 9: assessmatrix.v1.SignOutResponse
 }
 var file_assessmatrix_v1_auth_proto_depIdxs = []int32{
-	0, // 0: assessmatrix.v1.VerifyStaffCodeResponse.staff:type_name -> assessmatrix.v1.Staff
-	0, // 1: assessmatrix.v1.WhoAmIResponse.staff:type_name -> assessmatrix.v1.Staff
-	1, // 2: assessmatrix.v1.AuthService.RequestStaffCode:input_type -> assessmatrix.v1.RequestStaffCodeRequest
-	3, // 3: assessmatrix.v1.AuthService.VerifyStaffCode:input_type -> assessmatrix.v1.VerifyStaffCodeRequest
-	5, // 4: assessmatrix.v1.AuthService.WhoAmI:input_type -> assessmatrix.v1.WhoAmIRequest
-	7, // 5: assessmatrix.v1.AuthService.SignOut:input_type -> assessmatrix.v1.SignOutRequest
-	2, // 6: assessmatrix.v1.AuthService.RequestStaffCode:output_type -> assessmatrix.v1.RequestStaffCodeResponse
-	4, // 7: assessmatrix.v1.AuthService.VerifyStaffCode:output_type -> assessmatrix.v1.VerifyStaffCodeResponse
-	6, // 8: assessmatrix.v1.AuthService.WhoAmI:output_type -> assessmatrix.v1.WhoAmIResponse
-	8, // 9: assessmatrix.v1.AuthService.SignOut:output_type -> assessmatrix.v1.SignOutResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: assessmatrix.v1.Staff.role:type_name -> assessmatrix.v1.Role
+	1, // 1: assessmatrix.v1.VerifyStaffCodeResponse.staff:type_name -> assessmatrix.v1.Staff
+	1, // 2: assessmatrix.v1.WhoAmIResponse.staff:type_name -> assessmatrix.v1.Staff
+	2, // 3: assessmatrix.v1.AuthService.RequestStaffCode:input_type -> assessmatrix.v1.RequestStaffCodeRequest
+	4, // 4: assessmatrix.v1.AuthService.VerifyStaffCode:input_type -> assessmatrix.v1.VerifyStaffCodeRequest
+	6, // 5: assessmatrix.v1.AuthService.WhoAmI:input_type -> assessmatrix.v1.WhoAmIRequest
+	8, // 6: assessmatrix.v1.AuthService.SignOut:input_type -> assessmatrix.v1.SignOutRequest
+	3, // 7: assessmatrix.v1.AuthService.RequestStaffCode:output_type -> assessmatrix.v1.RequestStaffCodeResponse
+	5, // 8: assessmatrix.v1.AuthService.VerifyStaffCode:output_type -> assessmatrix.v1.VerifyStaffCodeResponse
+	7, // 9: assessmatrix.v1.AuthService.WhoAmI:output_type -> assessmatrix.v1.WhoAmIResponse
+	9, // 10: assessmatrix.v1.AuthService.SignOut:output_type -> assessmatrix.v1.SignOutResponse
+	7, // [7:11] is the sub-list for method output_type
+	3, // [3:7] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_auth_proto_init() }
@@ -518,13 +589,14 @@ func file_assessmatrix_v1_auth_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_auth_proto_rawDesc), len(file_assessmatrix_v1_auth_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_assessmatrix_v1_auth_proto_goTypes,
 		DependencyIndexes: file_assessmatrix_v1_auth_proto_depIdxs,
+		EnumInfos:         file_assessmatrix_v1_auth_proto_enumTypes,
 		MessageInfos:      file_assessmatrix_v1_auth_proto_msgTypes,
 	}.Build()
 	File_assessmatrix_v1_auth_proto = out.File

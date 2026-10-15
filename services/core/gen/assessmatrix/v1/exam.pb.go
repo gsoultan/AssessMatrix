@@ -663,13 +663,16 @@ type Exam struct {
 	Title            string `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
 	Issuer           string `protobuf:"bytes,7,opt,name=issuer,proto3" json:"issuer,omitempty"`
 	// Integrity tier, 0 to 3.
-	Tier          int32      `protobuf:"varint,8,opt,name=tier,proto3" json:"tier,omitempty"`
-	PassPct       int32      `protobuf:"varint,9,opt,name=pass_pct,json=passPct,proto3" json:"pass_pct,omitempty"`
-	Shuffle       bool       `protobuf:"varint,10,opt,name=shuffle,proto3" json:"shuffle,omitempty"`
-	Timed         bool       `protobuf:"varint,11,opt,name=timed,proto3" json:"timed,omitempty"`
-	Anonymous     bool       `protobuf:"varint,12,opt,name=anonymous,proto3" json:"anonymous,omitempty"`
-	Sections      []*Section `protobuf:"bytes,13,rep,name=sections,proto3" json:"sections,omitempty"`
-	UpdatedAt     int64      `protobuf:"varint,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Tier      int32      `protobuf:"varint,8,opt,name=tier,proto3" json:"tier,omitempty"`
+	PassPct   int32      `protobuf:"varint,9,opt,name=pass_pct,json=passPct,proto3" json:"pass_pct,omitempty"`
+	Shuffle   bool       `protobuf:"varint,10,opt,name=shuffle,proto3" json:"shuffle,omitempty"`
+	Timed     bool       `protobuf:"varint,11,opt,name=timed,proto3" json:"timed,omitempty"`
+	Anonymous bool       `protobuf:"varint,12,opt,name=anonymous,proto3" json:"anonymous,omitempty"`
+	Sections  []*Section `protobuf:"bytes,13,rep,name=sections,proto3" json:"sections,omitempty"`
+	UpdatedAt int64      `protobuf:"varint,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Set on a copy shared in from another tenant. Read-only: only sharing
+	// again changes it.
+	SharedFrom    *SharedFrom `protobuf:"bytes,15,opt,name=shared_from,json=sharedFrom,proto3" json:"shared_from,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -802,6 +805,75 @@ func (x *Exam) GetUpdatedAt() int64 {
 	return 0
 }
 
+func (x *Exam) GetSharedFrom() *SharedFrom {
+	if x != nil {
+		return x.SharedFrom
+	}
+	return nil
+}
+
+// The original a shared copy follows, as it was when last shared.
+type SharedFrom struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ExamId string                 `protobuf:"bytes,1,opt,name=exam_id,json=examId,proto3" json:"exam_id,omitempty"`
+	// The original's version this copy was last brought up to.
+	Version       int32  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	TenantName    string `protobuf:"bytes,3,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SharedFrom) Reset() {
+	*x = SharedFrom{}
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SharedFrom) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SharedFrom) ProtoMessage() {}
+
+func (x *SharedFrom) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SharedFrom.ProtoReflect.Descriptor instead.
+func (*SharedFrom) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SharedFrom) GetExamId() string {
+	if x != nil {
+		return x.ExamId
+	}
+	return ""
+}
+
+func (x *SharedFrom) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *SharedFrom) GetTenantName() string {
+	if x != nil {
+		return x.TenantName
+	}
+	return ""
+}
+
 // A frozen copy. Publishing is what makes one; attempts and invitations are
 // pinned to it, so editing the working copy cannot change a paper being sat.
 type ExamVersion struct {
@@ -817,7 +889,7 @@ type ExamVersion struct {
 
 func (x *ExamVersion) Reset() {
 	*x = ExamVersion{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[6]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -829,7 +901,7 @@ func (x *ExamVersion) String() string {
 func (*ExamVersion) ProtoMessage() {}
 
 func (x *ExamVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[6]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -842,7 +914,7 @@ func (x *ExamVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExamVersion.ProtoReflect.Descriptor instead.
 func (*ExamVersion) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{6}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ExamVersion) GetExamId() string {
@@ -888,7 +960,7 @@ type ListExamsRequest struct {
 
 func (x *ListExamsRequest) Reset() {
 	*x = ListExamsRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[7]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -900,7 +972,7 @@ func (x *ListExamsRequest) String() string {
 func (*ListExamsRequest) ProtoMessage() {}
 
 func (x *ListExamsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[7]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -913,7 +985,7 @@ func (x *ListExamsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExamsRequest.ProtoReflect.Descriptor instead.
 func (*ListExamsRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{7}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{8}
 }
 
 type ListExamsResponse struct {
@@ -925,7 +997,7 @@ type ListExamsResponse struct {
 
 func (x *ListExamsResponse) Reset() {
 	*x = ListExamsResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[8]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -937,7 +1009,7 @@ func (x *ListExamsResponse) String() string {
 func (*ListExamsResponse) ProtoMessage() {}
 
 func (x *ListExamsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[8]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -950,7 +1022,7 @@ func (x *ListExamsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExamsResponse.ProtoReflect.Descriptor instead.
 func (*ListExamsResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{8}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListExamsResponse) GetExams() []*Exam {
@@ -969,7 +1041,7 @@ type GetExamRequest struct {
 
 func (x *GetExamRequest) Reset() {
 	*x = GetExamRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[9]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -981,7 +1053,7 @@ func (x *GetExamRequest) String() string {
 func (*GetExamRequest) ProtoMessage() {}
 
 func (x *GetExamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[9]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -994,7 +1066,7 @@ func (x *GetExamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExamRequest.ProtoReflect.Descriptor instead.
 func (*GetExamRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{9}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetExamRequest) GetId() string {
@@ -1013,7 +1085,7 @@ type GetExamResponse struct {
 
 func (x *GetExamResponse) Reset() {
 	*x = GetExamResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[10]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1025,7 +1097,7 @@ func (x *GetExamResponse) String() string {
 func (*GetExamResponse) ProtoMessage() {}
 
 func (x *GetExamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[10]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1038,7 +1110,7 @@ func (x *GetExamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetExamResponse.ProtoReflect.Descriptor instead.
 func (*GetExamResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{10}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetExamResponse) GetExam() *Exam {
@@ -1057,7 +1129,7 @@ type CreateExamRequest struct {
 
 func (x *CreateExamRequest) Reset() {
 	*x = CreateExamRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[11]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1141,7 @@ func (x *CreateExamRequest) String() string {
 func (*CreateExamRequest) ProtoMessage() {}
 
 func (x *CreateExamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[11]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1154,7 @@ func (x *CreateExamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateExamRequest.ProtoReflect.Descriptor instead.
 func (*CreateExamRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{11}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CreateExamRequest) GetKind() Kind {
@@ -1101,7 +1173,7 @@ type CreateExamResponse struct {
 
 func (x *CreateExamResponse) Reset() {
 	*x = CreateExamResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[12]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1113,7 +1185,7 @@ func (x *CreateExamResponse) String() string {
 func (*CreateExamResponse) ProtoMessage() {}
 
 func (x *CreateExamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[12]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1126,7 +1198,7 @@ func (x *CreateExamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateExamResponse.ProtoReflect.Descriptor instead.
 func (*CreateExamResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{12}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CreateExamResponse) GetExam() *Exam {
@@ -1151,7 +1223,7 @@ type SaveExamRequest struct {
 
 func (x *SaveExamRequest) Reset() {
 	*x = SaveExamRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[13]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1163,7 +1235,7 @@ func (x *SaveExamRequest) String() string {
 func (*SaveExamRequest) ProtoMessage() {}
 
 func (x *SaveExamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[13]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1176,7 +1248,7 @@ func (x *SaveExamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveExamRequest.ProtoReflect.Descriptor instead.
 func (*SaveExamRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{13}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SaveExamRequest) GetExam() *Exam {
@@ -1209,7 +1281,7 @@ type SaveExamResponse struct {
 
 func (x *SaveExamResponse) Reset() {
 	*x = SaveExamResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[14]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1221,7 +1293,7 @@ func (x *SaveExamResponse) String() string {
 func (*SaveExamResponse) ProtoMessage() {}
 
 func (x *SaveExamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[14]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1234,7 +1306,7 @@ func (x *SaveExamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveExamResponse.ProtoReflect.Descriptor instead.
 func (*SaveExamResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{14}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *SaveExamResponse) GetExam() *Exam {
@@ -1253,7 +1325,7 @@ type DuplicateExamRequest struct {
 
 func (x *DuplicateExamRequest) Reset() {
 	*x = DuplicateExamRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[15]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1265,7 +1337,7 @@ func (x *DuplicateExamRequest) String() string {
 func (*DuplicateExamRequest) ProtoMessage() {}
 
 func (x *DuplicateExamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[15]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1278,7 +1350,7 @@ func (x *DuplicateExamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DuplicateExamRequest.ProtoReflect.Descriptor instead.
 func (*DuplicateExamRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{15}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DuplicateExamRequest) GetId() string {
@@ -1297,7 +1369,7 @@ type DuplicateExamResponse struct {
 
 func (x *DuplicateExamResponse) Reset() {
 	*x = DuplicateExamResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[16]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1309,7 +1381,7 @@ func (x *DuplicateExamResponse) String() string {
 func (*DuplicateExamResponse) ProtoMessage() {}
 
 func (x *DuplicateExamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[16]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1322,7 +1394,7 @@ func (x *DuplicateExamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DuplicateExamResponse.ProtoReflect.Descriptor instead.
 func (*DuplicateExamResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{16}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DuplicateExamResponse) GetExam() *Exam {
@@ -1342,7 +1414,7 @@ type SetExamStatusRequest struct {
 
 func (x *SetExamStatusRequest) Reset() {
 	*x = SetExamStatusRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[17]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1354,7 +1426,7 @@ func (x *SetExamStatusRequest) String() string {
 func (*SetExamStatusRequest) ProtoMessage() {}
 
 func (x *SetExamStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[17]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1367,7 +1439,7 @@ func (x *SetExamStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetExamStatusRequest.ProtoReflect.Descriptor instead.
 func (*SetExamStatusRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{17}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SetExamStatusRequest) GetId() string {
@@ -1393,7 +1465,7 @@ type SetExamStatusResponse struct {
 
 func (x *SetExamStatusResponse) Reset() {
 	*x = SetExamStatusResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[18]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1405,7 +1477,7 @@ func (x *SetExamStatusResponse) String() string {
 func (*SetExamStatusResponse) ProtoMessage() {}
 
 func (x *SetExamStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[18]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1418,7 +1490,7 @@ func (x *SetExamStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetExamStatusResponse.ProtoReflect.Descriptor instead.
 func (*SetExamStatusResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{18}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SetExamStatusResponse) GetExam() *Exam {
@@ -1437,7 +1509,7 @@ type DeleteExamRequest struct {
 
 func (x *DeleteExamRequest) Reset() {
 	*x = DeleteExamRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[19]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1449,7 +1521,7 @@ func (x *DeleteExamRequest) String() string {
 func (*DeleteExamRequest) ProtoMessage() {}
 
 func (x *DeleteExamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[19]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1462,7 +1534,7 @@ func (x *DeleteExamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteExamRequest.ProtoReflect.Descriptor instead.
 func (*DeleteExamRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{19}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DeleteExamRequest) GetId() string {
@@ -1480,7 +1552,7 @@ type DeleteExamResponse struct {
 
 func (x *DeleteExamResponse) Reset() {
 	*x = DeleteExamResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[20]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1492,7 +1564,7 @@ func (x *DeleteExamResponse) String() string {
 func (*DeleteExamResponse) ProtoMessage() {}
 
 func (x *DeleteExamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[20]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +1577,7 @@ func (x *DeleteExamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteExamResponse.ProtoReflect.Descriptor instead.
 func (*DeleteExamResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{20}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{21}
 }
 
 type ListExamVersionsRequest struct {
@@ -1517,7 +1589,7 @@ type ListExamVersionsRequest struct {
 
 func (x *ListExamVersionsRequest) Reset() {
 	*x = ListExamVersionsRequest{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[21]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1529,7 +1601,7 @@ func (x *ListExamVersionsRequest) String() string {
 func (*ListExamVersionsRequest) ProtoMessage() {}
 
 func (x *ListExamVersionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[21]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1542,7 +1614,7 @@ func (x *ListExamVersionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExamVersionsRequest.ProtoReflect.Descriptor instead.
 func (*ListExamVersionsRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{21}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListExamVersionsRequest) GetExamId() string {
@@ -1561,7 +1633,7 @@ type ListExamVersionsResponse struct {
 
 func (x *ListExamVersionsResponse) Reset() {
 	*x = ListExamVersionsResponse{}
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[22]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1573,7 +1645,7 @@ func (x *ListExamVersionsResponse) String() string {
 func (*ListExamVersionsResponse) ProtoMessage() {}
 
 func (x *ListExamVersionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_exam_proto_msgTypes[22]
+	mi := &file_assessmatrix_v1_exam_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1586,7 +1658,7 @@ func (x *ListExamVersionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListExamVersionsResponse.ProtoReflect.Descriptor instead.
 func (*ListExamVersionsResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{22}
+	return file_assessmatrix_v1_exam_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListExamVersionsResponse) GetVersions() []*ExamVersion {
@@ -1633,7 +1705,7 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aminutes\x18\x03 \x01(\x05R\aminutes\x12+\n" +
-	"\x05items\x18\x04 \x03(\v2\x15.assessmatrix.v1.ItemR\x05items\"\xb9\x03\n" +
+	"\x05items\x18\x04 \x03(\v2\x15.assessmatrix.v1.ItemR\x05items\"\xf7\x03\n" +
 	"\x04Exam\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x15.assessmatrix.v1.KindR\x04kind\x12/\n" +
@@ -1650,7 +1722,15 @@ const file_assessmatrix_v1_exam_proto_rawDesc = "" +
 	"\tanonymous\x18\f \x01(\bR\tanonymous\x124\n" +
 	"\bsections\x18\r \x03(\v2\x18.assessmatrix.v1.SectionR\bsections\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\x03R\tupdatedAt\"\xa2\x01\n" +
+	"updated_at\x18\x0e \x01(\x03R\tupdatedAt\x12<\n" +
+	"\vshared_from\x18\x0f \x01(\v2\x1b.assessmatrix.v1.SharedFromR\n" +
+	"sharedFrom\"`\n" +
+	"\n" +
+	"SharedFrom\x12\x17\n" +
+	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x05R\aversion\x12\x1f\n" +
+	"\vtenant_name\x18\x03 \x01(\tR\n" +
+	"tenantName\"\xa2\x01\n" +
 	"\vExamVersion\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x05R\aversion\x12!\n" +
@@ -1740,7 +1820,7 @@ func file_assessmatrix_v1_exam_proto_rawDescGZIP() []byte {
 }
 
 var file_assessmatrix_v1_exam_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_assessmatrix_v1_exam_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_assessmatrix_v1_exam_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_assessmatrix_v1_exam_proto_goTypes = []any{
 	(Kind)(0),                        // 0: assessmatrix.v1.Kind
 	(Status)(0),                      // 1: assessmatrix.v1.Status
@@ -1752,23 +1832,24 @@ var file_assessmatrix_v1_exam_proto_goTypes = []any{
 	(*Item)(nil),                     // 7: assessmatrix.v1.Item
 	(*Section)(nil),                  // 8: assessmatrix.v1.Section
 	(*Exam)(nil),                     // 9: assessmatrix.v1.Exam
-	(*ExamVersion)(nil),              // 10: assessmatrix.v1.ExamVersion
-	(*ListExamsRequest)(nil),         // 11: assessmatrix.v1.ListExamsRequest
-	(*ListExamsResponse)(nil),        // 12: assessmatrix.v1.ListExamsResponse
-	(*GetExamRequest)(nil),           // 13: assessmatrix.v1.GetExamRequest
-	(*GetExamResponse)(nil),          // 14: assessmatrix.v1.GetExamResponse
-	(*CreateExamRequest)(nil),        // 15: assessmatrix.v1.CreateExamRequest
-	(*CreateExamResponse)(nil),       // 16: assessmatrix.v1.CreateExamResponse
-	(*SaveExamRequest)(nil),          // 17: assessmatrix.v1.SaveExamRequest
-	(*SaveExamResponse)(nil),         // 18: assessmatrix.v1.SaveExamResponse
-	(*DuplicateExamRequest)(nil),     // 19: assessmatrix.v1.DuplicateExamRequest
-	(*DuplicateExamResponse)(nil),    // 20: assessmatrix.v1.DuplicateExamResponse
-	(*SetExamStatusRequest)(nil),     // 21: assessmatrix.v1.SetExamStatusRequest
-	(*SetExamStatusResponse)(nil),    // 22: assessmatrix.v1.SetExamStatusResponse
-	(*DeleteExamRequest)(nil),        // 23: assessmatrix.v1.DeleteExamRequest
-	(*DeleteExamResponse)(nil),       // 24: assessmatrix.v1.DeleteExamResponse
-	(*ListExamVersionsRequest)(nil),  // 25: assessmatrix.v1.ListExamVersionsRequest
-	(*ListExamVersionsResponse)(nil), // 26: assessmatrix.v1.ListExamVersionsResponse
+	(*SharedFrom)(nil),               // 10: assessmatrix.v1.SharedFrom
+	(*ExamVersion)(nil),              // 11: assessmatrix.v1.ExamVersion
+	(*ListExamsRequest)(nil),         // 12: assessmatrix.v1.ListExamsRequest
+	(*ListExamsResponse)(nil),        // 13: assessmatrix.v1.ListExamsResponse
+	(*GetExamRequest)(nil),           // 14: assessmatrix.v1.GetExamRequest
+	(*GetExamResponse)(nil),          // 15: assessmatrix.v1.GetExamResponse
+	(*CreateExamRequest)(nil),        // 16: assessmatrix.v1.CreateExamRequest
+	(*CreateExamResponse)(nil),       // 17: assessmatrix.v1.CreateExamResponse
+	(*SaveExamRequest)(nil),          // 18: assessmatrix.v1.SaveExamRequest
+	(*SaveExamResponse)(nil),         // 19: assessmatrix.v1.SaveExamResponse
+	(*DuplicateExamRequest)(nil),     // 20: assessmatrix.v1.DuplicateExamRequest
+	(*DuplicateExamResponse)(nil),    // 21: assessmatrix.v1.DuplicateExamResponse
+	(*SetExamStatusRequest)(nil),     // 22: assessmatrix.v1.SetExamStatusRequest
+	(*SetExamStatusResponse)(nil),    // 23: assessmatrix.v1.SetExamStatusResponse
+	(*DeleteExamRequest)(nil),        // 24: assessmatrix.v1.DeleteExamRequest
+	(*DeleteExamResponse)(nil),       // 25: assessmatrix.v1.DeleteExamResponse
+	(*ListExamVersionsRequest)(nil),  // 26: assessmatrix.v1.ListExamVersionsRequest
+	(*ListExamVersionsResponse)(nil), // 27: assessmatrix.v1.ListExamVersionsResponse
 }
 var file_assessmatrix_v1_exam_proto_depIdxs = []int32{
 	4,  // 0: assessmatrix.v1.Choice.image:type_name -> assessmatrix.v1.Media
@@ -1780,39 +1861,40 @@ var file_assessmatrix_v1_exam_proto_depIdxs = []int32{
 	0,  // 6: assessmatrix.v1.Exam.kind:type_name -> assessmatrix.v1.Kind
 	1,  // 7: assessmatrix.v1.Exam.status:type_name -> assessmatrix.v1.Status
 	8,  // 8: assessmatrix.v1.Exam.sections:type_name -> assessmatrix.v1.Section
-	9,  // 9: assessmatrix.v1.ExamVersion.exam:type_name -> assessmatrix.v1.Exam
-	9,  // 10: assessmatrix.v1.ListExamsResponse.exams:type_name -> assessmatrix.v1.Exam
-	9,  // 11: assessmatrix.v1.GetExamResponse.exam:type_name -> assessmatrix.v1.Exam
-	0,  // 12: assessmatrix.v1.CreateExamRequest.kind:type_name -> assessmatrix.v1.Kind
-	9,  // 13: assessmatrix.v1.CreateExamResponse.exam:type_name -> assessmatrix.v1.Exam
-	9,  // 14: assessmatrix.v1.SaveExamRequest.exam:type_name -> assessmatrix.v1.Exam
-	3,  // 15: assessmatrix.v1.SaveExamRequest.mode:type_name -> assessmatrix.v1.SaveMode
-	9,  // 16: assessmatrix.v1.SaveExamResponse.exam:type_name -> assessmatrix.v1.Exam
-	9,  // 17: assessmatrix.v1.DuplicateExamResponse.exam:type_name -> assessmatrix.v1.Exam
-	1,  // 18: assessmatrix.v1.SetExamStatusRequest.status:type_name -> assessmatrix.v1.Status
-	9,  // 19: assessmatrix.v1.SetExamStatusResponse.exam:type_name -> assessmatrix.v1.Exam
-	10, // 20: assessmatrix.v1.ListExamVersionsResponse.versions:type_name -> assessmatrix.v1.ExamVersion
-	11, // 21: assessmatrix.v1.ExamService.ListExams:input_type -> assessmatrix.v1.ListExamsRequest
-	13, // 22: assessmatrix.v1.ExamService.GetExam:input_type -> assessmatrix.v1.GetExamRequest
-	15, // 23: assessmatrix.v1.ExamService.CreateExam:input_type -> assessmatrix.v1.CreateExamRequest
-	17, // 24: assessmatrix.v1.ExamService.SaveExam:input_type -> assessmatrix.v1.SaveExamRequest
-	19, // 25: assessmatrix.v1.ExamService.DuplicateExam:input_type -> assessmatrix.v1.DuplicateExamRequest
-	21, // 26: assessmatrix.v1.ExamService.SetExamStatus:input_type -> assessmatrix.v1.SetExamStatusRequest
-	23, // 27: assessmatrix.v1.ExamService.DeleteExam:input_type -> assessmatrix.v1.DeleteExamRequest
-	25, // 28: assessmatrix.v1.ExamService.ListExamVersions:input_type -> assessmatrix.v1.ListExamVersionsRequest
-	12, // 29: assessmatrix.v1.ExamService.ListExams:output_type -> assessmatrix.v1.ListExamsResponse
-	14, // 30: assessmatrix.v1.ExamService.GetExam:output_type -> assessmatrix.v1.GetExamResponse
-	16, // 31: assessmatrix.v1.ExamService.CreateExam:output_type -> assessmatrix.v1.CreateExamResponse
-	18, // 32: assessmatrix.v1.ExamService.SaveExam:output_type -> assessmatrix.v1.SaveExamResponse
-	20, // 33: assessmatrix.v1.ExamService.DuplicateExam:output_type -> assessmatrix.v1.DuplicateExamResponse
-	22, // 34: assessmatrix.v1.ExamService.SetExamStatus:output_type -> assessmatrix.v1.SetExamStatusResponse
-	24, // 35: assessmatrix.v1.ExamService.DeleteExam:output_type -> assessmatrix.v1.DeleteExamResponse
-	26, // 36: assessmatrix.v1.ExamService.ListExamVersions:output_type -> assessmatrix.v1.ListExamVersionsResponse
-	29, // [29:37] is the sub-list for method output_type
-	21, // [21:29] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	10, // 9: assessmatrix.v1.Exam.shared_from:type_name -> assessmatrix.v1.SharedFrom
+	9,  // 10: assessmatrix.v1.ExamVersion.exam:type_name -> assessmatrix.v1.Exam
+	9,  // 11: assessmatrix.v1.ListExamsResponse.exams:type_name -> assessmatrix.v1.Exam
+	9,  // 12: assessmatrix.v1.GetExamResponse.exam:type_name -> assessmatrix.v1.Exam
+	0,  // 13: assessmatrix.v1.CreateExamRequest.kind:type_name -> assessmatrix.v1.Kind
+	9,  // 14: assessmatrix.v1.CreateExamResponse.exam:type_name -> assessmatrix.v1.Exam
+	9,  // 15: assessmatrix.v1.SaveExamRequest.exam:type_name -> assessmatrix.v1.Exam
+	3,  // 16: assessmatrix.v1.SaveExamRequest.mode:type_name -> assessmatrix.v1.SaveMode
+	9,  // 17: assessmatrix.v1.SaveExamResponse.exam:type_name -> assessmatrix.v1.Exam
+	9,  // 18: assessmatrix.v1.DuplicateExamResponse.exam:type_name -> assessmatrix.v1.Exam
+	1,  // 19: assessmatrix.v1.SetExamStatusRequest.status:type_name -> assessmatrix.v1.Status
+	9,  // 20: assessmatrix.v1.SetExamStatusResponse.exam:type_name -> assessmatrix.v1.Exam
+	11, // 21: assessmatrix.v1.ListExamVersionsResponse.versions:type_name -> assessmatrix.v1.ExamVersion
+	12, // 22: assessmatrix.v1.ExamService.ListExams:input_type -> assessmatrix.v1.ListExamsRequest
+	14, // 23: assessmatrix.v1.ExamService.GetExam:input_type -> assessmatrix.v1.GetExamRequest
+	16, // 24: assessmatrix.v1.ExamService.CreateExam:input_type -> assessmatrix.v1.CreateExamRequest
+	18, // 25: assessmatrix.v1.ExamService.SaveExam:input_type -> assessmatrix.v1.SaveExamRequest
+	20, // 26: assessmatrix.v1.ExamService.DuplicateExam:input_type -> assessmatrix.v1.DuplicateExamRequest
+	22, // 27: assessmatrix.v1.ExamService.SetExamStatus:input_type -> assessmatrix.v1.SetExamStatusRequest
+	24, // 28: assessmatrix.v1.ExamService.DeleteExam:input_type -> assessmatrix.v1.DeleteExamRequest
+	26, // 29: assessmatrix.v1.ExamService.ListExamVersions:input_type -> assessmatrix.v1.ListExamVersionsRequest
+	13, // 30: assessmatrix.v1.ExamService.ListExams:output_type -> assessmatrix.v1.ListExamsResponse
+	15, // 31: assessmatrix.v1.ExamService.GetExam:output_type -> assessmatrix.v1.GetExamResponse
+	17, // 32: assessmatrix.v1.ExamService.CreateExam:output_type -> assessmatrix.v1.CreateExamResponse
+	19, // 33: assessmatrix.v1.ExamService.SaveExam:output_type -> assessmatrix.v1.SaveExamResponse
+	21, // 34: assessmatrix.v1.ExamService.DuplicateExam:output_type -> assessmatrix.v1.DuplicateExamResponse
+	23, // 35: assessmatrix.v1.ExamService.SetExamStatus:output_type -> assessmatrix.v1.SetExamStatusResponse
+	25, // 36: assessmatrix.v1.ExamService.DeleteExam:output_type -> assessmatrix.v1.DeleteExamResponse
+	27, // 37: assessmatrix.v1.ExamService.ListExamVersions:output_type -> assessmatrix.v1.ListExamVersionsResponse
+	30, // [30:38] is the sub-list for method output_type
+	22, // [22:30] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_exam_proto_init() }
@@ -1826,7 +1908,7 @@ func file_assessmatrix_v1_exam_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_exam_proto_rawDesc), len(file_assessmatrix_v1_exam_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   23,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

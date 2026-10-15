@@ -6,12 +6,24 @@ package assessmatrix.v1;
 // protect (docs/09 §5). OIDC is the next door, for enterprise tenants.
 // A verified code sets an HttpOnly, Secure, SameSite=Strict session cookie.
 
+// What a staff member may do in one tenant.
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  // Everything a member can do, plus who has access, new tenants and sharing
+  // instruments with other tenants.
+  ROLE_ADMIN = 1;
+  // Build, invite, score: the everyday work.
+  ROLE_MEMBER = 2;
+}
+
 message Staff {
   string id = 1;
   string email = 2;
   string name = 3;
   string tenant_id = 4;
   string tenant_name = 5;
+  // Their role in this tenant.
+  Role role = 6;
 }
 
 service AuthService {

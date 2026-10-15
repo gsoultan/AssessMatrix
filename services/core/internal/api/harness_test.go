@@ -131,6 +131,7 @@ type client struct {
 	results   assessmatrixv1connect.ResultServiceClient
 	proctor   assessmatrixv1connect.ProctorServiceClient
 	hooks     assessmatrixv1connect.WebhookServiceClient
+	tenants   assessmatrixv1connect.TenantServiceClient
 }
 
 func (h *harness) browser() *client {
@@ -148,6 +149,7 @@ func (h *harness) browser() *client {
 		results:   assessmatrixv1connect.NewResultServiceClient(hc, u),
 		proctor:   assessmatrixv1connect.NewProctorServiceClient(hc, u),
 		hooks:     assessmatrixv1connect.NewWebhookServiceClient(hc, u),
+		tenants:   assessmatrixv1connect.NewTenantServiceClient(hc, u),
 	}
 }
 
@@ -155,15 +157,22 @@ func (h *harness) browser() *client {
 func (h *harness) tenant(name string) *client {
 	h.t.Helper()
 	ctx := context.Background()
-	email := strings.ToLower(name) + "-" + secure.Token()[:8] + "@example.test"
+	email := strings.ReplaceAll(strings.ToLower(name), " ", "-") + "-" + secure.Token()[:8] + "@example.test"
 	var tenant string
 	if err := h.owner.QueryRow(ctx, `INSERT INTO tenants (name) VALUES ($1) RETURNING id`, name).Scan(&tenant); err != nil {
 		h.t.Fatal(err)
 	}
-	if _, err := h.owner.Exec(ctx, `INSERT INTO staff (tenant_id, email) VALUES ($1, $2)`, tenant, email); err != nil {
+	if _, err := h.owner.Exec(ctx, `INSERT INTO staff (tenant_id, email, role) VALUES ($1, $2, 'admin')`, tenant, email); err != nil {
 		h.t.Fatal(err)
 	}
 	h.lastTenant = tenant
+	return h.signIn(email)
+}
+
+// signIn signs an address in, in a fresh browser, the way the studio does.
+func (h *harness) signIn(email string) *client {
+	h.t.Helper()
+	ctx := context.Background()
 	c := h.browser()
 	get(c.auth.RequestStaffCode(ctx, connect.NewRequest(&v1.RequestStaffCodeRequest{Email: email})))
 	code := h.lastCode(email)
