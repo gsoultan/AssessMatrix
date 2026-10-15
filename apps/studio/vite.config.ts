@@ -19,6 +19,9 @@ export const base = {
     proxy: {
       '/assessmatrix.v1.': core,
       '/dev/mailbox': core,
+      '/media': core,
+      '/credentials/': core,
+      '/issuers/': core,
     },
   },
 }

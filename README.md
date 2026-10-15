@@ -42,15 +42,49 @@ AssessMatrix's bet: **make assessments AI-immune by construction, not by surveil
 | `docs/09-production-plan.md` | Phased plan from prototype to the first live exam, with exit gates |
 | `AGENTS.md` | Developer profile roster (Driver/Challenger) |
 | `apps/studio/` | **Running prototype** — React 19 · Mantine 9.6 · Tailwind 4 · Vite 8 · Bun |
-| `scripts/` · `Makefile` | Dev scripts — `make dev`, `make check`, `make build`, `make e2e` |
+| `scripts/` · `Makefile` | Dev scripts — `make up`, `make dev`, `make check`, `make build`, `make e2e` |
 
 ## Status
 
 Strategy and architecture defined. `apps/studio/` runs thirteen screens, six of them functional; the exam authoring and
 delivery loop, and candidate invitations by emailed link, are functional against local storage. No backend exists yet.
 
+## Run it locally
+
+One command brings up the whole stack: Postgres, the schema, a demo admin, the Go core and
+the web apps, with hot reload.
+
 ```bash
-make dev      # install if needed, free port 5180, start on http://localhost:5180
+make up       # Ctrl-C stops it; `make down` stops Postgres too
+```
+
+On a Mac you need [Docker Desktop](https://www.docker.com/products/docker-desktop/) or
+[OrbStack](https://orbstack.dev) running, plus `brew install go` and
+`curl -fsSL https://bun.sh/install | bash`. The first run creates `.env` with fresh secrets,
+installs packages and downloads the Go toolchain the core pins, so it takes a few minutes.
+
+| What | Where |
+| :--- | :--- |
+| Studio | http://localhost:5180, sign in as `admin@example.id` |
+| The sign-in code | http://localhost:5180/dev/mailbox?to=admin@example.id (mail stays in memory; nothing is sent) |
+| Candidate app | http://localhost:5180/take/, opened from an invitation link in the same mailbox |
+| Verify page | http://localhost:5181/verify/ |
+| Core API | http://localhost:8080, metrics on :9090 |
+| Postgres | `localhost:5432`, database `assessmatrix`; passwords in `.env` |
+
+Edits to the studio or the verify page show in the browser at once. Edits to the core (any
+`.go` or `.sql` file) rebuild it, apply new migrations and restart it; a build error leaves the
+previous build serving. The psychometrics worker runs too if `python3` can import `psycopg`
+(`pip3 install -r services/psychometrics/requirements.txt`).
+
+If another Postgres already holds port 5432, add `AM_PG_PORT=5433` to `.env`. Other ports:
+`PORT`, `VERIFY_PORT`, `CORE_PORT`, `METRICS_PORT`. `AM_DEMO_EMAIL` changes the demo admin.
+`RESET=1 make down` deletes the database, so the next `make up` starts empty.
+
+The other commands:
+
+```bash
+make dev      # the studio alone on local storage, no backend: http://localhost:5180
 make check    # type-check
 make build    # type-check + production build
 make e2e      # browser smoke test of create-exam → take-exam → score
