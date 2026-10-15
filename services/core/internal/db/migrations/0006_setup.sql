@@ -11,6 +11,10 @@ CREATE FUNCTION am_create_tenant(p_tenant text, p_region text, p_email text, p_n
   AS $$
   DECLARE t uuid; s uuid;
   BEGIN
+    -- `core tenant` run twice must not make a second organisation for one person.
+    IF EXISTS (SELECT 1 FROM staff WHERE lower(email) = lower(p_email)) THEN
+      RAISE EXCEPTION '% already has access to a tenant', p_email USING ERRCODE = 'unique_violation';
+    END IF;
     INSERT INTO tenants (name, region) VALUES (p_tenant, coalesce(nullif(p_region, ''), 'id')) RETURNING id INTO t;
     INSERT INTO staff (tenant_id, email, name) VALUES (t, p_email, coalesce(p_name, '')) RETURNING id INTO s;
     RETURN QUERY SELECT t, s;

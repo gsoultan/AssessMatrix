@@ -85,7 +85,7 @@ AM_MIGRATE_DATABASE_URL="$OWNER_URL" "$DEV/core" migrate >"$DEV/migrate.log" 2>&
 ok "migrations applied"
 if AM_MIGRATE_DATABASE_URL="$OWNER_URL" "$DEV/core" tenant "Demo" "$DEMO_EMAIL" >"$DEV/seed.log" 2>&1; then
   ok "seeded tenant \"Demo\" with staff $DEMO_EMAIL"
-elif grep -q staff_email_key "$DEV/seed.log"; then
+elif grep -qE "already has access|staff_email_key" "$DEV/seed.log"; then
   ok "demo staff $DEMO_EMAIL already exists"
 else
   cat "$DEV/seed.log"
