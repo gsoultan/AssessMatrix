@@ -95,10 +95,19 @@ func createTenant(ctx context.Context, log *slog.Logger, args []string) error {
 	defer conn.Close(ctx)
 	var tenant, staff string
 	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		// Bootstrapping only: an address that already works somewhere adds
+		// further tenants from the studio, as their administrator.
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM staff WHERE lower(email) = lower($1))`, args[1]).Scan(&exists); err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("%s already has access to a tenant; create more tenants from the studio", args[1])
+		}
 		if err := tx.QueryRow(ctx, `INSERT INTO tenants (name) VALUES ($1) RETURNING id`, args[0]).Scan(&tenant); err != nil {
 			return err
 		}
-		return tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email) VALUES ($1, $2) RETURNING id`, tenant, args[1]).Scan(&staff)
+		return tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email, role) VALUES ($1, $2, 'admin') RETURNING id`, tenant, args[1]).Scan(&staff)
 	})
 	if err != nil {
 		return err

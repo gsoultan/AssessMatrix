@@ -90,6 +90,8 @@ export type Exam = {
   anonymous: boolean
   sections: Section[]
   updatedAt: number
+  /** Set on a copy shared in from another tenant: the original's version it holds. */
+  sharedFrom?: { examId: string; version: number; tenantName: string }
 }
 
 export const isLive = (e: Exam) => e.status === 'published'

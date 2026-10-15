@@ -2,15 +2,15 @@
 // @generated from file assessmatrix/v1/auth.proto (package assessmatrix.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file assessmatrix/v1/auth.proto.
  */
 export const file_assessmatrix_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("Chphc3Nlc3NtYXRyaXgvdjEvYXV0aC5wcm90bxIPYXNzZXNzbWF0cml4LnYxIlgKBVN0YWZmEgoKAmlkGAEgASgJEg0KBWVtYWlsGAIgASgJEgwKBG5hbWUYAyABKAkSEQoJdGVuYW50X2lkGAQgASgJEhMKC3RlbmFudF9uYW1lGAUgASgJIigKF1JlcXVlc3RTdGFmZkNvZGVSZXF1ZXN0Eg0KBWVtYWlsGAEgASgJIhoKGFJlcXVlc3RTdGFmZkNvZGVSZXNwb25zZSI1ChZWZXJpZnlTdGFmZkNvZGVSZXF1ZXN0Eg0KBWVtYWlsGAEgASgJEgwKBGNvZGUYAiABKAkiTAoXVmVyaWZ5U3RhZmZDb2RlUmVzcG9uc2USCgoCb2sYASABKAgSJQoFc3RhZmYYAiABKAsyFi5hc3Nlc3NtYXRyaXgudjEuU3RhZmYiDwoNV2hvQW1JUmVxdWVzdCI3Cg5XaG9BbUlSZXNwb25zZRIlCgVzdGFmZhgBIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TdGFmZiIQCg5TaWduT3V0UmVxdWVzdCIRCg9TaWduT3V0UmVzcG9uc2Uy9QIKC0F1dGhTZXJ2aWNlEmcKEFJlcXVlc3RTdGFmZkNvZGUSKC5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdFN0YWZmQ29kZVJlcXVlc3QaKS5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdFN0YWZmQ29kZVJlc3BvbnNlEmQKD1ZlcmlmeVN0YWZmQ29kZRInLmFzc2Vzc21hdHJpeC52MS5WZXJpZnlTdGFmZkNvZGVSZXF1ZXN0GiguYXNzZXNzbWF0cml4LnYxLlZlcmlmeVN0YWZmQ29kZVJlc3BvbnNlEkkKBldob0FtSRIeLmFzc2Vzc21hdHJpeC52MS5XaG9BbUlSZXF1ZXN0Gh8uYXNzZXNzbWF0cml4LnYxLldob0FtSVJlc3BvbnNlEkwKB1NpZ25PdXQSHy5hc3Nlc3NtYXRyaXgudjEuU2lnbk91dFJlcXVlc3QaIC5hc3Nlc3NtYXRyaXgudjEuU2lnbk91dFJlc3BvbnNlQtABChNjb20uYXNzZXNzbWF0cml4LnYxQglBdXRoUHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z");
+  fileDesc("Chphc3Nlc3NtYXRyaXgvdjEvYXV0aC5wcm90bxIPYXNzZXNzbWF0cml4LnYxIn0KBVN0YWZmEgoKAmlkGAEgASgJEg0KBWVtYWlsGAIgASgJEgwKBG5hbWUYAyABKAkSEQoJdGVuYW50X2lkGAQgASgJEhMKC3RlbmFudF9uYW1lGAUgASgJEiMKBHJvbGUYBiABKA4yFS5hc3Nlc3NtYXRyaXgudjEuUm9sZSIoChdSZXF1ZXN0U3RhZmZDb2RlUmVxdWVzdBINCgVlbWFpbBgBIAEoCSIaChhSZXF1ZXN0U3RhZmZDb2RlUmVzcG9uc2UiNQoWVmVyaWZ5U3RhZmZDb2RlUmVxdWVzdBINCgVlbWFpbBgBIAEoCRIMCgRjb2RlGAIgASgJIkwKF1ZlcmlmeVN0YWZmQ29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEiUKBXN0YWZmGAIgASgLMhYuYXNzZXNzbWF0cml4LnYxLlN0YWZmIg8KDVdob0FtSVJlcXVlc3QiNwoOV2hvQW1JUmVzcG9uc2USJQoFc3RhZmYYASABKAsyFi5hc3Nlc3NtYXRyaXgudjEuU3RhZmYiEAoOU2lnbk91dFJlcXVlc3QiEQoPU2lnbk91dFJlc3BvbnNlKj0KBFJvbGUSFAoQUk9MRV9VTlNQRUNJRklFRBAAEg4KClJPTEVfQURNSU4QARIPCgtST0xFX01FTUJFUhACMvUCCgtBdXRoU2VydmljZRJnChBSZXF1ZXN0U3RhZmZDb2RlEiguYXNzZXNzbWF0cml4LnYxLlJlcXVlc3RTdGFmZkNvZGVSZXF1ZXN0GikuYXNzZXNzbWF0cml4LnYxLlJlcXVlc3RTdGFmZkNvZGVSZXNwb25zZRJkCg9WZXJpZnlTdGFmZkNvZGUSJy5hc3Nlc3NtYXRyaXgudjEuVmVyaWZ5U3RhZmZDb2RlUmVxdWVzdBooLmFzc2Vzc21hdHJpeC52MS5WZXJpZnlTdGFmZkNvZGVSZXNwb25zZRJJCgZXaG9BbUkSHi5hc3Nlc3NtYXRyaXgudjEuV2hvQW1JUmVxdWVzdBofLmFzc2Vzc21hdHJpeC52MS5XaG9BbUlSZXNwb25zZRJMCgdTaWduT3V0Eh8uYXNzZXNzbWF0cml4LnYxLlNpZ25PdXRSZXF1ZXN0GiAuYXNzZXNzbWF0cml4LnYxLlNpZ25PdXRSZXNwb25zZULQAQoTY29tLmFzc2Vzc21hdHJpeC52MUIJQXV0aFByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw");
 
 /**
  * @generated from message assessmatrix.v1.Staff
@@ -40,6 +40,13 @@ export type Staff = Message<"assessmatrix.v1.Staff"> & {
    * @generated from field: string tenant_name = 5;
    */
   tenantName: string;
+
+  /**
+   * Their role in this tenant.
+   *
+   * @generated from field: assessmatrix.v1.Role role = 6;
+   */
+  role: Role;
 };
 
 /**
@@ -178,6 +185,39 @@ export type SignOutResponse = Message<"assessmatrix.v1.SignOutResponse"> & {
  */
 export const SignOutResponseSchema: GenMessage<SignOutResponse> = /*@__PURE__*/
   messageDesc(file_assessmatrix_v1_auth, 8);
+
+/**
+ * What a staff member may do in one tenant.
+ *
+ * @generated from enum assessmatrix.v1.Role
+ */
+export enum Role {
+  /**
+   * @generated from enum value: ROLE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Everything a member can do, plus who has access, new tenants and sharing
+   * instruments with other tenants.
+   *
+   * @generated from enum value: ROLE_ADMIN = 1;
+   */
+  ADMIN = 1,
+
+  /**
+   * Build, invite, score: the everyday work.
+   *
+   * @generated from enum value: ROLE_MEMBER = 2;
+   */
+  MEMBER = 2,
+}
+
+/**
+ * Describes the enum assessmatrix.v1.Role.
+ */
+export const RoleSchema: GenEnum<Role> = /*@__PURE__*/
+  enumDesc(file_assessmatrix_v1_auth, 0);
 
 /**
  * @generated from service assessmatrix.v1.AuthService

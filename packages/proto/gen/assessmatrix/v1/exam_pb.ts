@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/exam.proto.
  */
 export const file_assessmatrix_v1_exam: GenFile = /*@__PURE__*/
-  fileDesc("Chphc3Nlc3NtYXRyaXgvdjEvZXhhbS5wcm90bxIPYXNzZXNzbWF0cml4LnYxIlIKBU1lZGlhEgoKAmlkGAEgASgJEgsKA3VybBgCIAEoCRILCgNhbHQYAyABKAkSCQoBdxgEIAEoBRIJCgFoGAUgASgFEg0KBWJ5dGVzGAYgASgDIkkKBkNob2ljZRIKCgJpZBgBIAEoCRIMCgR0ZXh0GAIgASgJEiUKBWltYWdlGAMgASgLMhYuYXNzZXNzbWF0cml4LnYxLk1lZGlhIj0KBVNjYWxlEg4KBnBvaW50cxgBIAEoBRIRCgltaW5fbGFiZWwYAiABKAkSEQoJbWF4X2xhYmVsGAMgASgJIp8CCgRJdGVtEgoKAmlkGAEgASgJEicKBHR5cGUYAiABKA4yGS5hc3Nlc3NtYXRyaXgudjEuSXRlbVR5cGUSDAoEc3RlbRgDIAEoCRIlCgVpbWFnZRgEIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5NZWRpYRIoCgdjaG9pY2VzGAUgAygLMhcuYXNzZXNzbWF0cml4LnYxLkNob2ljZRIPCgdjb3JyZWN0GAYgAygJEg4KBnBvaW50cxgHIAEoBRINCgVza2lsbBgIIAEoCRIaChJhbGxvd19hbnN3ZXJfaW1hZ2UYCSABKAgSEAoIcmVxdWlyZWQYCiABKAgSJQoFc2NhbGUYCyABKAsyFi5hc3Nlc3NtYXRyaXgudjEuU2NhbGUiWgoHU2VjdGlvbhIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB21pbnV0ZXMYAyABKAUSJAoFaXRlbXMYBCADKAsyFS5hc3Nlc3NtYXRyaXgudjEuSXRlbSK+AgoERXhhbRIKCgJpZBgBIAEoCRIjCgRraW5kGAIgASgOMhUuYXNzZXNzbWF0cml4LnYxLktpbmQSJwoGc3RhdHVzGAMgASgOMhcuYXNzZXNzbWF0cml4LnYxLlN0YXR1cxIPCgd2ZXJzaW9uGAQgASgFEhkKEXB1Ymxpc2hlZF92ZXJzaW9uGAUgASgFEg0KBXRpdGxlGAYgASgJEg4KBmlzc3VlchgHIAEoCRIMCgR0aWVyGAggASgFEhAKCHBhc3NfcGN0GAkgASgFEg8KB3NodWZmbGUYCiABKAgSDQoFdGltZWQYCyABKAgSEQoJYW5vbnltb3VzGAwgASgIEioKCHNlY3Rpb25zGA0gAygLMhguYXNzZXNzbWF0cml4LnYxLlNlY3Rpb24SEgoKdXBkYXRlZF9hdBgOIAEoAyJ4CgtFeGFtVmVyc2lvbhIPCgdleGFtX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAUSFAoMcHVibGlzaGVkX2F0GAMgASgDEgwKBG5vdGUYBCABKAkSIwoEZXhhbRgFIAEoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtIhIKEExpc3RFeGFtc1JlcXVlc3QiOQoRTGlzdEV4YW1zUmVzcG9uc2USJAoFZXhhbXMYASADKAsyFS5hc3Nlc3NtYXRyaXgudjEuRXhhbSIcCg5HZXRFeGFtUmVxdWVzdBIKCgJpZBgBIAEoCSI2Cg9HZXRFeGFtUmVzcG9uc2USIwoEZXhhbRgBIAEoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtIjgKEUNyZWF0ZUV4YW1SZXF1ZXN0EiMKBGtpbmQYASABKA4yFS5hc3Nlc3NtYXRyaXgudjEuS2luZCI5ChJDcmVhdGVFeGFtUmVzcG9uc2USIwoEZXhhbRgBIAEoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtInwKD1NhdmVFeGFtUmVxdWVzdBIjCgRleGFtGAEgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0SJwoEbW9kZRgCIAEoDjIZLmFzc2Vzc21hdHJpeC52MS5TYXZlTW9kZRIbChNleHBlY3RlZF91cGRhdGVkX2F0GAMgASgDIjcKEFNhdmVFeGFtUmVzcG9uc2USIwoEZXhhbRgBIAEoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtIiIKFER1cGxpY2F0ZUV4YW1SZXF1ZXN0EgoKAmlkGAEgASgJIjwKFUR1cGxpY2F0ZUV4YW1SZXNwb25zZRIjCgRleGFtGAEgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0iSwoUU2V0RXhhbVN0YXR1c1JlcXVlc3QSCgoCaWQYASABKAkSJwoGc3RhdHVzGAIgASgOMhcuYXNzZXNzbWF0cml4LnYxLlN0YXR1cyI8ChVTZXRFeGFtU3RhdHVzUmVzcG9uc2USIwoEZXhhbRgBIAEoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtIh8KEURlbGV0ZUV4YW1SZXF1ZXN0EgoKAmlkGAEgASgJIhQKEkRlbGV0ZUV4YW1SZXNwb25zZSIqChdMaXN0RXhhbVZlcnNpb25zUmVxdWVzdBIPCgdleGFtX2lkGAEgASgJIkoKGExpc3RFeGFtVmVyc2lvbnNSZXNwb25zZRIuCgh2ZXJzaW9ucxgBIAMoCzIcLmFzc2Vzc21hdHJpeC52MS5FeGFtVmVyc2lvbipLCgRLaW5kEhQKEEtJTkRfVU5TUEVDSUZJRUQQABINCglLSU5EX0VYQU0QARINCglLSU5EX1FVSVoQAhIPCgtLSU5EX1NVUlZFWRADKl0KBlN0YXR1cxIWChJTVEFUVVNfVU5TUEVDSUZJRUQQABIQCgxTVEFUVVNfRFJBRlQQARIUChBTVEFUVVNfUFVCTElTSEVEEAISEwoPU1RBVFVTX0FSQ0hJVkVEEAMqwAEKCEl0ZW1UeXBlEhkKFUlURU1fVFlQRV9VTlNQRUNJRklFRBAAEhQKEElURU1fVFlQRV9TSU5HTEUQARIWChJJVEVNX1RZUEVfTVVMVElQTEUQAhIVChFJVEVNX1RZUEVfQk9PTEVBThADEhMKD0lURU1fVFlQRV9TSE9SVBAEEhMKD0lURU1fVFlQRV9FU1NBWRAFEhQKEElURU1fVFlQRV9MSUtFUlQQBhIUChBJVEVNX1RZUEVfUkFUSU5HEAcqbQoIU2F2ZU1vZGUSGQoVU0FWRV9NT0RFX1VOU1BFQ0lGSUVEEAASEwoPU0FWRV9NT0RFX0RSQUZUEAESFgoSU0FWRV9NT0RFX0lOX1BMQUNFEAISGQoVU0FWRV9NT0RFX05FV19WRVJTSU9OEAMy1wUKC0V4YW1TZXJ2aWNlElIKCUxpc3RFeGFtcxIhLmFzc2Vzc21hdHJpeC52MS5MaXN0RXhhbXNSZXF1ZXN0GiIuYXNzZXNzbWF0cml4LnYxLkxpc3RFeGFtc1Jlc3BvbnNlEkwKB0dldEV4YW0SHy5hc3Nlc3NtYXRyaXgudjEuR2V0RXhhbVJlcXVlc3QaIC5hc3Nlc3NtYXRyaXgudjEuR2V0RXhhbVJlc3BvbnNlElUKCkNyZWF0ZUV4YW0SIi5hc3Nlc3NtYXRyaXgudjEuQ3JlYXRlRXhhbVJlcXVlc3QaIy5hc3Nlc3NtYXRyaXgudjEuQ3JlYXRlRXhhbVJlc3BvbnNlEk8KCFNhdmVFeGFtEiAuYXNzZXNzbWF0cml4LnYxLlNhdmVFeGFtUmVxdWVzdBohLmFzc2Vzc21hdHJpeC52MS5TYXZlRXhhbVJlc3BvbnNlEl4KDUR1cGxpY2F0ZUV4YW0SJS5hc3Nlc3NtYXRyaXgudjEuRHVwbGljYXRlRXhhbVJlcXVlc3QaJi5hc3Nlc3NtYXRyaXgudjEuRHVwbGljYXRlRXhhbVJlc3BvbnNlEl4KDVNldEV4YW1TdGF0dXMSJS5hc3Nlc3NtYXRyaXgudjEuU2V0RXhhbVN0YXR1c1JlcXVlc3QaJi5hc3Nlc3NtYXRyaXgudjEuU2V0RXhhbVN0YXR1c1Jlc3BvbnNlElUKCkRlbGV0ZUV4YW0SIi5hc3Nlc3NtYXRyaXgudjEuRGVsZXRlRXhhbVJlcXVlc3QaIy5hc3Nlc3NtYXRyaXgudjEuRGVsZXRlRXhhbVJlc3BvbnNlEmcKEExpc3RFeGFtVmVyc2lvbnMSKC5hc3Nlc3NtYXRyaXgudjEuTGlzdEV4YW1WZXJzaW9uc1JlcXVlc3QaKS5hc3Nlc3NtYXRyaXgudjEuTGlzdEV4YW1WZXJzaW9uc1Jlc3BvbnNlQtABChNjb20uYXNzZXNzbWF0cml4LnYxQglFeGFtUHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z");
+  fileDesc("Chphc3Nlc3NtYXRyaXgvdjEvZXhhbS5wcm90bxIPYXNzZXNzbWF0cml4LnYxIlIKBU1lZGlhEgoKAmlkGAEgASgJEgsKA3VybBgCIAEoCRILCgNhbHQYAyABKAkSCQoBdxgEIAEoBRIJCgFoGAUgASgFEg0KBWJ5dGVzGAYgASgDIkkKBkNob2ljZRIKCgJpZBgBIAEoCRIMCgR0ZXh0GAIgASgJEiUKBWltYWdlGAMgASgLMhYuYXNzZXNzbWF0cml4LnYxLk1lZGlhIj0KBVNjYWxlEg4KBnBvaW50cxgBIAEoBRIRCgltaW5fbGFiZWwYAiABKAkSEQoJbWF4X2xhYmVsGAMgASgJIp8CCgRJdGVtEgoKAmlkGAEgASgJEicKBHR5cGUYAiABKA4yGS5hc3Nlc3NtYXRyaXgudjEuSXRlbVR5cGUSDAoEc3RlbRgDIAEoCRIlCgVpbWFnZRgEIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5NZWRpYRIoCgdjaG9pY2VzGAUgAygLMhcuYXNzZXNzbWF0cml4LnYxLkNob2ljZRIPCgdjb3JyZWN0GAYgAygJEg4KBnBvaW50cxgHIAEoBRINCgVza2lsbBgIIAEoCRIaChJhbGxvd19hbnN3ZXJfaW1hZ2UYCSABKAgSEAoIcmVxdWlyZWQYCiABKAgSJQoFc2NhbGUYCyABKAsyFi5hc3Nlc3NtYXRyaXgudjEuU2NhbGUiWgoHU2VjdGlvbhIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB21pbnV0ZXMYAyABKAUSJAoFaXRlbXMYBCADKAsyFS5hc3Nlc3NtYXRyaXgudjEuSXRlbSLwAgoERXhhbRIKCgJpZBgBIAEoCRIjCgRraW5kGAIgASgOMhUuYXNzZXNzbWF0cml4LnYxLktpbmQSJwoGc3RhdHVzGAMgASgOMhcuYXNzZXNzbWF0cml4LnYxLlN0YXR1cxIPCgd2ZXJzaW9uGAQgASgFEhkKEXB1Ymxpc2hlZF92ZXJzaW9uGAUgASgFEg0KBXRpdGxlGAYgASgJEg4KBmlzc3VlchgHIAEoCRIMCgR0aWVyGAggASgFEhAKCHBhc3NfcGN0GAkgASgFEg8KB3NodWZmbGUYCiABKAgSDQoFdGltZWQYCyABKAgSEQoJYW5vbnltb3VzGAwgASgIEioKCHNlY3Rpb25zGA0gAygLMhguYXNzZXNzbWF0cml4LnYxLlNlY3Rpb24SEgoKdXBkYXRlZF9hdBgOIAEoAxIwCgtzaGFyZWRfZnJvbRgPIAEoCzIbLmFzc2Vzc21hdHJpeC52MS5TaGFyZWRGcm9tIkMKClNoYXJlZEZyb20SDwoHZXhhbV9pZBgBIAEoCRIPCgd2ZXJzaW9uGAIgASgFEhMKC3RlbmFudF9uYW1lGAMgASgJIngKC0V4YW1WZXJzaW9uEg8KB2V4YW1faWQYASABKAkSDwoHdmVyc2lvbhgCIAEoBRIUCgxwdWJsaXNoZWRfYXQYAyABKAMSDAoEbm90ZRgEIAEoCRIjCgRleGFtGAUgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0iEgoQTGlzdEV4YW1zUmVxdWVzdCI5ChFMaXN0RXhhbXNSZXNwb25zZRIkCgVleGFtcxgBIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5FeGFtIhwKDkdldEV4YW1SZXF1ZXN0EgoKAmlkGAEgASgJIjYKD0dldEV4YW1SZXNwb25zZRIjCgRleGFtGAEgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0iOAoRQ3JlYXRlRXhhbVJlcXVlc3QSIwoEa2luZBgBIAEoDjIVLmFzc2Vzc21hdHJpeC52MS5LaW5kIjkKEkNyZWF0ZUV4YW1SZXNwb25zZRIjCgRleGFtGAEgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0ifAoPU2F2ZUV4YW1SZXF1ZXN0EiMKBGV4YW0YASABKAsyFS5hc3Nlc3NtYXRyaXgudjEuRXhhbRInCgRtb2RlGAIgASgOMhkuYXNzZXNzbWF0cml4LnYxLlNhdmVNb2RlEhsKE2V4cGVjdGVkX3VwZGF0ZWRfYXQYAyABKAMiNwoQU2F2ZUV4YW1SZXNwb25zZRIjCgRleGFtGAEgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0iIgoURHVwbGljYXRlRXhhbVJlcXVlc3QSCgoCaWQYASABKAkiPAoVRHVwbGljYXRlRXhhbVJlc3BvbnNlEiMKBGV4YW0YASABKAsyFS5hc3Nlc3NtYXRyaXgudjEuRXhhbSJLChRTZXRFeGFtU3RhdHVzUmVxdWVzdBIKCgJpZBgBIAEoCRInCgZzdGF0dXMYAiABKA4yFy5hc3Nlc3NtYXRyaXgudjEuU3RhdHVzIjwKFVNldEV4YW1TdGF0dXNSZXNwb25zZRIjCgRleGFtGAEgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0iHwoRRGVsZXRlRXhhbVJlcXVlc3QSCgoCaWQYASABKAkiFAoSRGVsZXRlRXhhbVJlc3BvbnNlIioKF0xpc3RFeGFtVmVyc2lvbnNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiSgoYTGlzdEV4YW1WZXJzaW9uc1Jlc3BvbnNlEi4KCHZlcnNpb25zGAEgAygLMhwuYXNzZXNzbWF0cml4LnYxLkV4YW1WZXJzaW9uKksKBEtpbmQSFAoQS0lORF9VTlNQRUNJRklFRBAAEg0KCUtJTkRfRVhBTRABEg0KCUtJTkRfUVVJWhACEg8KC0tJTkRfU1VSVkVZEAMqXQoGU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhAKDFNUQVRVU19EUkFGVBABEhQKEFNUQVRVU19QVUJMSVNIRUQQAhITCg9TVEFUVVNfQVJDSElWRUQQAyrAAQoISXRlbVR5cGUSGQoVSVRFTV9UWVBFX1VOU1BFQ0lGSUVEEAASFAoQSVRFTV9UWVBFX1NJTkdMRRABEhYKEklURU1fVFlQRV9NVUxUSVBMRRACEhUKEUlURU1fVFlQRV9CT09MRUFOEAMSEwoPSVRFTV9UWVBFX1NIT1JUEAQSEwoPSVRFTV9UWVBFX0VTU0FZEAUSFAoQSVRFTV9UWVBFX0xJS0VSVBAGEhQKEElURU1fVFlQRV9SQVRJTkcQByptCghTYXZlTW9kZRIZChVTQVZFX01PREVfVU5TUEVDSUZJRUQQABITCg9TQVZFX01PREVfRFJBRlQQARIWChJTQVZFX01PREVfSU5fUExBQ0UQAhIZChVTQVZFX01PREVfTkVXX1ZFUlNJT04QAzLXBQoLRXhhbVNlcnZpY2USUgoJTGlzdEV4YW1zEiEuYXNzZXNzbWF0cml4LnYxLkxpc3RFeGFtc1JlcXVlc3QaIi5hc3Nlc3NtYXRyaXgudjEuTGlzdEV4YW1zUmVzcG9uc2USTAoHR2V0RXhhbRIfLmFzc2Vzc21hdHJpeC52MS5HZXRFeGFtUmVxdWVzdBogLmFzc2Vzc21hdHJpeC52MS5HZXRFeGFtUmVzcG9uc2USVQoKQ3JlYXRlRXhhbRIiLmFzc2Vzc21hdHJpeC52MS5DcmVhdGVFeGFtUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5DcmVhdGVFeGFtUmVzcG9uc2USTwoIU2F2ZUV4YW0SIC5hc3Nlc3NtYXRyaXgudjEuU2F2ZUV4YW1SZXF1ZXN0GiEuYXNzZXNzbWF0cml4LnYxLlNhdmVFeGFtUmVzcG9uc2USXgoNRHVwbGljYXRlRXhhbRIlLmFzc2Vzc21hdHJpeC52MS5EdXBsaWNhdGVFeGFtUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5EdXBsaWNhdGVFeGFtUmVzcG9uc2USXgoNU2V0RXhhbVN0YXR1cxIlLmFzc2Vzc21hdHJpeC52MS5TZXRFeGFtU3RhdHVzUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5TZXRFeGFtU3RhdHVzUmVzcG9uc2USVQoKRGVsZXRlRXhhbRIiLmFzc2Vzc21hdHJpeC52MS5EZWxldGVFeGFtUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5EZWxldGVFeGFtUmVzcG9uc2USZwoQTGlzdEV4YW1WZXJzaW9ucxIoLmFzc2Vzc21hdHJpeC52MS5MaXN0RXhhbVZlcnNpb25zUmVxdWVzdBopLmFzc2Vzc21hdHJpeC52MS5MaXN0RXhhbVZlcnNpb25zUmVzcG9uc2VC0AEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCCUV4YW1Qcm90b1ABWlFnaXRodWIuY29tL2dzb3VsdGFuL2Fzc2Vzc21hdHJpeC9zZXJ2aWNlcy9jb3JlL2dlbi9hc3Nlc3NtYXRyaXgvdjE7YXNzZXNzbWF0cml4djGiAgNBWFiqAg9Bc3Nlc3NtYXRyaXguVjHKAg9Bc3Nlc3NtYXRyaXhcVjHiAhtBc3Nlc3NtYXRyaXhcVjFcR1BCTWV0YWRhdGHqAhBBc3Nlc3NtYXRyaXg6OlYxYgZwcm90bzM");
 
 /**
  * An image. `url` is an object-storage URL in production; the prototype's
@@ -294,6 +294,14 @@ export type Exam = Message<"assessmatrix.v1.Exam"> & {
    * @generated from field: int64 updated_at = 14;
    */
   updatedAt: bigint;
+
+  /**
+   * Set on a copy shared in from another tenant. Read-only: only sharing
+   * again changes it.
+   *
+   * @generated from field: assessmatrix.v1.SharedFrom shared_from = 15;
+   */
+  sharedFrom?: SharedFrom | undefined;
 };
 
 /**
@@ -302,6 +310,37 @@ export type Exam = Message<"assessmatrix.v1.Exam"> & {
  */
 export const ExamSchema: GenMessage<Exam> = /*@__PURE__*/
   messageDesc(file_assessmatrix_v1_exam, 5);
+
+/**
+ * The original a shared copy follows, as it was when last shared.
+ *
+ * @generated from message assessmatrix.v1.SharedFrom
+ */
+export type SharedFrom = Message<"assessmatrix.v1.SharedFrom"> & {
+  /**
+   * @generated from field: string exam_id = 1;
+   */
+  examId: string;
+
+  /**
+   * The original's version this copy was last brought up to.
+   *
+   * @generated from field: int32 version = 2;
+   */
+  version: number;
+
+  /**
+   * @generated from field: string tenant_name = 3;
+   */
+  tenantName: string;
+};
+
+/**
+ * Describes the message assessmatrix.v1.SharedFrom.
+ * Use `create(SharedFromSchema)` to create a new message.
+ */
+export const SharedFromSchema: GenMessage<SharedFrom> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_exam, 6);
 
 /**
  * A frozen copy. Publishing is what makes one; attempts and invitations are
@@ -341,7 +380,7 @@ export type ExamVersion = Message<"assessmatrix.v1.ExamVersion"> & {
  * Use `create(ExamVersionSchema)` to create a new message.
  */
 export const ExamVersionSchema: GenMessage<ExamVersion> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 6);
+  messageDesc(file_assessmatrix_v1_exam, 7);
 
 /**
  * @generated from message assessmatrix.v1.ListExamsRequest
@@ -354,7 +393,7 @@ export type ListExamsRequest = Message<"assessmatrix.v1.ListExamsRequest"> & {
  * Use `create(ListExamsRequestSchema)` to create a new message.
  */
 export const ListExamsRequestSchema: GenMessage<ListExamsRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 7);
+  messageDesc(file_assessmatrix_v1_exam, 8);
 
 /**
  * @generated from message assessmatrix.v1.ListExamsResponse
@@ -371,7 +410,7 @@ export type ListExamsResponse = Message<"assessmatrix.v1.ListExamsResponse"> & {
  * Use `create(ListExamsResponseSchema)` to create a new message.
  */
 export const ListExamsResponseSchema: GenMessage<ListExamsResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 8);
+  messageDesc(file_assessmatrix_v1_exam, 9);
 
 /**
  * @generated from message assessmatrix.v1.GetExamRequest
@@ -388,7 +427,7 @@ export type GetExamRequest = Message<"assessmatrix.v1.GetExamRequest"> & {
  * Use `create(GetExamRequestSchema)` to create a new message.
  */
 export const GetExamRequestSchema: GenMessage<GetExamRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 9);
+  messageDesc(file_assessmatrix_v1_exam, 10);
 
 /**
  * @generated from message assessmatrix.v1.GetExamResponse
@@ -405,7 +444,7 @@ export type GetExamResponse = Message<"assessmatrix.v1.GetExamResponse"> & {
  * Use `create(GetExamResponseSchema)` to create a new message.
  */
 export const GetExamResponseSchema: GenMessage<GetExamResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 10);
+  messageDesc(file_assessmatrix_v1_exam, 11);
 
 /**
  * @generated from message assessmatrix.v1.CreateExamRequest
@@ -422,7 +461,7 @@ export type CreateExamRequest = Message<"assessmatrix.v1.CreateExamRequest"> & {
  * Use `create(CreateExamRequestSchema)` to create a new message.
  */
 export const CreateExamRequestSchema: GenMessage<CreateExamRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 11);
+  messageDesc(file_assessmatrix_v1_exam, 12);
 
 /**
  * @generated from message assessmatrix.v1.CreateExamResponse
@@ -439,7 +478,7 @@ export type CreateExamResponse = Message<"assessmatrix.v1.CreateExamResponse"> &
  * Use `create(CreateExamResponseSchema)` to create a new message.
  */
 export const CreateExamResponseSchema: GenMessage<CreateExamResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 12);
+  messageDesc(file_assessmatrix_v1_exam, 13);
 
 /**
  * @generated from message assessmatrix.v1.SaveExamRequest
@@ -472,7 +511,7 @@ export type SaveExamRequest = Message<"assessmatrix.v1.SaveExamRequest"> & {
  * Use `create(SaveExamRequestSchema)` to create a new message.
  */
 export const SaveExamRequestSchema: GenMessage<SaveExamRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 13);
+  messageDesc(file_assessmatrix_v1_exam, 14);
 
 /**
  * @generated from message assessmatrix.v1.SaveExamResponse
@@ -489,7 +528,7 @@ export type SaveExamResponse = Message<"assessmatrix.v1.SaveExamResponse"> & {
  * Use `create(SaveExamResponseSchema)` to create a new message.
  */
 export const SaveExamResponseSchema: GenMessage<SaveExamResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 14);
+  messageDesc(file_assessmatrix_v1_exam, 15);
 
 /**
  * @generated from message assessmatrix.v1.DuplicateExamRequest
@@ -506,7 +545,7 @@ export type DuplicateExamRequest = Message<"assessmatrix.v1.DuplicateExamRequest
  * Use `create(DuplicateExamRequestSchema)` to create a new message.
  */
 export const DuplicateExamRequestSchema: GenMessage<DuplicateExamRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 15);
+  messageDesc(file_assessmatrix_v1_exam, 16);
 
 /**
  * @generated from message assessmatrix.v1.DuplicateExamResponse
@@ -523,7 +562,7 @@ export type DuplicateExamResponse = Message<"assessmatrix.v1.DuplicateExamRespon
  * Use `create(DuplicateExamResponseSchema)` to create a new message.
  */
 export const DuplicateExamResponseSchema: GenMessage<DuplicateExamResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 16);
+  messageDesc(file_assessmatrix_v1_exam, 17);
 
 /**
  * @generated from message assessmatrix.v1.SetExamStatusRequest
@@ -545,7 +584,7 @@ export type SetExamStatusRequest = Message<"assessmatrix.v1.SetExamStatusRequest
  * Use `create(SetExamStatusRequestSchema)` to create a new message.
  */
 export const SetExamStatusRequestSchema: GenMessage<SetExamStatusRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 17);
+  messageDesc(file_assessmatrix_v1_exam, 18);
 
 /**
  * @generated from message assessmatrix.v1.SetExamStatusResponse
@@ -562,7 +601,7 @@ export type SetExamStatusResponse = Message<"assessmatrix.v1.SetExamStatusRespon
  * Use `create(SetExamStatusResponseSchema)` to create a new message.
  */
 export const SetExamStatusResponseSchema: GenMessage<SetExamStatusResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 18);
+  messageDesc(file_assessmatrix_v1_exam, 19);
 
 /**
  * @generated from message assessmatrix.v1.DeleteExamRequest
@@ -579,7 +618,7 @@ export type DeleteExamRequest = Message<"assessmatrix.v1.DeleteExamRequest"> & {
  * Use `create(DeleteExamRequestSchema)` to create a new message.
  */
 export const DeleteExamRequestSchema: GenMessage<DeleteExamRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 19);
+  messageDesc(file_assessmatrix_v1_exam, 20);
 
 /**
  * @generated from message assessmatrix.v1.DeleteExamResponse
@@ -592,7 +631,7 @@ export type DeleteExamResponse = Message<"assessmatrix.v1.DeleteExamResponse"> &
  * Use `create(DeleteExamResponseSchema)` to create a new message.
  */
 export const DeleteExamResponseSchema: GenMessage<DeleteExamResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 20);
+  messageDesc(file_assessmatrix_v1_exam, 21);
 
 /**
  * @generated from message assessmatrix.v1.ListExamVersionsRequest
@@ -609,7 +648,7 @@ export type ListExamVersionsRequest = Message<"assessmatrix.v1.ListExamVersionsR
  * Use `create(ListExamVersionsRequestSchema)` to create a new message.
  */
 export const ListExamVersionsRequestSchema: GenMessage<ListExamVersionsRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 21);
+  messageDesc(file_assessmatrix_v1_exam, 22);
 
 /**
  * @generated from message assessmatrix.v1.ListExamVersionsResponse
@@ -626,7 +665,7 @@ export type ListExamVersionsResponse = Message<"assessmatrix.v1.ListExamVersions
  * Use `create(ListExamVersionsResponseSchema)` to create a new message.
  */
 export const ListExamVersionsResponseSchema: GenMessage<ListExamVersionsResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_exam, 22);
+  messageDesc(file_assessmatrix_v1_exam, 23);
 
 /**
  * What an instrument is for. The engine is identical; what changes is whether

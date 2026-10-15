@@ -26,6 +26,14 @@ const (
 	Public Access = iota + 1
 	Staff
 	Candidate
+	// Admin is a staff member whose role in the session's tenant is admin.
+	Admin
+)
+
+// Roles a staff member can hold in a tenant, as stored.
+const (
+	RoleAdmin  = "admin"
+	RoleMember = "member"
 )
 
 const (
@@ -40,6 +48,8 @@ type Principal struct {
 	Tenant       db.TenantID
 	StaffID      string
 	AssignmentID string
+	// Role is the staff member's role in Tenant. Empty for a candidate.
+	Role string
 }
 
 type ctxKey struct{}
@@ -64,6 +74,9 @@ type Authenticator struct {
 }
 
 var errUnauthenticated = connect.NewError(connect.CodeUnauthenticated, errors.New("sign in required"))
+
+// ErrNotAdmin refuses a member an administrator's procedure.
+var ErrNotAdmin = connect.NewError(connect.CodePermissionDenied, errors.New("only an administrator of this tenant can do this"))
 
 // Interceptor enforces the policy on every unary call.
 func (a *Authenticator) Interceptor() connect.Interceptor { return interceptor{a} }
@@ -113,6 +126,15 @@ func (a *Authenticator) authorize(ctx context.Context, procedure string, h http.
 			return nil, err
 		}
 		return with(ctx, p), nil
+	case Admin:
+		p, err := a.staff(ctx, h)
+		if err != nil {
+			return nil, err
+		}
+		if p.Role != RoleAdmin {
+			return nil, ErrNotAdmin
+		}
+		return with(ctx, p), nil
 	case Candidate:
 		p, err := a.candidate(ctx, h)
 		if err != nil {
@@ -139,8 +161,8 @@ func (a *Authenticator) staff(ctx context.Context, h http.Header) (*Principal, e
 	}
 	var p Principal
 	err := a.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT tenant_id, staff_id FROM am_staff_session($1)`, a.Keys.SessionHash(token)).
-			Scan(&p.Tenant, &p.StaffID)
+		return tx.QueryRow(ctx, `SELECT tenant_id, staff_id, role FROM am_staff_session($1)`, a.Keys.SessionHash(token)).
+			Scan(&p.Tenant, &p.StaffID, &p.Role)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errUnauthenticated

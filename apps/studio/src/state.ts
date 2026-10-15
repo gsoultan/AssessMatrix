@@ -36,6 +36,7 @@ import { type SaveHow, explain, isSignedOut, repo } from './backend/repo'
 import { type Seat, gate } from './backend/gate'
 import { type Pending, enqueue, flush, forget, open as openQueue, pendingCount, pendingEvents, replay } from './backend/sync'
 import { type Staff, staffAuth } from './backend/staff'
+import { tenancy } from './backend/tenancy'
 import { whenRefused } from './backend/onetab'
 import type { Signal } from './backend/signals'
 import { type Purpose, collects } from './integrity'
@@ -71,6 +72,8 @@ type AppState = {
   boot: () => Promise<void>
   signedIn: (s: Staff) => Promise<void>
   signOut: () => Promise<void>
+  /** Move this session to another tenant the staff member belongs to, and load it. */
+  switchTenant: (tenantId: string) => Promise<void>
   /** The last thing that went wrong, in words a person can act on. */
   notice: string
   dismissNotice: () => void
@@ -299,7 +302,7 @@ export const useApp = create<AppState>((set, get) => {
   })
 
   return {
-    staff: CORE ? undefined : { id: 'local', email: '', name: 'This browser', tenantName: 'Local data' },
+    staff: CORE ? undefined : { id: 'local', email: '', name: 'This browser', tenantId: 'local', tenantName: 'Local data', role: 'admin' },
     notice: '',
     dismissNotice: () => set({ notice: '' }),
 
@@ -316,6 +319,24 @@ export const useApp = create<AppState>((set, get) => {
     signOut: async () => {
       await staffAuth.signOut()
       set({ staff: null, exams: [], people: [], assignments: [], responses: {}, screen: 'library' })
+    },
+    switchTenant: async (tenantId) => {
+      const staff = await run(null, () => tenancy.switchTo(tenantId))
+      if (!staff) return
+      // Nothing of the tenant left behind may show in the one arrived at.
+      set({
+        staff,
+        notice: '',
+        exams: [],
+        people: [],
+        assignments: [],
+        responses: {},
+        screen: 'library',
+        currentExamId: null,
+        previewExamId: null,
+        assignTarget: null,
+      })
+      await run(undefined, async () => set(await repo.load()))
     },
 
     screen: arrivedAsCandidate() ? 'player' : 'library',

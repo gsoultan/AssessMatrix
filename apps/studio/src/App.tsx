@@ -23,6 +23,7 @@ import {
   IconX,
   IconChevronDown,
   IconDeviceLaptop,
+  IconShieldLock,
 } from '@tabler/icons-react'
 
 import { CandidateApp } from './screens/CandidateApp'
@@ -42,6 +43,8 @@ import { People } from './screens/People'
 import { Assignments } from './screens/Assignments'
 import { Webhooks } from './screens/Webhooks'
 import { SignIn } from './screens/SignIn'
+import { Access } from './screens/Access'
+import { TenantSwitcher } from './components/TenantSwitcher'
 import { useApp } from './state'
 import { CORE, SHOW_MOCKS } from './backend/mode'
 
@@ -67,6 +70,8 @@ const ALL_SCREENS = [
   ...(CORE ? [{ key: 'webhooks', more: true, name: 'Webhooks', sub: 'Events to your systems', Icon: IconWebhook, El: Webhooks } as const] : []),
   { key: 'monitor', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
   { key: 'player', name: 'Candidate preview', sub: 'See it as a candidate does', Icon: IconDeviceLaptop, El: CandidateApp },
+  // Tenants exist only on the core, and only an administrator manages them.
+  ...(CORE ? [{ key: 'access', admin: true, name: 'Access', sub: 'Tenants · who works where', Icon: IconShieldLock, El: Access } as const] : []),
   { key: 'author', more: true, name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },
   { key: 'aitask', more: true, name: 'AI-in-the-loop task', sub: 'Score the collaboration', Icon: IconSparkles, El: AiTask },
   { key: 'profile', more: true, name: 'Evidence profile', sub: 'Skill graph · credentials', Icon: IconCertificate, El: EvidenceProfile },
@@ -127,7 +132,9 @@ function Shell() {
   const dark = colorScheme === 'dark'
   const [opened, { toggle, close }] = useDisclosure(false)
   const isDesktop = useMediaQuery('(min-width: 1024px)')
-  const current = SCREENS.find((s) => s.key === active) ?? SCREENS[0]!
+  // Administrators' screens are not shown to members (the core refuses them anyway).
+  const allowed = (s: (typeof SCREENS)[number]) => !('admin' in s) || staff?.role === 'admin'
+  const current = SCREENS.filter(allowed).find((s) => s.key === active) ?? SCREENS[0]!
   const Screen = current.El as React.ComponentType<{ isDesktop: boolean }>
 
   // The editor has no nav entry, so keep its parent section lit — otherwise
@@ -184,7 +191,7 @@ function Shell() {
 
   const nav = (
     <nav className="flex flex-col gap-0.5 p-3">
-      {MAIN_NAV.map(item)}
+      {MAIN_NAV.filter(allowed).map(item)}
       {MORE_NAV.length > 0 && (
         <>
           <button
@@ -209,12 +216,14 @@ function Shell() {
           <div className="grid h-7 w-7 place-items-center rounded-md" style={{ background: 'var(--color-s1)' }}>
             <span className="text-[13px] font-bold text-white">A</span>
           </div>
-          <div>
-            <p className="text-[13px] font-semibold leading-none tracking-tight">AssessMatrix</p>
-            <p className="mt-1 text-[11px] leading-none text-ink-muted">
-              {CORE ? staff?.tenantName : 'prototype · local data'}
-            </p>
-          </div>
+          {CORE ? (
+            <TenantSwitcher />
+          ) : (
+            <div>
+              <p className="text-[13px] font-semibold leading-none tracking-tight">AssessMatrix</p>
+              <p className="mt-1 text-[11px] leading-none text-ink-muted">prototype · local data</p>
+            </div>
+          )}
         </div>
         {nav}
         <div className="flex flex-wrap items-center gap-2 px-3 pb-4">
@@ -235,6 +244,11 @@ function Shell() {
         </header>
 
         <Drawer opened={opened} onClose={close} size="260px" title="AssessMatrix" padding={0} hiddenFrom="lg">
+          {CORE && (
+            <div className="flex border-b border-hair px-5 py-3">
+              <TenantSwitcher />
+            </div>
+          )}
           {nav}
           {CORE && <div className="px-3 pb-4">{signOutButton}</div>}
         </Drawer>

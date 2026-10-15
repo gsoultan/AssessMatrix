@@ -8,7 +8,9 @@ penetration test before the first paid exam; sections 1–2 are what the testers
 | Area | Control | Where |
 | :--- | :--- | :--- |
 | Tenant isolation | Every tenant table has row level security keyed on `app.tenant_id`; the app connects as a role that cannot bypass it; cross-tenant lookups by id are `SECURITY DEFINER` functions that return ids only. Every RPC is in `TestTenantIsolation` | `internal/db/migrations`, `internal/api/isolation_test.go` |
-| Authorisation | Each procedure has a policy entry (public, staff, candidate); a procedure without one cannot be reached | `internal/api/server.go` `Policy()`, `internal/auth` |
+| Authorisation | Each procedure has a policy entry (public, staff, admin, candidate); a procedure without one cannot be reached | `internal/api/server.go` `Policy()`, `internal/auth` |
+| Staff across tenants | A staff row is one membership of one tenant, with a role (admin or member). A session is in one tenant at a time; switching mints a session in the other tenant and revokes the old one. Admin procedures are refused at the interceptor from the session's role, and a request that reaches another tenant (granting access, sharing an instrument) checks the caller is an admin there too. Withdrawn access ends that tenant's sessions at once; a tenant always keeps one admin | `internal/api/tenants.go`, `0007_tenancy.sql`, `internal/api/tenancy_test.go` |
+| Sharing instruments | A shared version is copied into each target tenant as that tenant's own instrument and published there; its images are copied into the target's storage, never read across tenants. Where it came from is not in the frozen version candidates are given | `internal/api/tenants.go` `ShareExam` |
 | Staff sign-in | Emailed one-time code, hashed at rest, short-lived; session cookie `HttpOnly`, `Secure`, `SameSite=Strict`, 12 h | `internal/api/authsvc.go` |
 | Candidate access | Invite links carry a random token, hashed at rest; one attempt per assignment | `internal/api/invite.go` |
 | Cross-site requests | `SameSite=Strict` plus an `Origin` check on every non-GET | `cmd/core/main.go` `sameOrigin` |
