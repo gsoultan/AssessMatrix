@@ -40,6 +40,7 @@ import { Responses } from './screens/Responses'
 import { Library } from './screens/Library'
 import { People } from './screens/People'
 import { Assignments } from './screens/Assignments'
+import { Webhooks } from './screens/Webhooks'
 import { SignIn } from './screens/SignIn'
 import { useApp } from './state'
 import { CORE, SHOW_MOCKS } from './backend/mode'
@@ -62,6 +63,8 @@ const ALL_SCREENS = [
   { key: 'responses', name: 'Responses', sub: 'Results', Icon: IconChartBar, El: Responses },
   // Needs the core: people score essays and the worker analyses items there.
   ...(CORE ? [{ key: 'scoring', name: 'Scoring', sub: 'Essays · item analysis', Icon: IconChecklist, El: Scoring } as const] : []),
+  // Needs the core: it signs and sends the requests.
+  ...(CORE ? [{ key: 'webhooks', more: true, name: 'Webhooks', sub: 'Events to your systems', Icon: IconWebhook, El: Webhooks } as const] : []),
   { key: 'monitor', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
   { key: 'player', name: 'Candidate preview', sub: 'See it as a candidate does', Icon: IconDeviceLaptop, El: CandidateApp },
   { key: 'author', more: true, name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },

@@ -252,6 +252,13 @@ func (s *Server) mintAndMail(ctx context.Context, tx pgx.Tx, a *assignmentRow, k
 	if err := logInvite(ctx, tx, a.ID, kind, detail); err != nil {
 		return err
 	}
+	// The link itself never goes in a webhook: it opens the candidate's paper.
+	if err := s.emit(ctx, tx, EventAssignmentInvited, a.PersonID, map[string]any{
+		"assignment_id": a.ID, "exam_id": a.ExamID, "exam_version": a.ExamVersion, "person_id": a.PersonID,
+		"reason": kind, "expires_at": expires.UTC().Format(time.RFC3339),
+	}); err != nil {
+		return err
+	}
 	m, err := mailFor(ctx, tx, a)
 	if err != nil {
 		return err

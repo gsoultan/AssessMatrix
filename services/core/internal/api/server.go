@@ -25,6 +25,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
 // Server holds what every handler needs.
@@ -43,6 +44,8 @@ type Server struct {
 	Now       func() time.Time
 	// Media is where uploaded images go, and the one region it may hold.
 	Media media.Regional
+	// WebhookPolicy says which receiver URLs staff may register.
+	WebhookPolicy webhook.Policy
 
 	// Per-IP limits on the unauthenticated candidate and sign-in endpoints.
 	// The per-row counters (tries, sends, cooldowns) are the real defence;
@@ -110,6 +113,14 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.ResultServiceScoreAnswerProcedure,
 		assessmatrixv1connect.ResultServiceGetItemAnalysisProcedure,
 		assessmatrixv1connect.ProctorServiceWatchExamProcedure,
+		assessmatrixv1connect.WebhookServiceListWebhooksProcedure,
+		assessmatrixv1connect.WebhookServiceCreateWebhookProcedure,
+		assessmatrixv1connect.WebhookServiceUpdateWebhookProcedure,
+		assessmatrixv1connect.WebhookServiceRotateWebhookSecretProcedure,
+		assessmatrixv1connect.WebhookServiceDeleteWebhookProcedure,
+		assessmatrixv1connect.WebhookServiceListDeliveriesProcedure,
+		assessmatrixv1connect.WebhookServiceRedeliverProcedure,
+		assessmatrixv1connect.WebhookServicePingWebhookProcedure,
 	)
 	return p
 }
@@ -131,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(assessmatrixv1connect.NewCandidateServiceHandler(&candidateService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewResultServiceHandler(&resultService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewProctorServiceHandler(&proctorService{s}, opts...))
+	mux.Handle(assessmatrixv1connect.NewWebhookServiceHandler(&webhookService{s}, opts...))
 	return mux
 }
 

@@ -127,18 +127,32 @@ func (s *Server) settleCredential(ctx context.Context, tx pgx.Tx, att *attemptRo
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", err
 	}
+	credEvent := func(typ string, extra map[string]any) error {
+		d := map[string]any{"credential_id": id, "attempt_id": att.ID, "exam_id": att.ExamID, "person_id": att.PersonID,
+			"url": s.CredentialURL(id)}
+		for k, v := range extra {
+			d[k] = v
+		}
+		return s.emit(ctx, tx, typ, att.PersonID, d)
+	}
 	switch {
 	case exists && !earned:
 		if revoked == nil {
-			_, err = tx.Exec(ctx, `UPDATE credentials SET revoked_at = now(), revoked_why = $2 WHERE id = $1`, id,
-				"a later review of the attempt brought the score below the pass mark")
+			why := "a later review of the attempt brought the score below the pass mark"
+			if _, err := tx.Exec(ctx, `UPDATE credentials SET revoked_at = now(), revoked_why = $2 WHERE id = $1`, id, why); err != nil {
+				return "", err
+			}
+			return "", credEvent(EventCredentialRevoked, map[string]any{"reason": why})
 		}
-		return "", err
+		return "", nil
 	case exists && earned:
 		if revoked != nil {
-			_, err = tx.Exec(ctx, `UPDATE credentials SET revoked_at = NULL, revoked_why = NULL WHERE id = $1`, id)
+			if _, err := tx.Exec(ctx, `UPDATE credentials SET revoked_at = NULL, revoked_why = NULL WHERE id = $1`, id); err != nil {
+				return "", err
+			}
+			return id, credEvent(EventCredentialIssued, map[string]any{"restored": true})
 		}
-		return id, err
+		return id, nil
 	case !earned:
 		return "", nil
 	}
@@ -200,6 +214,9 @@ func (s *Server) settleCredential(ctx context.Context, tx pgx.Tx, att *attemptRo
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO credentials (id, tenant_id, attempt_id, jwt) VALUES ($1, am_tenant(), $2, $3)`,
 		id, att.ID, jwt); err != nil {
+		return "", err
+	}
+	if err := credEvent(EventCredentialIssued, map[string]any{"restored": false}); err != nil {
 		return "", err
 	}
 	link := s.CredentialURL(id)

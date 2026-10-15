@@ -28,7 +28,10 @@ type config struct {
 	TrustProxy    bool   // AM_TRUST_PROXY=1 behind a proxy that sets X-Forwarded-For
 	StaticDir     string // AM_STATIC_DIR: serve the built web app from here
 	Dev           bool   // AM_DEV=1
-	Media         mediaConfig
+	// AM_WEBHOOK_ALLOW_PRIVATE=1 lets webhooks reach http and private
+	// addresses, for a receiver on a developer's machine. Needs AM_DEV=1.
+	WebhookAllowPrivate bool
+	Media               mediaConfig
 }
 
 // mediaConfig picks where uploaded images go. One store serves one region;
@@ -53,17 +56,18 @@ func env(k, def string) string {
 
 func loadConfig(serving bool) (*config, error) {
 	c := &config{
-		DatabaseURL:   os.Getenv("AM_DATABASE_URL"),
-		MigrateURL:    os.Getenv("AM_MIGRATE_DATABASE_URL"),
-		AppRole:       env("AM_APP_ROLE", "am_app"),
-		Listen:        env("AM_LISTEN", ":8080"),
-		MetricsListen: env("AM_METRICS_LISTEN", ":9090"),
-		PublicURL:     strings.TrimRight(os.Getenv("AM_PUBLIC_URL"), "/"),
-		RunnerURL:     strings.TrimRight(os.Getenv("AM_RUNNER_URL"), "/"),
-		Mailer:        env("AM_MAILER", "log"),
-		TrustProxy:    os.Getenv("AM_TRUST_PROXY") == "1",
-		StaticDir:     os.Getenv("AM_STATIC_DIR"),
-		Dev:           os.Getenv("AM_DEV") == "1",
+		DatabaseURL:         os.Getenv("AM_DATABASE_URL"),
+		MigrateURL:          os.Getenv("AM_MIGRATE_DATABASE_URL"),
+		AppRole:             env("AM_APP_ROLE", "am_app"),
+		Listen:              env("AM_LISTEN", ":8080"),
+		MetricsListen:       env("AM_METRICS_LISTEN", ":9090"),
+		PublicURL:           strings.TrimRight(os.Getenv("AM_PUBLIC_URL"), "/"),
+		RunnerURL:           strings.TrimRight(os.Getenv("AM_RUNNER_URL"), "/"),
+		Mailer:              env("AM_MAILER", "log"),
+		TrustProxy:          os.Getenv("AM_TRUST_PROXY") == "1",
+		StaticDir:           os.Getenv("AM_STATIC_DIR"),
+		Dev:                 os.Getenv("AM_DEV") == "1",
+		WebhookAllowPrivate: os.Getenv("AM_WEBHOOK_ALLOW_PRIVATE") == "1",
 		Media: mediaConfig{
 			Store:    env("AM_MEDIA_STORE", "none"),
 			Region:   env("AM_MEDIA_REGION", "id"),
@@ -101,6 +105,9 @@ func loadConfig(serving bool) (*config, error) {
 		errs = append(errs, err)
 	}
 	c.Secret = secret
+	if c.WebhookAllowPrivate && !c.Dev {
+		errs = append(errs, errors.New("AM_WEBHOOK_ALLOW_PRIVATE=1 lets tenants reach internal addresses and needs AM_DEV=1"))
+	}
 	switch c.Mailer {
 	case "log":
 	case "mailbox":
