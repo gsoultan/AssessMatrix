@@ -12,6 +12,7 @@ import { ExamService } from '@assessmatrix/proto/exam_pb'
 import { PersonService } from '@assessmatrix/proto/people_pb'
 import { ProctorService } from '@assessmatrix/proto/proctor_pb'
 import { ResultService } from '@assessmatrix/proto/result_pb'
+import { WebhookService } from '@assessmatrix/proto/webhook_pb'
 
 const transport = createConnectTransport({
   baseUrl: '/',
@@ -27,4 +28,5 @@ export const api = {
   candidate: createClient(CandidateService, transport),
   results: createClient(ResultService, transport),
   proctor: createClient(ProctorService, transport),
+  webhooks: createClient(WebhookService, transport),
 }

@@ -99,6 +99,34 @@ comes almost free — and gets a capability nobody else offers.
 **Delivery rules:** HMAC-signed with a timestamp, at-least-once, **strictly ordered per
 attempt**, idempotency key on every payload, exponential backoff with a dead-letter view.
 
+**Shipped (the Webhooks screen, `WebhookService`, `services/core/internal/webhook`):**
+
+| Event | When |
+| :--- | :--- |
+| `exam.published` | A version of an instrument is published |
+| `assignment.invited` | A link is mailed: first send, resend, or the candidate asked for a new one |
+| `attempt.started` | A candidate starts (resuming is not a second start) |
+| `attempt.submitted` · `attempt.expired` | Handed in, or closed by the server's clock; carries the score |
+| `attempt.scored` | A person scored an essay and the result changed |
+| `credential.issued` · `credential.revoked` | Open Badges credential issued, restored or revoked |
+| `webhook.ping` | "Send test event" on the screen |
+
+- Each request is `POST` JSON `{"id", "type", "created_at", "data"}`. `data` names records by id
+  (`attempt_id`, `assignment_id`, `exam_id`, `person_id`) with versions, times and scores;
+  never a name, email, answer or live link.
+- `AssessMatrix-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t + "." + body)>`. Reject a
+  `t` more than five minutes old. `webhook.Verify` is the reference implementation.
+- `AssessMatrix-Event-Id` is the same on every retry and redelivery: de-duplicate on it.
+- The event is written in the same transaction as the change, so a rolled-back change sends
+  nothing. Delivery is at least once, **not ordered**: order by `created_at`.
+- Ten tries over about four hours, then the delivery is marked failed and can be sent again
+  from the screen. The log is kept 30 days; erasing a person deletes the events about them.
+- Receivers must be `https` on a public address. Private, loopback, link-local and metadata
+  addresses are refused when the URL is saved and again at connect time, after DNS;
+  redirects are not followed. `AM_WEBHOOK_ALLOW_PRIVATE=1` (with `AM_DEV=1`) lifts this for a
+  receiver on a developer's machine.
+- Strict per-attempt ordering and replay of a time window are still to come.
+
 **The differentiator — replay.** Since the log is the source of truth, a customer can replay
 any webhook window: "resend everything for attempt X," or "resend all events from 14:00 to
 16:00 yesterday." Integration debugging stops being a support ticket. Ship a self-serve

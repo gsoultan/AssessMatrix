@@ -130,6 +130,7 @@ type client struct {
 	candidate assessmatrixv1connect.CandidateServiceClient
 	results   assessmatrixv1connect.ResultServiceClient
 	proctor   assessmatrixv1connect.ProctorServiceClient
+	hooks     assessmatrixv1connect.WebhookServiceClient
 }
 
 func (h *harness) browser() *client {
@@ -146,6 +147,7 @@ func (h *harness) browser() *client {
 		candidate: assessmatrixv1connect.NewCandidateServiceClient(hc, u),
 		results:   assessmatrixv1connect.NewResultServiceClient(hc, u),
 		proctor:   assessmatrixv1connect.NewProctorServiceClient(hc, u),
+		hooks:     assessmatrixv1connect.NewWebhookServiceClient(hc, u),
 	}
 }
 
