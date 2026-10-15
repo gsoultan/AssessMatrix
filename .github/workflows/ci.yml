@@ -95,7 +95,8 @@ jobs:
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
             -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
             -c "CREATE ROLE am_app LOGIN PASSWORD 'app'" \
-            -c "CREATE DATABASE assessmatrix_test OWNER am_owner"
+            -c "CREATE DATABASE assessmatrix_test OWNER am_owner" \
+            -c "CREATE DATABASE assessmatrix_test_setup OWNER am_owner"
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race -count=1 ./...
@@ -208,7 +209,8 @@ jobs:
           psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
             -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
             -c "CREATE ROLE am_app LOGIN PASSWORD 'app'" \
-            -c "CREATE DATABASE assessmatrix OWNER am_owner"
+            -c "CREATE DATABASE assessmatrix OWNER am_owner" \
+            -c "CREATE DATABASE assessmatrix_fresh OWNER am_owner"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -218,5 +220,10 @@ jobs:
         working-directory: apps/studio
         run: bunx playwright install --with-deps chromium
       - run: make e2e-core
+      - name: First run on a fresh install, through /setup
+        env:
+          AM_E2E_SETUP_DATABASE_URL: postgres://am_app:app@localhost:5432/assessmatrix_fresh
+          AM_E2E_SETUP_MIGRATE_DATABASE_URL: postgres://am_owner:owner@localhost:5432/assessmatrix_fresh
+        run: make e2e-setup
       - name: A small cohort, all at once, nothing lost
         run: N=40 MINUTES=0.25 RAMP=10s ./scripts/load.sh

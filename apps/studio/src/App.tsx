@@ -41,6 +41,7 @@ import { Library } from './screens/Library'
 import { People } from './screens/People'
 import { Assignments } from './screens/Assignments'
 import { SignIn } from './screens/SignIn'
+import { Setup } from './screens/Setup'
 import { useApp } from './state'
 import { CORE, SHOW_MOCKS } from './backend/mode'
 
@@ -89,10 +90,13 @@ export function App() {
   const staff = useApp((s) => s.staff)
   const candidateView = useApp((s) => s.candidateView)
   const boot = useApp((s) => s.boot)
+  // First run lives at /setup. Finishing it signs the administrator in,
+  // which sets staff and shows the studio.
+  const [onSetup] = useState(() => CORE && atSetup())
   useEffect(() => {
     // A candidate who came by link never needs a staff session checked.
-    if (!candidateView) void boot()
-  }, [boot, candidateView])
+    if (!candidateView && !onSetup) void boot()
+  }, [boot, candidateView, onSetup])
 
   // Against the core, a candidate gets their assessment and nothing else.
   if (CORE && candidateView)
@@ -101,6 +105,7 @@ export function App() {
         <CandidateApp standalone />
       </main>
     )
+  if (onSetup && !staff) return <Setup />
   if (staff === undefined)
     return (
       <p role="status" className="p-8 text-center text-[13px] text-ink-muted">
@@ -110,6 +115,8 @@ export function App() {
   if (staff === null) return <SignIn />
   return <Shell />
 }
+
+const atSetup = () => window.location.pathname.replace(/\/+$/, '') === '/setup'
 
 function Shell() {
   const staff = useApp((st) => st.staff)

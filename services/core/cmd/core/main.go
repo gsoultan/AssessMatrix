@@ -3,6 +3,7 @@
 //	core migrate                       apply schema migrations as the owner
 //	core serve                         run the API and the mail worker
 //	core tenant <name> <staff-email>   create a tenant and its first staff member
+//	core setup-code                    print the code first-run setup at /setup asks for
 //
 // Configuration is environment only; see config.go.
 package main
@@ -57,8 +58,10 @@ func main() {
 		err = serve(ctx, log)
 	case "tenant":
 		err = createTenant(ctx, log, os.Args[2:])
+	case "setup-code":
+		err = printSetupCode()
 	default:
-		err = fmt.Errorf("unknown command %q (want migrate, serve or tenant)", cmd)
+		err = fmt.Errorf("unknown command %q (want migrate, serve, tenant or setup-code)", cmd)
 	}
 	if err != nil {
 		log.Error("exit", "cmd", cmd, "err", err)
@@ -93,16 +96,25 @@ func createTenant(ctx context.Context, log *slog.Logger, args []string) error {
 	}
 	defer conn.Close(ctx)
 	var tenant, staff string
-	err = pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `INSERT INTO tenants (name) VALUES ($1) RETURNING id`, args[0]).Scan(&tenant); err != nil {
-			return err
-		}
-		return tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email) VALUES ($1, $2) RETURNING id`, tenant, args[1]).Scan(&staff)
-	})
+	err = conn.QueryRow(ctx, `SELECT tenant_id, staff_id FROM am_create_tenant($1, '', $2, '')`, args[0], args[1]).Scan(&tenant, &staff)
 	if err != nil {
 		return err
 	}
 	log.Info("tenant created", "tenant", tenant, "staff", staff)
+	return nil
+}
+
+// printSetupCode prints the code /setup asks for. It needs only AM_SECRET.
+func printSetupCode() error {
+	secret, err := decodeSecret(os.Getenv("AM_SECRET"))
+	if err != nil {
+		return err
+	}
+	keys, err := secure.NewKeys(secret)
+	if err != nil {
+		return err
+	}
+	fmt.Println(keys.SetupCode())
 	return nil
 }
 
@@ -115,12 +127,25 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	// A single-machine install may hand serve the owner too, so the first
+	// start sets up the schema by itself. The owner connection is closed
+	// before anything is served; requests only ever run as the app role.
+	if cfg.MigrateURL != "" {
+		applied, err := db.Migrate(ctx, cfg.MigrateURL, cfg.AppRole)
+		if err != nil {
+			return fmt.Errorf("set up the database: %w", err)
+		}
+		log.Info("migrations applied", "applied", applied)
+	}
 	database, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer database.Close()
 	if err := database.CheckRole(ctx); err != nil {
+		return err
+	}
+	if err := checkSchema(ctx, database); err != nil {
 		return err
 	}
 
@@ -166,6 +191,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	if err := jobs.Start(ctx); err != nil {
 		return err
 	}
+	announceSetup(ctx, log, database, keys, cfg.PublicURL)
 
 	mux := http.NewServeMux()
 	rpc := srv.Handler()
@@ -242,6 +268,34 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	// Stop taking requests first, then let in-flight mail jobs finish.
 	err = errors.Join(server.Shutdown(shutdown), jobs.Stop(shutdown))
 	return err
+}
+
+// checkSchema stops a server whose database is older than its code, with
+// the command that fixes it, instead of failing on the first request.
+func checkSchema(ctx context.Context, d *db.DB) error {
+	var have string
+	err := d.Pool.QueryRow(ctx, `SELECT am_schema_version()`).Scan(&have)
+	want := db.LatestMigration()
+	if err != nil {
+		return fmt.Errorf("the database schema is not set up for this build (%v): run `core migrate`, "+
+			"or set AM_MIGRATE_DATABASE_URL so serve applies it", err)
+	}
+	if have < want {
+		return fmt.Errorf("the database schema is at %s but this build needs %s: run `core migrate`, "+
+			"or set AM_MIGRATE_DATABASE_URL so serve applies it", have, want)
+	}
+	return nil
+}
+
+// announceSetup prints where and with what code to finish first-run setup,
+// while there is no organisation yet. The code is useless once setup is done.
+func announceSetup(ctx context.Context, log *slog.Logger, d *db.DB, keys *secure.Keys, publicURL string) {
+	var needed bool
+	if err := d.Pool.QueryRow(ctx, `SELECT am_setup_needed()`).Scan(&needed); err != nil || !needed {
+		return
+	}
+	log.Warn("first-run setup is open: finish it at the URL with this code", "url", publicURL+"/setup",
+		"setup_code", keys.SetupCode())
 }
 
 func openMedia(ctx context.Context, m mediaConfig) (media.Store, error) {

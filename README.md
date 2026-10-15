@@ -46,8 +46,26 @@ AssessMatrix's bet: **make assessments AI-immune by construction, not by surveil
 
 ## Status
 
-Strategy and architecture defined. `apps/studio/` runs thirteen screens, six of them functional; the exam authoring and
-delivery loop, and candidate invitations by emailed link, are functional against local storage. No backend exists yet.
+The Go core (`services/core`) and Postgres back the whole loop: staff sign in by emailed code,
+author and publish, invite by personal link, and candidates sit the exam in the runner
+(`/take/`), offline-tolerant, and submit; the server scores it and issues a credential. CI runs
+that loop in a real browser against the real server, including a browser killed during a
+network outage (`make e2e-core`), and a fresh install through first-run setup (`make e2e-setup`).
+What is left before a live high-stakes exam is the go-live checklist in `docs/09` §4 and
+`docs/11` (load test at the partner's cohort size, pentest, backup drill on production size,
+DPIA sign-off), which are operational steps rather than code.
+
+## Install on a server
+
+```bash
+cp .env.example .env     # fill in passwords, AM_SECRET, AM_DOMAIN, SMTP; see docs/13
+docker compose --profile tls up -d
+docker compose logs core | grep setup_code
+```
+
+Then open `https://<AM_DOMAIN>/setup`, enter that code, and create your organisation and its
+administrator. The database schema is applied before the core starts; `/setup` shows it is
+ready and locks itself once the first administrator exists.
 
 ## Run it locally
 

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { IconArrowRight, IconMailCheck } from '@tabler/icons-react'
 import { ConnectError, Code } from '@connectrpc/connect'
 import { staffAuth } from '../backend/staff'
+import { setup } from '../backend/setup'
 
 const trouble = (err: unknown) =>
   err instanceof ConnectError && err.code === Code.ResourceExhausted
@@ -21,6 +22,14 @@ export function SignIn() {
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
+
+  // A fresh install has nobody to sign in yet: send the visitor to setup.
+  useEffect(() => {
+    setup.status().then(
+      (s) => s.needed && window.location.replace('/setup'),
+      () => {},
+    )
+  }, [])
 
   const send = async () => {
     if (!email.includes('@')) return setNote('Enter the email address you were invited with.')
