@@ -59,6 +59,7 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 	ctx := context.Background()
 
 	a := h.tenant("Alpha")
+	tenantA := h.lastTenant
 	fa := h.publishedFixture(a)
 	candA := h.redeem(fa)
 	attA := get(candA.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents}))).Msg.GetAttempt()
@@ -214,6 +215,63 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			r := get(b.auth.WhoAmI(ctx, connect.NewRequest(&v1.WhoAmIRequest{})))
 			if r.Msg.GetStaff().GetTenantName() != "Beta" {
 				t.Error("WhoAmI: B is told it is someone else")
+			}
+		},
+		// Tenancy: B is an administrator, but of B only.
+		"/assessmatrix.v1.TenantService/ListMyTenants": func() {
+			for _, tn := range get(b.tenants.ListMyTenants(ctx, connect.NewRequest(&v1.ListMyTenantsRequest{}))).Msg.GetTenants() {
+				if tn.GetId() == tenantA {
+					t.Error("ListMyTenants: B is told it belongs to A")
+				}
+			}
+		},
+		"/assessmatrix.v1.TenantService/SwitchTenant": func() {
+			_, err := b.tenants.SwitchTenant(ctx, connect.NewRequest(&v1.SwitchTenantRequest{TenantId: tenantA}))
+			denied("SwitchTenant", err)
+		},
+		"/assessmatrix.v1.TenantService/CreateTenant": func() {
+			made := get(b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Beta Two"}))).Msg.GetTenant()
+			for _, tn := range get(a.tenants.ListMyTenants(ctx, connect.NewRequest(&v1.ListMyTenantsRequest{}))).Msg.GetTenants() {
+				if tn.GetId() == made.GetId() {
+					t.Error("CreateTenant: B's new tenant was handed to A")
+				}
+			}
+		},
+		"/assessmatrix.v1.TenantService/ListAccess": func() {
+			r := get(b.tenants.ListAccess(ctx, connect.NewRequest(&v1.ListAccessRequest{})))
+			for _, tn := range r.Msg.GetTenants() {
+				if tn.GetId() == tenantA {
+					t.Error("ListAccess: B sees A as a tenant it runs")
+				}
+			}
+			for _, st := range r.Msg.GetStaff() {
+				for _, g := range st.GetGrants() {
+					if g.GetTenantId() == tenantA {
+						t.Error("ListAccess: B sees who works in A")
+					}
+				}
+			}
+		},
+		"/assessmatrix.v1.TenantService/SetAccess": func() {
+			_, err := b.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: "mole@example.test", TenantId: tenantA, Role: v1.Role_ROLE_ADMIN}))
+			denied("SetAccess", err)
+		},
+		"/assessmatrix.v1.TenantService/ListExamCopies": func() {
+			_, err := b.tenants.ListExamCopies(ctx, connect.NewRequest(&v1.ListExamCopiesRequest{ExamId: fa.exam.GetId()}))
+			denied("ListExamCopies", err)
+		},
+		"/assessmatrix.v1.TenantService/ShareExam": func() {
+			_, err := b.tenants.ShareExam(ctx, connect.NewRequest(&v1.ShareExamRequest{ExamId: fa.exam.GetId(), TenantIds: []string{tenantA}}))
+			denied("ShareExam (A's instrument)", err)
+			// B's own instrument cannot be pushed into A either.
+			r := get(b.tenants.ShareExam(ctx, connect.NewRequest(&v1.ShareExamRequest{ExamId: fb.exam.GetId(), TenantIds: []string{tenantA}})))
+			if res := r.Msg.GetResults()[0]; res.GetError() == "" || res.GetCopy() != nil {
+				t.Error("ShareExam: B put an instrument into A")
+			}
+			for _, e := range get(a.exams.ListExams(ctx, connect.NewRequest(&v1.ListExamsRequest{}))).Msg.GetExams() {
+				if e.GetSharedFrom() != nil {
+					t.Error("ShareExam: A holds a copy B pushed")
+				}
 			}
 		},
 		// Candidate procedures: B's candidate session against A's attempt.

@@ -125,6 +125,16 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.WebhookServiceListDeliveriesProcedure,
 		assessmatrixv1connect.WebhookServiceRedeliverProcedure,
 		assessmatrixv1connect.WebhookServicePingWebhookProcedure,
+		assessmatrixv1connect.TenantServiceListMyTenantsProcedure,
+		assessmatrixv1connect.TenantServiceSwitchTenantProcedure,
+	)
+	// Who may work here, new tenants, and what leaves this tenant for another.
+	set(auth.Admin,
+		assessmatrixv1connect.TenantServiceCreateTenantProcedure,
+		assessmatrixv1connect.TenantServiceListAccessProcedure,
+		assessmatrixv1connect.TenantServiceSetAccessProcedure,
+		assessmatrixv1connect.TenantServiceListExamCopiesProcedure,
+		assessmatrixv1connect.TenantServiceShareExamProcedure,
 	)
 	return p
 }
@@ -148,6 +158,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(assessmatrixv1connect.NewProctorServiceHandler(&proctorService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewSetupServiceHandler(&setupService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewWebhookServiceHandler(&webhookService{s}, opts...))
+	mux.Handle(assessmatrixv1connect.NewTenantServiceHandler(&tenantService{s}, opts...))
 	return mux
 }
 

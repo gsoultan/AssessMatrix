@@ -105,6 +105,17 @@ message Exam {
   bool anonymous = 12;
   repeated Section sections = 13;
   int64 updated_at = 14;
+  // Set on a copy shared in from another tenant. Read-only: only sharing
+  // again changes it.
+  SharedFrom shared_from = 15;
+}
+
+// The original a shared copy follows, as it was when last shared.
+message SharedFrom {
+  string exam_id = 1;
+  // The original's version this copy was last brought up to.
+  int32 version = 2;
+  string tenant_name = 3;
 }
 
 // A frozen copy. Publishing is what makes one; attempts and invitations are
