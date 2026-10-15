@@ -23,7 +23,7 @@ page.on('console', (c) => c.type() === 'error' && errors.push(c.text()))
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
 
 const nav = async (name) => {
-  const exit = page.getByRole('button', { name: /^Exit$/ })
+  const exit = page.getByRole('button', { name: /^Exit preview$/ })
   if (await exit.count()) { await exit.click(); await page.waitForTimeout(250) }
   await page.getByRole('button', { name }).first().click()
   await page.waitForTimeout(400)
@@ -67,12 +67,9 @@ const xlsx = (rows) => {
   return Buffer.concat([...locals, cd, end])
 }
 
-/** The candidate picker keeps open-access instruments behind a demo disclosure. */
-const openDemoList = async () => {
-  const sum = page.getByText('Demo — buka tanpa undangan')
-  if (await sum.count()) await sum.click()
-  await page.waitForTimeout(250)
-}
+/** What the studio's candidate preview says about one instrument. */
+const previewRow = async (title) =>
+  page.locator('div', { has: page.getByRole('button', { name: `Preview ${title}` }) }).last().innerText()
 
 /** Answer whatever control this question offers. */
 const answerHere = async (text = 'lag') => {
@@ -192,20 +189,18 @@ try {
   await page.getByRole('button', { name: /Save draft/ }).click()
   await page.waitForTimeout(350)
 
-  await nav(/Take exam/i)
-  await openDemoList()
-  ;(await page.getByRole('button', { name: /E2E Draft Quiz/ }).count()) === 0
-    ? ok('a draft is not offered to candidates')
-    : bad('a draft was sittable')
+  await nav(/^Candidate preview$/)
+  ;(await previewRow('E2E Draft Quiz')).includes('candidates cannot open it yet')
+    ? ok('a draft can be previewed, and says candidates cannot open it')
+    : bad('the preview list did not mark the draft as closed to candidates')
 
   await nav(/Library/)
   await page.getByRole('button', { name: /Actions for E2E Draft Quiz/ }).click()
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /^Publish$/ }).click()
   await page.waitForTimeout(400)
-  await nav(/Take exam/i)
-  await openDemoList()
-  ;(await page.getByRole('button', { name: /E2E Draft Quiz/ }).count())
+  await nav(/^Candidate preview$/)
+  ;(await previewRow('E2E Draft Quiz')).includes('candidates can open it by invitation')
     ? ok('publishing makes it available to candidates')
     : bad('publishing did not expose it')
 
@@ -245,10 +240,25 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(450)
+  const tab = async (name) => {
+    await page.getByRole('tab', { name: new RegExp(`^${name}`) }).click()
+    await page.waitForTimeout(250)
+  }
+  const inviteMore = async () => {
+    await page.getByRole('button', { name: /^Invite people$/ }).first().click()
+    await page.waitForTimeout(400)
+  }
+  ;(await page.getByRole('dialog', { name: /Invite people/ }).count())
+    ? ok('"Assign people" from the Library opens the invite panel straight away')
+    : bad('the invite panel did not open from the Library')
   await page.getByRole('button', { name: /^Select Budi Santoso$/ }).click()
   await page.waitForTimeout(150)
   await page.getByRole('button', { name: /^Invite 1 person$/ }).click()
   await page.waitForTimeout(600)
+  ;(await page.getByRole('dialog', { name: /Invite people/ }).count()) === 0
+    ? ok('the invite panel closes once the invitation is sent')
+    : bad('the invite panel stayed open after inviting')
+  await tab('Outbox')
   const budiLink = page.getByRole('link', { name: 'Open the link emailed to budi.santoso@example.id' })
   ;(await budiLink.count())
     ? ok('inviting a person emails them their own link')
@@ -256,11 +266,12 @@ try {
   ;(await page.getByRole('button', { name: /Copy invitation/ }).count()) === 0
     ? ok('there is no way to copy a link back out of an assignment')
     : bad('a link can still be copied from the assignment')
+  const budiHref = await budiLink.first().getAttribute('href')
+  await tab('People')
   ;(await page.getByText(/^v2$/).count())
     ? ok('an invitation pins the version it was issued against')
     : bad('invitation did not record a version')
 
-  const budiHref = await budiLink.first().getAttribute('href')
   const budiToken = budiHref.split('#/i/')[1]
   const stored = await page.evaluate(() =>
     Object.keys(localStorage).filter((k) => k !== 'am.outbox.v1').map((k) => localStorage.getItem(k)).join('\n'),
@@ -270,6 +281,7 @@ try {
     : bad('the raw link token is stored, or is not 256 bits')
 
   // invite an address that was never on the roster
+  await inviteMore()
   await page.getByRole('button', { name: /Invite someone not on the roster/ }).click()
   await page.waitForTimeout(300)
   await page.getByPlaceholder(/Agus Wibowo/).fill('Agus Wibowo <agus.wibowo@example.id>')
@@ -283,6 +295,7 @@ try {
     : bad('ad-hoc invitee missing')
 
   // bulk, from a CSV: header in any order, an extra column that must not be kept, a bad row
+  await inviteMore()
   await page.getByLabel('Upload a CSV or Excel roster').setInputFiles({
     name: 'kandidat.csv',
     mimeType: 'text/csv',
@@ -297,6 +310,7 @@ try {
     : bad('CSV preview did not count new and rejected rows')
   await page.getByRole('button', { name: /^Invite 2 people$/ }).click()
   await page.waitForTimeout(600)
+  await tab('Outbox')
   ;(await page.getByText(/Invited 2, 2 added to the roster/).count()) &&
   (await page.getByRole('link', { name: 'Open the link emailed to eko.prasetyo@example.id' }).count())
     ? ok('a CSV invites everyone usable in it, and each gets an email')
@@ -306,6 +320,7 @@ try {
     : ok('columns other than name, email and group are dropped, not stored')
 
   // bulk, from an Excel workbook
+  await inviteMore()
   await page.getByLabel('Upload a CSV or Excel roster').setInputFiles({
     name: 'kandidat.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -317,6 +332,7 @@ try {
   await page.waitForTimeout(400)
   await page.getByRole('button', { name: /^Invite 1 person$/ }).last().click()
   await page.waitForTimeout(600)
+  await tab('Outbox')
   ;(await page.getByRole('link', { name: 'Open the link emailed to rina.kusuma@example.id' }).count())
     ? ok('an .xlsx roster is read and its people invited')
     : bad('.xlsx import did not invite')
@@ -335,6 +351,7 @@ try {
 
   // revoke, then resend
   const agusHref = await page.getByRole('link', { name: 'Open the link emailed to agus.wibowo@example.id' }).getAttribute('href')
+  await tab('People')
   await page.getByRole('button', { name: 'Revoke invitation for Agus Wibowo' }).click()
   await page.waitForTimeout(400)
   ;(await holderSees(agusHref)).includes('Undangan ini telah ditarik')
@@ -347,6 +364,7 @@ try {
     : bad('the previous link survived a resend')
 
   /* ---------------- sit it through the invitation ---------------- */
+  await tab('Outbox')
   await budiLink.first().click()
   await page.waitForTimeout(700)
   const gateText = await page.locator('main').innerText()
@@ -376,6 +394,13 @@ try {
   ;(await holderSees(budiHref)).includes('Tautan ini sudah dipakai')
     ? ok('a link is spent once its code is verified')
     : bad('a spent link opened again')
+  await other.goto(URL, { waitUntil: 'networkidle' })
+  await other.getByRole('button', { name: /^Assignments$/ }).first().click()
+  await other.getByRole('button', { name: 'Open E2E — Rekrutmen Backend' }).click()
+  await other.waitForTimeout(400)
+  ;(await other.locator('tr', { has: other.getByRole('button', { name: 'Invitation history for Budi Santoso' }) }).innerText()).includes('Opened')
+    ? ok('someone who opened their link but has not started shows as "Opened"')
+    : bad(`the opened link did not show: ${(await other.locator('tr', { has: other.getByRole('button', { name: 'Invitation history for Budi Santoso' }) }).innerText()).slice(0, 80)}`)
   await other.close()
 
   ;(await page.getByText(/Yang kami kumpulkan/).count())
@@ -445,12 +470,33 @@ try {
 
   await nav(/Assignments/)
   await page.waitForTimeout(500)
-  ;(await page.getByText('Submitted').count())
+  ;(await page.getByRole('button', { name: /^Open / }).count()) && (await page.getByText(/of \d+ completed/).count())
+    ? ok('Assignments opens on the list of instruments, with progress on each')
+    : bad('Assignments did not open on its list of instruments')
+  await page.getByRole('button', { name: 'Open E2E — Rekrutmen Backend' }).click()
+  await page.waitForTimeout(400)
+  await page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: /^Invited/ }).click()
+  await page.waitForTimeout(200)
+  const notStarted = await page.getByRole('button', { name: 'View answers from Budi Santoso' }).count()
+  await page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: /^Completed/ }).click()
+  await page.waitForTimeout(200)
+  notStarted === 0 && (await page.getByRole('button', { name: 'View answers from Budi Santoso' }).count()) === 1
+    ? ok('the people on an instrument filter by status')
+    : bad('the status filter did not narrow the list')
+  ;(await page.getByText('Completed').count())
     ? ok('completing an invitation updates the assignment to submitted')
     : bad('assignment status did not follow the attempt')
   ;(await page.getByText(/^100%$/).count())
     ? ok('the score lands back on the roster row')
     : bad('score did not reach the assignment')
+  await page.getByRole('button', { name: 'View answers from Budi Santoso' }).click()
+  await page.waitForTimeout(400)
+  const sheet = page.getByRole('dialog')
+  ;(await sheet.getByText(/^Correct$/).count()) === total && (await sheet.getByText(/Answered:/).count()) > 0
+    ? ok(`each candidate's answers can be read, question by question (${total} marked correct)`)
+    : bad(`the answer sheet did not show every question as correct: ${(await sheet.innerText()).slice(0, 120)}`)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 
   /* ---------------- questionnaire, opened straight from the library ---------------- */
   await nav(/Library/)
@@ -463,13 +509,17 @@ try {
     ? ok('questionnaire shows no pass threshold')
     : bad('pass threshold leaked into an ungraded instrument')
 
+  ;(await page.getByText(/Penyimpanan luring/).count())
+    ? ok('the start page checks the device itself when there is no camera to ask about')
+    : bad('the start page did not check the device')
   await page.getByRole('button', { name: /Mulai mengisi/ }).click()
-  await page.waitForTimeout(300)
+  await page.waitForTimeout(400)
   ;(await page.getByText(/UU PDP No. 27\/2022/).count()) === 0
     ? ok('untiered questionnaire skips the consent gate')
     : bad('consent gate appeared on a Tier 0 questionnaire')
-  await page.getByRole('button', { name: /Mulai sekarang/ }).click()
-  await page.waitForTimeout(400)
+  ;(await page.getByText(/Pertanyaan 1 dari \d+/i).count())
+    ? ok('one press on the start page opens the first question')
+    : bad('the start page needed more than one press')
 
   const qTotal = Number((await page.getByText(/Pertanyaan 1 dari \d+/i).first().innerText()).match(/dari (\d+)/i)[1])
 
@@ -500,7 +550,7 @@ try {
     ? ok('questionnaire submitted — thanked, not graded')
     : bad('questionnaire produced a grade instead of a thank-you')
 
-  await nav(/Aggregate results/)
+  await nav(/^Responses$/)
   const mean = await page.getByText(/mean \d/).first().count()
   const answered = await page.getByText(/1 of 1 answered/).first().count()
   mean > 0 && answered > 0

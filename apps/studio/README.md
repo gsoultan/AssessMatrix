@@ -1,6 +1,7 @@
 # AssessMatrix — prototype
 
-Thirteen screens. Six of them are **functional**, not mocked.
+Thirteen screens. Six of them are **functional**, not mocked. The sidebar lists the everyday ones,
+one line each, in the order the work is done; the design mock-ups sit folded under **More**.
 
 An instrument has a **purpose** — *Exam*, *Quiz* or *Questionnaire* — and that one field decides
 whether answers have a right one, whether there is a clock, and what "results" means. The
@@ -17,13 +18,23 @@ engine underneath is identical: sections, delivery, autosave, media, event log.
   optional answer key, and settings tucked behind a toggle because you set them once.
 - **People** — the roster you assign from. Add someone inline, or paste a list (bare email,
   `Name <email>`, or `Name, email, group`); duplicate emails are skipped, never doubled.
-- **Assignments** — the delivery step. Pick an instrument, pick people, and each assignment
-  mints its own invitation token — **one person, one link, never a shared URL** — then tracks
-  them from invited → in progress → submitted, with the score landing back on the row.
-- **Take exam** — the **candidate application**: a full-bleed experience with no product chrome,
-  because a participant arrives from an invitation link and the whole screen is theirs. It runs
-  the real stages — invitation → consent → readiness → attempt → review → submit → result — on
-  live data. A questionnaire ends in a thank-you, not a grade.
+- **Assignments** — the delivery step. It opens on a list of instruments, each with how many
+  people have completed it; filter by Open / All completed / No one invited, or search. Click one
+  to open its page: **Invite people** opens a side panel to pick from the roster (or paste
+  addresses), and the page below has two tabs, **People** and **Outbox**. Each assignment mints its own invitation token — **one person, one
+  link, never a shared URL** — and the row tracks them as **Invited → Opened → In progress →
+  Completed** (or **Expired**). *Opened* means they followed the link but have not started.
+  Filter the invited list by status or search by name, with the score landing back on the row. A
+  submitted row has **View answers**: every question, what that person answered, right or wrong
+  against the key of the version they sat, and the points. Anonymous instruments have none.
+- **Candidate preview** — the **candidate application**, as an administrator sees it: pick any
+  exam (drafts too) and sit it exactly as a candidate would, under a bar that says it is a
+  preview. A real candidate never sees this list: their invitation link opens one assessment,
+  full-bleed, with no product chrome. The stages are link → emailed code → **start page** →
+  attempt → review → submit → result; the start page holds the details, the device check and
+  what is collected, so one press begins. Consent is its own step when the tier collects
+  anything, and an exam that uses the camera checks it only after consent. A questionnaire ends
+  in a thank-you, not a grade.
 - **Responses** — aggregate results for questionnaires: per-question distributions, means for
   scales, and free-text answers. One hue for every bar, because the options are categories of a
   single series.
@@ -83,7 +94,7 @@ real runner has to keep working disconnected mid-exam (see `../docs/06-frontend-
 | :--- | :--- |
 | **Library** | *Functional.* Lists every instrument, Active/Archived split, filter by type, search, publish, duplicate, archive, restore, open, preview as candidate. |
 | **Editor** | *Functional.* Inline question cards, seven types, reorder/duplicate, whole-exam preview with answer key, publish. |
-| **Take exam** | *Functional.* The candidate app — invite, consent, readiness, attempt, review, confirm, result. Timer warnings, autosave, flags, figures, attachments, resume. |
+| **Candidate preview** | *Functional.* The candidate app — link, code, start page, consent (by tier), attempt, review, confirm, result. Timer warnings, autosave, flags, figures, attachments, resume. |
 | **People** | *Functional.* Roster, inline add, paste-import with dedupe, groups, search. |
 | **Assignments** | *Functional.* Assign by person or group, per-person invitation links, live status and score tracking. |
 | **Responses** | *Functional.* Aggregate distributions, means, free-text answers. |

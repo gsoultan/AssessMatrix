@@ -501,6 +501,7 @@ function Editor({ start }: { start: Exam }) {
   const publishExam = useApp((s) => s.publishExam)
   const removeExam = useApp((s) => s.removeExam)
   const createExam = useApp((s) => s.createExam)
+  const previewAsCandidate = useApp((s) => s.previewAsCandidate)
   const setStatus = useApp((s) => s.setStatus)
   const currentExamId = useApp((s) => s.currentExamId)
   const [exam, setExam] = useState<Exam>(start)
@@ -1013,11 +1014,22 @@ function Editor({ start }: { start: Exam }) {
         {header}
         {settings}
         <div className="mx-auto max-w-[720px]">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <p className="text-[12.5px] text-ink-muted">Exactly what the participant sees.</p>
-            {scored && (
-              <Switch size="xs" label="Show answer key" checked={showKey} onChange={(e) => setShowKey(e.currentTarget.checked)} />
-            )}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[12.5px] text-ink-muted">Every question on one page, to check the content.</p>
+            <div className="flex items-center gap-3">
+              {scored && (
+                <Switch size="xs" label="Show answer key" checked={showKey} onChange={(e) => setShowKey(e.currentTarget.checked)} />
+              )}
+              {/* The candidate app sits what is saved: the version candidates get, not unsaved edits. */}
+              <Tooltip label={saved ? 'Start page, questions and result, as a candidate gets them' : 'Shows the last saved version'} withArrow>
+                <button
+                  onClick={() => previewAsCandidate(exam.id)}
+                  className="hair inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-1.5 text-[12.5px] font-medium text-ink-2"
+                >
+                  <IconEye size={14} stroke={2} /> Try it as a candidate
+                </button>
+              </Tooltip>
+            </div>
           </div>
           {items.length === 0 && (
             <p className="hair rounded-xl bg-surface py-10 text-center text-[13px] text-ink-muted">

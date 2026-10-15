@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from 'react'
-import { Select, TextInput, Textarea, Badge, Tooltip, Collapse } from '@mantine/core'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { TextInput, Textarea, Badge, Tooltip, Collapse, Drawer } from '@mantine/core'
 import {
   IconSend,
   IconCheck,
@@ -12,38 +12,84 @@ import {
   IconBan,
   IconHistory,
   IconInbox,
+  IconListDetails,
+  IconArrowLeft,
+  IconChevronRight,
+  IconUserPlus,
 } from '@tabler/icons-react'
-import { useApp } from '../state'
+import { useApp, useResponses } from '../state'
+import { AnswerSheet } from '../components/AnswerSheet'
 import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { RosterImport } from '../components/RosterImport'
 import { type LinkState, EVENT_LABEL, linkState, listOutbox } from '../invite'
-import { StatTile } from '../components/Viz'
 import {
   type AssignStatus,
   type Assignment,
   type Exam,
-  ASSIGN_STATUS,
   KINDS,
   allItems,
+  getAttempt,
   isScored,
+  resolveExam,
 } from '../store'
 
-const STATUS_STYLE: Record<AssignStatus, { bg: string; fg: string }> = {
+/**
+ * What the table shows. The stored status has no step between "invited" and
+ * "started"; the invitation's own history does: the link was opened, a code
+ * was asked for or verified, and nothing was started yet.
+ */
+type Seen = AssignStatus | 'opened'
+
+const OPENED_KINDS = new Set(['link.opened', 'code.sent', 'code.wrong', 'link.redeemed'])
+
+function seen(a: Assignment): Seen {
+  if (a.status !== 'invited') return a.status
+  const since = a.sentAt ?? 0
+  return a.redeemedAt || a.history.some((h) => OPENED_KINDS.has(h.kind) && h.t >= since) ? 'opened' : 'invited'
+}
+
+const SEEN_LABEL: Record<Seen, string> = {
+  invited: 'Invited',
+  opened: 'Opened',
+  started: 'In progress',
+  submitted: 'Completed',
+  expired: 'Expired',
+}
+
+const SEEN_HINT: Record<Seen, string> = {
+  invited: 'Invitation sent; the link has not been opened yet',
+  opened: 'Opened the link, but has not started the test',
+  started: 'Started the test and has not handed it in yet',
+  submitted: 'Handed in',
+  expired: 'The link ran out before they finished',
+}
+
+const STATUS_STYLE: Record<Seen, { bg: string; fg: string }> = {
   invited: { bg: 'var(--color-sunken)', fg: 'var(--color-ink-2)' },
+  opened: { bg: 'var(--color-wash-warn)', fg: 'var(--color-serious)' },
   started: { bg: 'var(--color-wash)', fg: 'var(--color-brand-text)' },
   submitted: { bg: 'var(--color-wash-good)', fg: 'var(--color-good-text)' },
   expired: { bg: 'var(--color-wash-warn)', fg: 'var(--color-serious)' },
 }
 
-function StatusPill({ status }: { status: AssignStatus }) {
+const STATUS_DOT: Record<Seen, string> = {
+  invited: 'var(--color-ink-muted)',
+  opened: 'var(--color-serious)',
+  started: 'var(--color-s1)',
+  submitted: 'var(--color-good-fill)',
+  expired: 'var(--color-serious)',
+}
+
+function StatusPill({ status }: { status: Seen }) {
   const s = STATUS_STYLE[status]
   return (
     <span
+      title={SEEN_HINT[status]}
       className="inline-flex items-center rounded px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide"
       style={{ background: s.bg, color: s.fg }}
     >
-      {ASSIGN_STATUS.find((x) => x.v === status)?.label}
+      {SEEN_LABEL[status]}
     </span>
   )
 }
@@ -97,6 +143,146 @@ const invitedNote = (r: { invited: number; created: number; sent: number }, live
   return live ? `${who} ${r.sent} ${r.sent === 1 ? 'email' : 'emails'} sent.` : `${who} Emails are held until this is published.`
 }
 
+/**
+ * One candidate's submitted answers. Locally the attempt is in this browser;
+ * against the core it is that assignment's response. An anonymous
+ * instrument has no such view: its answers are not tied to anyone.
+ */
+function CandidateAnswers({ exam, a }: { exam: Exam; a: Assignment }) {
+  const responses = useResponses(exam.id)
+  const load = useApp((s) => s.loadResponses)
+  // The list may have been read before this person handed in; read it again on opening.
+  const [fresh, setFresh] = useState(!CORE)
+  useEffect(() => {
+    if (CORE) void load(exam.id).finally(() => setFresh(true))
+  }, [exam.id, load])
+  const attempt = CORE ? responses.find((r) => r.assignmentId === a.id) : getAttempt(exam.id, a.id)
+  if (!attempt?.submittedAt)
+    return <p className="py-6 text-center text-[13px] text-ink-muted">{fresh ? 'No submitted answers found.' : 'Loading…'}</p>
+  const sat = resolveExam(exam, attempt.examVersion ?? a.examVersion)
+  return (
+    <>
+      <p className="tnum mb-3 text-[12.5px] text-ink-2">
+        Submitted {new Date(attempt.submittedAt).toLocaleString()} · v{sat.version}
+        {attempt.score && ` · ${attempt.score.raw} / ${attempt.score.max} points (${attempt.score.pct}%)`}
+      </p>
+      <AnswerSheet exam={sat} attempt={attempt} />
+    </>
+  )
+}
+
+type Stage = 'all' | 'open' | 'done' | 'none'
+
+const STAGES: { v: Stage; label: string; hint: string }[] = [
+  { v: 'all', label: 'All', hint: '' },
+  { v: 'open', label: 'Open', hint: 'Someone invited has not handed in yet' },
+  { v: 'done', label: 'All completed', hint: 'Every invited person has handed in' },
+  { v: 'none', label: 'No one invited', hint: 'Nobody has been invited yet' },
+]
+
+/** Assignments starts here: every instrument, with how far its invitations have got. Pick one to assign people. */
+function InstrumentList({ exams, assignments, onOpen }: { exams: Exam[]; assignments: Assignment[]; onOpen: (id: string) => void }) {
+  const [stage, setStage] = useState<Stage>('all')
+  const [find, setFind] = useState('')
+  const rows = exams.map((e) => {
+    const mine = assignments.filter((a) => a.examId === e.id)
+    const done = mine.filter((a) => a.status === 'submitted').length
+    const going = mine.filter((a) => a.status === 'started').length
+    const opened = mine.filter((a) => seen(a) === 'opened').length
+    const stageOf: Stage = mine.length === 0 ? 'none' : done === mine.length ? 'done' : 'open'
+    return { e, total: mine.length, done, going, opened, stage: stageOf }
+  })
+  const t = find.trim().toLowerCase()
+  const shown = rows.filter((r) => (stage === 'all' || r.stage === stage) && (!t || r.e.title.toLowerCase().includes(t)))
+
+  return (
+    <div className="p-4 sm:p-6">
+      <header className="mb-4">
+        <h1 className="text-[15px] font-semibold tracking-tight">Assignments</h1>
+        <p className="mt-0.5 max-w-[72ch] text-[12.5px] leading-snug text-ink-muted">
+          Pick an instrument to invite people to it and follow their progress. Each person gets their own link by
+          email.
+        </p>
+      </header>
+      {exams.length === 0 ? (
+        <p className="hair rounded-xl bg-surface py-12 text-center text-[13px] text-ink-muted">
+          Nothing to assign yet — create an instrument in the Library first.
+        </p>
+      ) : (
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Filter instruments" className="flex flex-wrap gap-1">
+              {STAGES.map((st) => {
+                const on = stage === st.v
+                const n = st.v === 'all' ? rows.length : rows.filter((r) => r.stage === st.v).length
+                return (
+                  <button
+                    key={st.v}
+                    onClick={() => setStage(st.v)}
+                    aria-pressed={on}
+                    title={st.hint || undefined}
+                    className="hair inline-flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-[12px] font-medium"
+                    style={on ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
+                  >
+                    {st.label} <span className="tnum text-ink-muted">{n}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <TextInput
+              size="xs"
+              className="ml-auto w-full sm:w-[220px]"
+              placeholder="Find an instrument"
+              aria-label="Find an instrument"
+              leftSection={<IconSearch size={13} stroke={1.8} />}
+              value={find}
+              onChange={(e) => setFind(e.currentTarget.value)}
+            />
+          </div>
+          <div className="hair divide-y divide-hair rounded-xl bg-surface">
+            {shown.length === 0 && <p className="py-10 text-center text-[12.5px] text-ink-muted">No instrument matches.</p>}
+            {shown.map(({ e, total, done, going, opened }) => (
+              <button
+                key={e.id}
+                onClick={() => onOpen(e.id)}
+                aria-label={`Open ${e.title}`}
+                className="flex w-full items-center gap-4 px-4 py-3.5 text-left hover:bg-ink/[0.03] sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13.5px] font-medium text-ink">{e.title}</p>
+                  <p className="tnum truncate text-[12px] text-ink-muted">
+                    {KINDS.find((k) => k.v === e.kind)?.label} · {e.status === 'published' ? 'Published' : 'Draft'} ·{' '}
+                    {allItems(e).length} questions
+                  </p>
+                </div>
+                <div className="hidden w-[260px] shrink-0 sm:block">
+                  {total === 0 ? (
+                    <p className="text-right text-[12px] text-ink-muted">No one invited yet</p>
+                  ) : (
+                    <>
+                      <p className="tnum text-right text-[12px] text-ink-2">
+                        <strong className="font-semibold text-ink">{done}</strong> of {total} completed
+                        {going > 0 && <span className="text-ink-muted"> · {going} in progress</span>}
+                        {opened > 0 && <span className="text-ink-muted"> · {opened} opened</span>}
+                      </p>
+                      <div className="mt-1.5 flex h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--color-track)' }}>
+                        <div style={{ width: `${(done / total) * 100}%`, background: 'var(--color-good-fill)' }} />
+                        <div style={{ width: `${(going / total) * 100}%`, background: 'var(--color-s1)' }} />
+                        <div style={{ width: `${(opened / total) * 100}%`, background: 'var(--color-serious)', opacity: 0.55 }} />
+                      </div>
+                    </>
+                  )}
+                </div>
+                <IconChevronRight size={16} stroke={2} className="shrink-0 text-ink-muted" />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const exams = useApp((s) => s.exams)
   const people = useApp((s) => s.people)
@@ -107,14 +293,14 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const unassignOne = useApp((s) => s.unassignOne)
   const sendInvite = useApp((s) => s.sendInvite)
   const revokeInviteFor = useApp((s) => s.revokeInviteFor)
-  const currentExamId = useApp((s) => s.currentExamId)
+  const assignTarget = useApp((s) => s.assignTarget)
   const setScreen = useApp((s) => s.setScreen)
 
   const active = useMemo(() => exams.filter((e) => e.status !== 'archived'), [exams])
-  const [examId, setExamId] = useState<string>(
-    () => currentExamId ?? active[0]?.id ?? '',
-  )
-  const exam: Exam | undefined = active.find((e) => e.id === examId) ?? active[0]
+  // The list of instruments comes first; one is open only when picked, or when
+  // the Library's "Assign people" asked for it.
+  const [examId, setExamId] = useState<string>(() => assignTarget ?? '')
+  const exam: Exam | undefined = active.find((e) => e.id === examId)
 
   const [picked, setPicked] = useState<string[]>([])
   const [group, setGroup] = useState('all')
@@ -122,8 +308,14 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const [due, setDue] = useState('')
   const [note, setNote] = useState('')
   const [historyOf, setHistoryOf] = useState('')
+  const [answersOf, setAnswersOf] = useState('')
+  const [show, setShow] = useState<Seen | 'all'>('all')
+  const [find, setFind] = useState('')
   const [adhocOpen, setAdhocOpen] = useState(false)
   const [adhoc, setAdhoc] = useState('')
+  const [tab, setTab] = useState<'people' | 'outbox'>('people')
+  // Arriving from the Library's "Assign people" goes straight to inviting.
+  const [inviting, setInviting] = useState(() => !!assignTarget)
 
   const rows = useMemo(
     () => (exam ? assignments.filter((a) => a.examId === exam.id) : []),
@@ -160,47 +352,82 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
     setNote(n ? `New link emailed to ${name}. The previous one no longer works.` : 'Nothing sent — publish the instrument first.')
   }
 
-  const count = (s: AssignStatus) => rows.filter((r) => r.status === s).length
+  const count = (s: Seen) => rows.filter((r) => seen(r) === s).length
+  const shown = rows.filter(
+    (r) =>
+      (show === 'all' || seen(r) === show) &&
+      (() => {
+        const t = find.trim().toLowerCase()
+        const p = personOf(r.personId)
+        return !t || !!p?.name.toLowerCase().includes(t) || !!p?.email.toLowerCase().includes(t)
+      })(),
+  )
 
-  if (!exam)
-    return (
-      <div className="p-6">
-        <p className="hair rounded-xl bg-surface py-12 text-center text-[13px] text-ink-muted">
-          Nothing to assign yet — create an instrument in the Library first.
-        </p>
-      </div>
-    )
+  const open = (id: string) => {
+    setExamId(id)
+    setPicked([])
+    setNote('')
+    setHistoryOf('')
+    setAnswersOf('')
+    setShow('all')
+    setFind('')
+    setTab('people')
+    setInviting(false)
+  }
+
+  if (!exam) return <InstrumentList exams={active} assignments={assignments} onOpen={open} />
+
+  const held = live && unsent.length > 0 && (
+    <button
+      onClick={async () => {
+        const n = await sendInvite(unsent.map((r) => r.id))
+        setNote(`${n} held ${n === 1 ? 'invitation' : 'invitations'} emailed.`)
+      }}
+      className="hair inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-surface px-3 text-[12.5px] font-medium text-ink-2"
+    >
+      <IconSend size={13} stroke={1.9} /> Send {unsent.length} held
+    </button>
+  )
+  // Close the drawer once something went out, so the new rows are in view.
+  const invited = (msg: string, done: boolean) => {
+    setNote(msg)
+    if (done) {
+      setInviting(false)
+      setTab('people')
+    }
+  }
 
   return (
     <div className="p-4 sm:p-6">
-      <header className="mb-4">
-        <h1 className="text-[15px] font-semibold tracking-tight">Assignments</h1>
-        <p className="mt-0.5 max-w-[72ch] text-[12.5px] leading-snug text-ink-muted">
-          Give named people a way in. Each assignment mints its own invitation link — one person,
-          one token, never a shared URL — and tracks them from invited through to submitted.
-        </p>
+      <button
+        onClick={() => open('')}
+        className="mb-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-2"
+      >
+        <IconArrowLeft size={14} stroke={2} /> All instruments
+      </button>
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+            {KINDS.find((k) => k.v === exam.kind)?.label} · v{exam.publishedVersion ?? exam.version} · {allItems(exam).length} questions
+          </p>
+          <h1 className="text-[17px] font-semibold tracking-tight">{exam.title}</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setScreen('people')}
+            className="hair inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-surface px-3 text-[12.5px] font-medium text-ink-2"
+          >
+            <IconUsers size={14} stroke={1.9} /> Manage roster
+          </button>
+          <button
+            onClick={() => { setNote(''); setInviting(true) }}
+            className="inline-flex h-[30px] items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold text-on-brand"
+            style={{ background: 'var(--color-s1)' }}
+          >
+            <IconUserPlus size={14} stroke={2} /> Invite people
+          </button>
+        </div>
       </header>
-
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Select
-          size="xs"
-          label="Instrument"
-          className="min-w-[280px] flex-1"
-          value={exam.id}
-          allowDeselect={false}
-          onChange={(v) => v && setExamId(v)}
-          data={active.map((e) => ({
-            value: e.id,
-            label: `${e.title} — ${KINDS.find((k) => k.v === e.kind)?.label}${e.status === 'draft' ? ' (draft)' : ''}`,
-          }))}
-        />
-        <button
-          onClick={() => setScreen('people')}
-          className="hair inline-flex h-[30px] items-center gap-1.5 rounded-lg bg-surface px-3 text-[12.5px] font-medium text-ink-2"
-        >
-          <IconUsers size={14} stroke={1.9} /> Manage roster
-        </button>
-      </div>
 
       {exam.status !== 'published' && (
         <p
@@ -216,179 +443,103 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
         </p>
       )}
 
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile label="Assigned" value={String(rows.length)} />
-        <StatTile label="Not started" value={String(count('invited'))} />
-        <StatTile label="In progress" value={String(count('started'))} />
-        <StatTile label="Submitted" value={String(count('submitted'))} />
+      {rows.length > 0 && (
+        <div className="mb-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="tnum text-[12.5px] text-ink-2">
+              <strong className="font-semibold text-ink">{count('submitted')}</strong> of {rows.length} completed
+            </p>
+            <p className="tnum text-[12px] text-ink-muted">{Math.round((count('submitted') / rows.length) * 100)}%</p>
+          </div>
+          <div className="mt-1.5 flex h-2 w-full overflow-hidden rounded-full" style={{ background: 'var(--color-track)' }}>
+            <div style={{ width: `${(count('submitted') / rows.length) * 100}%`, background: 'var(--color-good-fill)' }} />
+            <div style={{ width: `${(count('started') / rows.length) * 100}%`, background: 'var(--color-s1)' }} />
+            <div style={{ width: `${(count('opened') / rows.length) * 100}%`, background: 'var(--color-serious)', opacity: 0.55 }} />
+          </div>
+        </div>
+      )}
+
+      {note && !inviting && (
+        <p role="status" className="mb-3 text-[12.5px] text-ink-2">
+          {note}
+        </p>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-hair">
+        <div role="tablist" aria-label="Instrument sections" className="flex gap-4">
+          {(CORE ? (['people'] as const) : (['people', 'outbox'] as const)).map((t) => {
+            const on = tab === t
+            return (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setTab(t)}
+                className="-mb-px inline-flex items-center gap-1.5 border-b-2 px-0.5 pb-2 text-[13px] font-medium"
+                style={on ? { borderColor: 'var(--color-s1)', color: 'var(--color-ink)' } : { borderColor: 'transparent', color: 'var(--color-ink-muted)' }}
+              >
+                {t === 'people' ? <IconUsers size={14} stroke={1.9} /> : <IconInbox size={14} stroke={1.9} />}
+                {t === 'people' ? 'People' : 'Outbox'}
+                <span className="tnum rounded-full px-1.5 text-[11px]" style={{ background: 'var(--color-sunken)' }}>
+                  {t === 'people' ? rows.length : mails.length}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {tab === 'people' && held && <div className="pb-2">{held}</div>}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-        <Panel
-          title="Assign people"
-          hint={`${candidates.length} on the roster not yet assigned`}
-          actions={
-            candidates.length > 0 && (
-              <button
-                onClick={() => setPicked(picked.length === candidates.length ? [] : candidates.map((c) => c.id))}
-                className="text-[11.5px] font-medium"
-                style={{ color: 'var(--color-s1)' }}
-              >
-                {picked.length === candidates.length ? 'Clear' : 'Select all'}
-              </button>
-            )
-          }
-        >
-          <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-            {(['all', ...groups] as string[]).map((g) => (
-              <button
-                key={g}
-                onClick={() => setGroup(g)}
-                className="hair rounded-md bg-surface px-2 py-1 text-[11.5px] font-medium"
-                style={group === g ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
-              >
-                {g === 'all' ? 'All' : g}
-              </button>
-            ))}
-          </div>
-          <TextInput
-            size="xs"
-            placeholder="Search roster"
-            leftSection={<IconSearch size={13} stroke={1.8} />}
-            value={q}
-            onChange={(e) => setQ(e.currentTarget.value)}
-          />
-
-          <div className="scroll-thin mt-2.5 flex max-h-[260px] flex-col gap-1 overflow-y-auto">
-            {candidates.length === 0 && (
-              <p className="py-6 text-center text-[12.5px] text-ink-muted">
-                {people.length === 0 ? 'Roster is empty.' : 'Everyone matching is already assigned.'}
-              </p>
-            )}
-            {candidates.map((p) => {
-              const on = picked.includes(p.id)
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setPicked(on ? picked.filter((x) => x !== p.id) : [...picked, p.id])}
-                  aria-pressed={on}
-                  aria-label={`Select ${p.name}`}
-                  className="flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left"
-                  style={on ? { borderColor: 'transparent', background: 'var(--color-wash)' } : { borderColor: 'var(--color-hair)' }}
-                >
-                  <span
-                    className="grid h-4.5 w-4.5 shrink-0 place-items-center rounded"
-                    style={on ? { background: 'var(--color-s1)' } : { boxShadow: 'inset 0 0 0 1px var(--color-rule)' }}
-                  >
-                    {on && <IconCheck size={11} stroke={3} color="#fff" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-medium text-ink">{p.name}</span>
-                    <span className="tnum block truncate text-[11px] text-ink-muted">{p.email}</span>
-                  </span>
-                  {p.group && <Badge size="xs" variant="default">{p.group}</Badge>}
-                </button>
-              )
-            })}
-          </div>
-
-          <TextInput
-            size="xs"
-            type="date"
-            label="Due date"
-            description="Optional."
-            className="mt-3"
-            value={due}
-            onChange={(e) => setDue(e.currentTarget.value)}
-          />
-
-          <button
-            onClick={async () => {
-              setNote(invitedNote(await assign(exam.id, picked, dueAt), live))
-              setPicked([])
-            }}
-            disabled={picked.length === 0}
-            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-[13px] font-semibold text-on-brand disabled:opacity-40"
-            style={{ background: 'var(--color-s1)' }}
-          >
-            <IconSend size={15} stroke={2} />
-            Invite {picked.length > 0 ? `${picked.length} ` : ''}
-            {picked.length === 1 ? 'person' : 'people'}
-          </button>
-          {note && (
-            <p role="status" className="mt-2 text-[12px] text-ink-2">
-              {note}
-            </p>
-          )}
-
-          <div className="mt-4 border-t border-hair pt-3">
-            <button
-              onClick={() => setAdhocOpen((o) => !o)}
-              className="inline-flex items-center gap-1.5 text-[12.5px] font-medium"
-              style={{ color: 'var(--color-s1)' }}
-            >
-              <IconMailPlus size={14} stroke={2} /> Invite someone not on the roster
-            </button>
-            <Collapse expanded={adhocOpen} keepMounted={false}>
-              <Textarea
-                className="mt-2.5"
+      {tab === 'people' && (
+        <Panel pad={rows.length === 0}>
+          {rows.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-hair px-4 py-2.5 sm:px-5">
+              <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1">
+                {(['all', 'invited', 'opened', 'started', 'submitted', 'expired'] as const)
+                  .filter((v) => v === 'all' || v !== 'expired' || count('expired') > 0)
+                  .map((v) => {
+                    const on = show === v
+                    const n = v === 'all' ? rows.length : count(v)
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => setShow(v)}
+                        aria-pressed={on}
+                        title={v === 'all' ? undefined : SEEN_HINT[v]}
+                        className="hair inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium"
+                        style={on ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
+                      >
+                        {v !== 'all' && <span className="h-2 w-2 rounded-full" style={{ background: STATUS_DOT[v] }} />}
+                        {v === 'all' ? 'All' : SEEN_LABEL[v]}
+                        <span className="tnum text-ink-muted">{n}</span>
+                      </button>
+                    )
+                  })}
+              </div>
+              <TextInput
                 size="xs"
-                autosize
-                minRows={3}
-                placeholder={'dewi@example.id\nAgus Wibowo <agus@example.id>\nSiti Rahayu, siti@example.id, QA'}
-                value={adhoc}
-                onChange={(e) => setAdhoc(e.currentTarget.value)}
+                className="ml-auto w-full sm:w-[200px]"
+                placeholder="Find a person"
+                aria-label="Find a person"
+                leftSection={<IconSearch size={13} stroke={1.8} />}
+                value={find}
+                onChange={(e) => setFind(e.currentTarget.value)}
               />
-              <p className="mt-1.5 text-[11px] leading-snug text-ink-muted">
-                One per line. New addresses are added to the roster too — an invitation needs a
-                person to hang status and score on.
-              </p>
+            </div>
+          )}
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <p className="text-[12.5px] text-ink-muted">No one invited yet. Each person you invite is emailed their own link.</p>
               <button
-                onClick={async () => {
-                  const r = await assignByEmail(exam.id, adhoc, dueAt)
-                  setNote(invitedNote(r, live))
-                  if (r.invited) setAdhoc('')
-                }}
-                disabled={!adhoc.trim()}
-                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold text-on-brand disabled:opacity-40"
+                onClick={() => { setNote(''); setInviting(true) }}
+                className="inline-flex h-[30px] items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold text-on-brand"
                 style={{ background: 'var(--color-s1)' }}
               >
-                <IconSend size={14} stroke={2} /> Invite by email
+                <IconUserPlus size={14} stroke={2} /> Invite people
               </button>
-              <div className="mt-4 border-t border-hair pt-3">
-                <RosterImport
-                  roster={people}
-                  includeKnown
-                  action="Invite"
-                  onConfirm={async (drafts) => setNote(invitedNote(await assignDrafts(exam.id, drafts, dueAt), live))}
-                />
-              </div>
-            </Collapse>
-          </div>
-        </Panel>
-
-        <Panel
-          title="Invited"
-          hint={rows.length === 0 ? 'No one assigned yet.' : `${rows.length} assigned · ${allItems(exam).length} questions`}
-          actions={
-            live && unsent.length > 0 && (
-              <button
-                onClick={async () => {
-                  const n = await sendInvite(unsent.map((r) => r.id))
-                  setNote(`${n} held ${n === 1 ? 'invitation' : 'invitations'} emailed.`)
-                }}
-                className="hair inline-flex items-center gap-1.5 rounded-md bg-surface px-2.5 py-1 text-[11.5px] font-medium text-ink-2"
-              >
-                <IconSend size={12} stroke={1.9} /> Send {unsent.length} held
-              </button>
-            )
-          }
-          pad={rows.length === 0}
-        >
-          {rows.length === 0 ? (
-            <p className="py-10 text-center text-[12.5px] text-ink-muted">
-              Pick people on the left and invite them. Each is emailed their own link.
-            </p>
+            </div>
+          ) : shown.length === 0 ? (
+            <p className="py-10 text-center text-[12.5px] text-ink-muted">No one here matches.</p>
           ) : isDesktop ? (
             <div className="scroll-thin overflow-x-auto">
               <table className="w-full min-w-[620px] text-left">
@@ -404,7 +555,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => {
+                  {shown.map((r) => {
                     const p = personOf(r.personId)
                     const name = p?.name ?? 'Unknown'
                     const state = linkState(r)
@@ -415,9 +566,19 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                         <td className="px-4 py-3 sm:px-5">
                           <p className="text-[13px] font-medium text-ink">{p?.name ?? 'Unknown'}</p>
                           <p className="tnum text-[11px] text-ink-muted">{p?.email}</p>
+                          {r.status === 'submitted' && !exam.anonymous && (
+                            <button
+                              onClick={() => setAnswersOf(r.id)}
+                              aria-label={`View answers from ${name}`}
+                              className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-medium"
+                              style={{ color: 'var(--color-brand-text)' }}
+                            >
+                              <IconListDetails size={13} stroke={1.9} /> View answers
+                            </button>
+                          )}
                         </td>
                         <td className="px-3 py-3">
-                          <StatusPill status={r.status} />
+                          <StatusPill status={seen(r)} />
                           <LinkLine a={r} />
                         </td>
                         <td className="tnum px-3 py-3 text-[12px] text-ink-muted">v{r.examVersion}</td>
@@ -506,7 +667,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
             </div>
           ) : (
             <div className="flex flex-col gap-2 p-4">
-              {rows.map((r) => {
+              {shown.map((r) => {
                 const p = personOf(r.personId)
                 return (
                   <div key={r.id} className="hair rounded-xl bg-surface p-3.5">
@@ -515,7 +676,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                         <p className="truncate text-[13.5px] font-medium text-ink">{p?.name}</p>
                         <p className="tnum truncate text-[11.5px] text-ink-muted">{p?.email}</p>
                       </div>
-                      <StatusPill status={r.status} />
+                      <StatusPill status={seen(r)} />
                     </div>
                     <LinkLine a={r} />
                     <details className="mt-1.5">
@@ -528,6 +689,15 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                       <p className="tnum mt-1.5 text-[12px]" style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
                         {r.scorePct}% · {r.passed ? 'lulus' : 'belum lulus'}
                       </p>
+                    )}
+                    {r.status === 'submitted' && !exam.anonymous && (
+                      <button
+                        onClick={() => setAnswersOf(r.id)}
+                        aria-label={`View answers from ${p?.name}`}
+                        className="hair mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2"
+                      >
+                        <IconListDetails size={12} stroke={1.9} /> View answers
+                      </button>
                     )}
                     <div className="mt-2.5 flex items-center gap-2">
                       <button
@@ -554,19 +724,14 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
             </div>
           )}
         </Panel>
-      </div>
+      )}
 
-      {!CORE && (
-      <Panel
-        className="mt-4"
-        title={
-          <span className="inline-flex items-center gap-1.5">
-            <IconInbox size={14} stroke={1.9} className="text-ink-muted" /> Outbox — prototype stand-in for email
-          </span>
-        }
-        hint="No mail is sent yet. This lists what would have gone out, and it is the only place a link or a code can be read: the assignment keeps a hash, not the link. With a mail provider this panel goes away."
-        pad={mails.length === 0}
-      >
+      {tab === 'outbox' && !CORE && (
+        <Panel
+          hint="No mail is sent yet. This lists what would have gone out, and it is the only place a link or a code can be read: the assignment keeps a hash, not the link. With a mail provider this tab goes away."
+          title="What would have been emailed"
+          pad={mails.length === 0}
+        >
         {mails.length === 0 ? (
           <p className="py-4 text-center text-[12.5px] text-ink-muted">Nothing sent for this instrument yet.</p>
         ) : (
@@ -592,8 +757,174 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
             ))}
           </ul>
         )}
-      </Panel>
+        </Panel>
       )}
+
+      <Drawer
+        opened={!!answersOf}
+        onClose={() => setAnswersOf('')}
+        position="right"
+        size="lg"
+        title={
+          <span className="text-[14px] font-semibold">
+            Answers · {personOf(rows.find((r) => r.id === answersOf)?.personId ?? '')?.name ?? ''}
+          </span>
+        }
+      >
+        {exam && rows.find((r) => r.id === answersOf) && (
+          <CandidateAnswers exam={exam} a={rows.find((r) => r.id === answersOf)!} />
+        )}
+      </Drawer>
+
+      <Drawer
+        opened={inviting}
+        onClose={() => setInviting(false)}
+        position="right"
+        size="md"
+        title={<span className="text-[14px] font-semibold">Invite people</span>}
+      >
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <p className="text-[12px] text-ink-muted">{candidates.length} on the roster not yet invited</p>
+          {candidates.length > 0 && (
+            <button
+              onClick={() => setPicked(picked.length === candidates.length ? [] : candidates.map((c) => c.id))}
+              className="text-[11.5px] font-medium"
+              style={{ color: 'var(--color-s1)' }}
+            >
+              {picked.length === candidates.length ? 'Clear' : 'Select all'}
+            </button>
+          )}
+        </div>
+          <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
+            {(['all', ...groups] as string[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGroup(g)}
+                className="hair rounded-md bg-surface px-2 py-1 text-[11.5px] font-medium"
+                style={group === g ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
+              >
+                {g === 'all' ? 'All' : g}
+              </button>
+            ))}
+          </div>
+          <TextInput
+            size="xs"
+            placeholder="Search roster"
+            leftSection={<IconSearch size={13} stroke={1.8} />}
+            value={q}
+            onChange={(e) => setQ(e.currentTarget.value)}
+          />
+
+          <div className="scroll-thin mt-2.5 flex max-h-[calc(100dvh-360px)] min-h-[160px] flex-col gap-1 overflow-y-auto">
+            {candidates.length === 0 && (
+              <p className="py-6 text-center text-[12.5px] text-ink-muted">
+                {people.length === 0 ? 'Roster is empty.' : 'Everyone matching is already assigned.'}
+              </p>
+            )}
+            {candidates.map((p) => {
+              const on = picked.includes(p.id)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setPicked(on ? picked.filter((x) => x !== p.id) : [...picked, p.id])}
+                  aria-pressed={on}
+                  aria-label={`Select ${p.name}`}
+                  className="flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left"
+                  style={on ? { borderColor: 'transparent', background: 'var(--color-wash)' } : { borderColor: 'var(--color-hair)' }}
+                >
+                  <span
+                    className="grid h-4.5 w-4.5 shrink-0 place-items-center rounded"
+                    style={on ? { background: 'var(--color-s1)' } : { boxShadow: 'inset 0 0 0 1px var(--color-rule)' }}
+                  >
+                    {on && <IconCheck size={11} stroke={3} color="#fff" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12.5px] font-medium text-ink">{p.name}</span>
+                    <span className="tnum block truncate text-[11px] text-ink-muted">{p.email}</span>
+                  </span>
+                  {p.group && <Badge size="xs" variant="default">{p.group}</Badge>}
+                </button>
+              )
+            })}
+          </div>
+
+          <TextInput
+            size="xs"
+            type="date"
+            label="Due date"
+            description="Optional."
+            className="mt-3"
+            value={due}
+            onChange={(e) => setDue(e.currentTarget.value)}
+          />
+
+          <button
+            onClick={async () => {
+              const r = await assign(exam.id, picked, dueAt)
+              invited(invitedNote(r, live), r.invited > 0)
+              setPicked([])
+            }}
+            disabled={picked.length === 0}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-[13px] font-semibold text-on-brand disabled:opacity-40"
+            style={{ background: 'var(--color-s1)' }}
+          >
+            <IconSend size={15} stroke={2} />
+            Invite {picked.length > 0 ? `${picked.length} ` : ''}
+            {picked.length === 1 ? 'person' : 'people'}
+          </button>
+          {note && (
+            <p role="status" className="mt-2 text-[12px] text-ink-2">
+              {note}
+            </p>
+          )}
+          <div className="mt-4 border-t border-hair pt-3">
+            <button
+              onClick={() => setAdhocOpen((o) => !o)}
+              className="inline-flex items-center gap-1.5 text-[12.5px] font-medium"
+              style={{ color: 'var(--color-s1)' }}
+            >
+              <IconMailPlus size={14} stroke={2} /> Invite someone not on the roster
+            </button>
+            <Collapse expanded={adhocOpen} keepMounted={false}>
+              <Textarea
+                className="mt-2.5"
+                size="xs"
+                autosize
+                minRows={3}
+                placeholder={'dewi@example.id\nAgus Wibowo <agus@example.id>\nSiti Rahayu, siti@example.id, QA'}
+                value={adhoc}
+                onChange={(e) => setAdhoc(e.currentTarget.value)}
+              />
+              <p className="mt-1.5 text-[11px] leading-snug text-ink-muted">
+                One per line. New addresses are added to the roster too — an invitation needs a
+                person to hang status and score on.
+              </p>
+              <button
+                onClick={async () => {
+                  const r = await assignByEmail(exam.id, adhoc, dueAt)
+                  invited(invitedNote(r, live), r.invited > 0)
+                  if (r.invited) setAdhoc('')
+                }}
+                disabled={!adhoc.trim()}
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[12.5px] font-semibold text-on-brand disabled:opacity-40"
+                style={{ background: 'var(--color-s1)' }}
+              >
+                <IconSend size={14} stroke={2} /> Invite by email
+              </button>
+              <div className="mt-4 border-t border-hair pt-3">
+                <RosterImport
+                  roster={people}
+                  includeKnown
+                  action="Invite"
+                  onConfirm={async (drafts) => {
+                    const r = await assignDrafts(exam.id, drafts, dueAt)
+                    invited(invitedNote(r, live), r.invited > 0)
+                  }}
+                />
+              </div>
+            </Collapse>
+          </div>
+      </Drawer>
     </div>
   )
 }

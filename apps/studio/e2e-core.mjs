@@ -461,9 +461,19 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(500)
-  ;(await page.getByText('Submitted').count()) && (await page.getByText(/^100%$/).count())
+  // "Assign people" opens the invite panel; close it to read the table.
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  ;(await page.getByText('Completed').count()) && (await page.getByText(/^100%$/).count())
     ? ok('the score lands on the assignment row')
     : bad('the assignment did not show the submitted score')
+  await page.getByRole('button', { name: 'View answers from Kandidat Uji' }).click()
+  await page.getByRole('dialog').getByText(/^Correct$/).first().waitFor({ timeout: 8000 }).then(
+    () => ok("the candidate's answers are read back from the server, question by question"),
+    async () => bad(`the answer sheet did not load: ${(await page.getByRole('dialog').innerText()).slice(0, 120)}`),
+  )
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 
   /* ---------------- scoring: the worker's item analysis ---------------- */
   await nav(/Scoring/)
@@ -489,6 +499,8 @@ try {
   await page.waitForTimeout(250)
   await page.getByRole('menuitem', { name: /Assign people/ }).click()
   await page.waitForTimeout(500)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
   const revoke = page.getByRole('button', { name: /Revoke invitation for Kandidat Uji/ })
   ;(await revoke.count()) === 0 || (await revoke.first().isDisabled())
     ? ok('a submitted invitation cannot be revoked')
@@ -526,7 +538,7 @@ try {
     await p.waitForTimeout(300)
     if (await p.getByRole('button', { name: /Setuju dan lanjut/ }).count()) await p.getByRole('button', { name: /Setuju dan lanjut/ }).click()
     await p.waitForTimeout(300)
-    await p.getByRole('button', { name: /Mulai sekarang/ }).click()
+    if (await p.getByRole('button', { name: /Mulai sekarang/ }).count()) await p.getByRole('button', { name: /Mulai sekarang/ }).click()
     await p.waitForTimeout(600)
     // A wrong answer reaches the server while the network is up...
     await p.locator('main button[aria-pressed]', { hasText: 'panic' }).first().click()
