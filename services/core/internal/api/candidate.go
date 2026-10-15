@@ -469,6 +469,9 @@ func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Reques
 			a.ID, int16(v1.AssignStatus_ASSIGN_STATUS_STARTED), now); err != nil {
 			return err
 		}
+		if err := s.emit(ctx, tx, EventAttemptStarted, att.PersonID, attemptData(att, nil)); err != nil {
+			return err
+		}
 		out, err = s.attemptProto(att, nil, false)
 		return err
 	})
@@ -673,6 +676,15 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		}
 		if _, err := tx.Exec(ctx, `UPDATE assignments SET status = $2, submitted_at = $3 WHERE id = $1`,
 			att.AssignmentID, int16(v1.AssignStatus_ASSIGN_STATUS_SUBMITTED), now); err != nil {
+			return err
+		}
+		// Before the credential, so a receiver hears of the result first.
+		att.SubmittedAt = &now
+		typ := EventAttemptSubmitted
+		if force {
+			typ = EventAttemptExpired
+		}
+		if err := s.emit(ctx, tx, typ, att.PersonID, attemptData(att, score)); err != nil {
 			return err
 		}
 		if score != nil {

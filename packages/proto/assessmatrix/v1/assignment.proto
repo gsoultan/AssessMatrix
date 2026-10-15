@@ -62,6 +62,8 @@ message Assignment {
   int32 otp_sends = 17;
   int32 self_serves = 18;
   repeated InviteEvent history = 19;
+  // 1 for a person's first sitting of this instrument, 2 for the next, and so on.
+  int32 sitting = 20;
 }
 
 service AssignmentService {
@@ -91,6 +93,8 @@ message AssignPeopleRequest {
   repeated string person_ids = 2;
   // 0 for no due date.
   int64 due_at = 3;
+  // The published version to sit; 0 for the live one (the working one for a draft).
+  int32 exam_version = 4;
 }
 
 message AssignPeopleResponse {

@@ -140,6 +140,9 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		if err := storeScore(ctx, tx, att, e, answers, reviews, out.Score); err != nil {
 			return err
 		}
+		if err := s.emit(ctx, tx, EventAttemptScored, att.PersonID, attemptData(att, out.Score)); err != nil {
+			return err
+		}
 		cred, err := s.settleCredential(ctx, tx, att, e, out.Score)
 		if err != nil {
 			return err

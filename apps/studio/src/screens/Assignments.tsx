@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { TextInput, Textarea, Badge, Tooltip, Collapse, Drawer } from '@mantine/core'
+import { TextInput, Textarea, Badge, Tooltip, Collapse, Drawer, Select } from '@mantine/core'
 import {
   IconSend,
   IconCheck,
@@ -22,11 +22,12 @@ import { AnswerSheet } from '../components/AnswerSheet'
 import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { RosterImport } from '../components/RosterImport'
-import { type LinkState, EVENT_LABEL, linkState, listOutbox } from '../invite'
+import { type LinkState, EVENT_LABEL, linkState, listOutbox, sittingClosed } from '../invite'
 import {
   type AssignStatus,
   type Assignment,
   type Exam,
+  type ExamVersion,
   KINDS,
   allItems,
   getAttempt,
@@ -45,6 +46,7 @@ const OPENED_KINDS = new Set(['link.opened', 'code.sent', 'code.wrong', 'link.re
 
 function seen(a: Assignment): Seen {
   if (a.status !== 'invited') return a.status
+  if (linkState(a) === 'expired') return 'expired'
   const since = a.sentAt ?? 0
   return a.redeemedAt || a.history.some((h) => OPENED_KINDS.has(h.kind) && h.t >= since) ? 'opened' : 'invited'
 }
@@ -62,7 +64,7 @@ const SEEN_HINT: Record<Seen, string> = {
   opened: 'Opened the link, but has not started the test',
   started: 'Started the test and has not handed it in yet',
   submitted: 'Handed in',
-  expired: 'The link ran out before they finished',
+  expired: 'The link ran out before it was used. You can invite them again',
 }
 
 const STATUS_STYLE: Record<Seen, { bg: string; fg: string }> = {
@@ -321,24 +323,45 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
     () => (exam ? assignments.filter((a) => a.examId === exam.id) : []),
     [assignments, exam],
   )
-  const assignedIds = new Set(rows.map((r) => r.personId))
+  // Each person's latest sitting: they can be invited again only once it is closed.
+  const lastOf = useMemo(() => {
+    const m = new Map<string, Assignment>()
+    for (const r of rows) if ((m.get(r.personId)?.sitting ?? 0) < r.sitting) m.set(r.personId, r)
+    return m
+  }, [rows])
   const personOf = (id: string) => people.find((p) => p.id === id)
 
   const groups = useMemo(() => [...new Set(people.map((p) => p.group).filter(Boolean))].sort(), [people])
   const candidates = useMemo(
     () =>
       people
-        .filter((p) => !assignedIds.has(p.id))
+        .filter((p) => !lastOf.has(p.id) || sittingClosed(lastOf.get(p.id)!))
         .filter((p) => group === 'all' || p.group === group)
         .filter((p) => {
           const t = q.trim().toLowerCase()
           return !t || p.name.toLowerCase().includes(t) || p.email.toLowerCase().includes(t)
         }),
-    [people, assignedIds, group, q],
+    [people, lastOf, group, q],
   )
 
   const live = exam?.status === 'published'
   const dueAt = due ? new Date(due).getTime() : undefined
+  // Frozen versions a new sitting can be given; '' is the live one.
+  const [versions, setVersions] = useState<ExamVersion[]>([])
+  const [pickVersion, setPickVersion] = useState('')
+  const examVersion = pickVersion ? Number(pickVersion) : undefined
+  const listVersions = useApp((s) => s.listVersions)
+  const shownId = exam?.id
+  const published = exam?.publishedVersion
+  useEffect(() => {
+    setPickVersion('')
+    if (!inviting || !shownId || !published) return setVersions([])
+    let live = true
+    listVersions(shownId).then((vs) => live && setVersions(vs.filter((v) => v.version <= published)))
+    return () => {
+      live = false
+    }
+  }, [inviting, shownId, published, listVersions])
   const unsent = rows.filter((r) => linkState(r) === 'unsent' && r.status !== 'submitted')
   // Every send writes an assignment, so this re-reads exactly when there is something new.
   const mails = useMemo(() => {
@@ -353,7 +376,11 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   }
 
   const count = (s: Seen) => rows.filter((r) => seen(r) === s).length
-  const shown = rows.filter(
+  // A person's sittings sit together, in order, where their first one was.
+  const firstAt = new Map<string, number>()
+  rows.forEach((r, i) => firstAt.has(r.personId) || firstAt.set(r.personId, i))
+  const multi = (r: Assignment) => (lastOf.get(r.personId)?.sitting ?? 1) > 1
+  const shown = [...rows].sort((a, b) => firstAt.get(a.personId)! - firstAt.get(b.personId)! || a.sitting - b.sitting).filter(
     (r) =>
       (show === 'all' || seen(r) === show) &&
       (() => {
@@ -557,7 +584,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                 <tbody>
                   {shown.map((r) => {
                     const p = personOf(r.personId)
-                    const name = p?.name ?? 'Unknown'
+                    const name = `${p?.name ?? 'Unknown'}${r.sitting > 1 ? ` (sitting ${r.sitting})` : ''}`
                     const state = linkState(r)
                     const cols = isScored(exam) ? 7 : 6
                     return (
@@ -581,7 +608,10 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                           <StatusPill status={seen(r)} />
                           <LinkLine a={r} />
                         </td>
-                        <td className="tnum px-3 py-3 text-[12px] text-ink-muted">v{r.examVersion}</td>
+                        <td className="tnum px-3 py-3 text-[12px] text-ink-muted">
+                          v{r.examVersion}
+                          {multi(r) && <span className="block text-[11px]">Sitting {r.sitting}</span>}
+                        </td>
                         <td className="tnum px-3 py-3 text-[12px] text-ink-2">{when(r.startedAt)}</td>
                         <td className="tnum px-3 py-3 text-[12px] text-ink-2">{when(r.submittedAt)}</td>
                         {isScored(exam) && (
@@ -645,7 +675,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                               </Tooltip>
                             )}
                             <Tooltip label="Remove the assignment and its history" withArrow>
-                              <button onClick={() => unassignOne(r.id)} aria-label={`Unassign ${p?.name}`} className="hair grid h-7 w-7 place-items-center rounded-md bg-surface">
+                              <button onClick={() => unassignOne(r.id)} aria-label={`Unassign ${name}`} className="hair grid h-7 w-7 place-items-center rounded-md bg-surface">
                                 <IconTrash size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
                               </button>
                             </Tooltip>
@@ -674,7 +704,10 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-[13.5px] font-medium text-ink">{p?.name}</p>
-                        <p className="tnum truncate text-[11.5px] text-ink-muted">{p?.email}</p>
+                        <p className="tnum truncate text-[11.5px] text-ink-muted">
+                          {p?.email} · v{r.examVersion}
+                          {multi(r) ? ` · sitting ${r.sitting}` : ''}
+                        </p>
                       </div>
                       <StatusPill status={seen(r)} />
                     </div>
@@ -784,7 +817,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
         title={<span className="text-[14px] font-semibold">Invite people</span>}
       >
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <p className="text-[12px] text-ink-muted">{candidates.length} on the roster not yet invited</p>
+          <p className="text-[12px] text-ink-muted">{candidates.length} on the roster can be invited</p>
           {candidates.length > 0 && (
             <button
               onClick={() => setPicked(picked.length === candidates.length ? [] : candidates.map((c) => c.id))}
@@ -818,7 +851,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
           <div className="scroll-thin mt-2.5 flex max-h-[calc(100dvh-360px)] min-h-[160px] flex-col gap-1 overflow-y-auto">
             {candidates.length === 0 && (
               <p className="py-6 text-center text-[12.5px] text-ink-muted">
-                {people.length === 0 ? 'Roster is empty.' : 'Everyone matching is already assigned.'}
+                {people.length === 0 ? 'Roster is empty.' : 'Everyone matching already has an open invitation.'}
               </p>
             )}
             {candidates.map((p) => {
@@ -841,12 +874,33 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12.5px] font-medium text-ink">{p.name}</span>
                     <span className="tnum block truncate text-[11px] text-ink-muted">{p.email}</span>
+                    {lastOf.has(p.id) && (
+                      <span className="block truncate text-[11px]" style={{ color: 'var(--color-brand-text)' }}>
+                        Sitting {lastOf.get(p.id)!.sitting + 1} · last one {SEEN_LABEL[seen(lastOf.get(p.id)!)].toLowerCase()}
+                      </span>
+                    )}
                   </span>
                   {p.group && <Badge size="xs" variant="default">{p.group}</Badge>}
                 </button>
               )
             })}
           </div>
+
+          {versions.length > 1 && (
+            <Select
+              size="xs"
+              label="Version"
+              description="Earlier versions stay available for a new sitting."
+              className="mt-3"
+              allowDeselect={false}
+              value={pickVersion}
+              onChange={(v) => setPickVersion(v ?? '')}
+              data={versions.map((v) => ({
+                value: v.version === exam.publishedVersion ? '' : String(v.version),
+                label: `v${v.version}${v.version === exam.publishedVersion ? ' · live' : ''} · published ${when(v.publishedAt)}`,
+              }))}
+            />
+          )}
 
           <TextInput
             size="xs"
@@ -860,7 +914,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
 
           <button
             onClick={async () => {
-              const r = await assign(exam.id, picked, dueAt)
+              const r = await assign(exam.id, picked, dueAt, examVersion)
               invited(invitedNote(r, live), r.invited > 0)
               setPicked([])
             }}
@@ -901,7 +955,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
               </p>
               <button
                 onClick={async () => {
-                  const r = await assignByEmail(exam.id, adhoc, dueAt)
+                  const r = await assignByEmail(exam.id, adhoc, dueAt, examVersion)
                   invited(invitedNote(r, live), r.invited > 0)
                   if (r.invited) setAdhoc('')
                 }}
@@ -917,7 +971,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                   includeKnown
                   action="Invite"
                   onConfirm={async (drafts) => {
-                    const r = await assignDrafts(exam.id, drafts, dueAt)
+                    const r = await assignDrafts(exam.id, drafts, dueAt, examVersion)
                     invited(invitedNote(r, live), r.invited > 0)
                   }}
                 />

@@ -335,6 +335,11 @@ func (s *examService) SetExamStatus(ctx context.Context, req *connect.Request[v1
 			if err := snapshot(ctx, tx, out, "published"); err != nil {
 				return err
 			}
+			if err := s.emit(ctx, tx, EventExamPublished, "", map[string]any{
+				"exam_id": out.GetId(), "version": out.GetPublishedVersion(), "kind": out.GetKind().String(), "title": out.GetTitle(),
+			}); err != nil {
+				return err
+			}
 		}
 		return audit(ctx, tx, "exam.status", out.GetId(), map[string]any{"status": status.String(), "version": out.GetVersion()})
 	})

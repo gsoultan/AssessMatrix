@@ -120,6 +120,9 @@ func (s *Server) PurgeDue(ctx context.Context) (purged int, err error) {
 	if _, err := s.DB.Pool.Exec(ctx, `SELECT am_outbox_sweep($1)`, now.Add(-OutboxKeep)); err != nil {
 		return purged, err
 	}
+	if _, err := s.DB.Pool.Exec(ctx, `SELECT am_webhook_sweep($1)`, now.Add(-WebhookKeep)); err != nil {
+		return purged, err
+	}
 	return purged, nil
 }
 
@@ -203,6 +206,11 @@ func (s *personService) ErasePerson(ctx context.Context, req *connect.Request[v1
 		}
 		// Mail to them, and the person with their invitations.
 		if _, err := tx.Exec(ctx, `DELETE FROM outbox WHERE lower(to_addr) = lower($1)`, email); err != nil {
+			return err
+		}
+		// Webhook events about them, with their deliveries (ids only, but
+		// the id of an erased person should not outlive them here).
+		if _, err := tx.Exec(ctx, `DELETE FROM webhook_events WHERE person_id = $1`, id); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM people WHERE id = $1`, id); err != nil {

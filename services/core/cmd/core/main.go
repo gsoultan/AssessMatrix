@@ -36,6 +36,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
 // version is set at build time (deploy/Dockerfile).
@@ -164,10 +165,13 @@ func serve(ctx context.Context, log *slog.Logger) error {
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &mail.Worker{DB: database, Sender: sender})
+	hooks := webhook.Policy{AllowPrivate: cfg.WebhookAllowPrivate}
+	river.AddWorker(workers, &webhook.Worker{DB: database, Keys: keys, Client: webhook.NewClient(hooks)})
 	retention := &api.RetentionWorker{}
 	river.AddWorker(workers, retention)
 	jobs, err := river.NewClient(riverpgxv5.New(database.Pool), &river.Config{
-		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 10}},
+		// Webhooks have their own queue: a slow receiver never delays mail.
+		Queues:  map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: 10}, webhook.Queue: {MaxWorkers: 20}},
 		Workers: workers,
 		Logger:  log,
 		// Records past their retention period go within the hour (docs/13).
@@ -186,7 +190,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
-		Media: media.Regional{Store: store, Region: cfg.Media.Region}}
+		Media: media.Regional{Store: store, Region: cfg.Media.Region}, WebhookPolicy: hooks}
 	retention.Server = srv
 	if err := jobs.Start(ctx); err != nil {
 		return err

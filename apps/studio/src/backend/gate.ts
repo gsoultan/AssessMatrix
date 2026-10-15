@@ -128,6 +128,8 @@ const core: Gate = {
       examId: exam.id,
       examVersion: exam.version,
       personId: '',
+      // The candidate's seat needs no sitting number; staff screens read it.
+      sitting: 1,
       assignedAt: 0,
       status: attempt?.submittedAt ? 'submitted' : attempt ? 'started' : 'invited',
       expiresAt: Number(inv?.expiresAt ?? 0) || undefined,

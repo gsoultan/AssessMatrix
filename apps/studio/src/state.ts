@@ -10,6 +10,7 @@ import {
   type Person,
   type Assignment,
   type PersonDraft,
+  type ExamVersion,
   addResponse,
   allItems,
   append,
@@ -120,6 +121,8 @@ type AppState = {
   /** Hard delete. Only reachable from the archive, never from the main list. */
   destroyExam: (id: string) => Promise<void>
   loadResponses: (examId: string) => Promise<void>
+  /** Every frozen version of an instrument, newest first. */
+  listVersions: (examId: string) => Promise<ExamVersion[]>
   clearResponsesFor: (examId: string) => void
 
   /* ---- people and assignment ---- */
@@ -136,11 +139,11 @@ type AppState = {
    * Assign, and email each new assignee their link. `sent` is 0 for a draft:
    * an invitation to something that cannot be opened is held, not mailed.
    */
-  assign: (examId: string, personIds: string[], dueAt?: number) => Promise<Invited>
+  assign: (examId: string, personIds: string[], dueAt?: number, examVersion?: number) => Promise<Invited>
   /** Invite addresses that may not be on the roster; new ones are added to it. */
-  assignByEmail: (examId: string, text: string, dueAt?: number) => Promise<Invited>
+  assignByEmail: (examId: string, text: string, dueAt?: number, examVersion?: number) => Promise<Invited>
   /** The same, for people read from a file. */
-  assignDrafts: (examId: string, drafts: PersonDraft[], dueAt?: number) => Promise<Invited>
+  assignDrafts: (examId: string, drafts: PersonDraft[], dueAt?: number, examVersion?: number) => Promise<Invited>
   unassignOne: (id: string) => Promise<void>
   /** Mint and mail a new link, retiring the old one. Returns how many went out. */
   sendInvite: (assignmentIds: string[]) => Promise<number>
@@ -382,19 +385,19 @@ export const useApp = create<AppState>((set, get) => {
         return true
       }),
 
-    assign: (examId, personIds, dueAt) =>
+    assign: (examId, personIds, dueAt, examVersion) =>
       run({ invited: 0, created: 0, sent: 0 }, async () => {
-        const r = await repo.assign(examId, personIds, dueAt)
+        const r = await repo.assign(examId, personIds, dueAt, examVersion)
         await refreshDelivery()
         return { ...r, created: 0 }
       }),
 
-    assignByEmail: async (examId, text, dueAt) => get().assignDrafts(examId, parsePeopleText(text), dueAt),
+    assignByEmail: async (examId, text, dueAt, examVersion) => get().assignDrafts(examId, parsePeopleText(text), dueAt, examVersion),
 
-    assignDrafts: (examId, drafts, dueAt) =>
+    assignDrafts: (examId, drafts, dueAt, examVersion) =>
       run({ invited: 0, created: 0, sent: 0 }, async () => {
         const { ids, created } = await repo.ensurePeople(drafts)
-        const r = await repo.assign(examId, ids, dueAt)
+        const r = await repo.assign(examId, ids, dueAt, examVersion)
         await refreshDelivery()
         return { ...r, created }
       }),
@@ -506,6 +509,8 @@ export const useApp = create<AppState>((set, get) => {
         putExam(copy)
         return copy
       }),
+
+    listVersions: (examId) => run([], () => repo.listVersions(examId)),
 
     loadResponses: (examId) =>
       run(undefined, async () => {

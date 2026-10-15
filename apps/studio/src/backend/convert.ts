@@ -217,6 +217,7 @@ export const assignmentIn = (a: as.Assignment): Assignment => ({
   examId: a.examId,
   examVersion: a.examVersion,
   personId: a.personId,
+  sitting: a.sitting || 1,
   assignedAt: n(a.assignedAt),
   dueAt: opt(a.dueAt),
   status: assignStatus.in(a.status),

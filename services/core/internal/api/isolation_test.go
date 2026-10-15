@@ -75,6 +75,11 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 	p2 := get(a.people.AddPerson(ctx, connect.NewRequest(&v1.AddPersonRequest{Person: &v1.PersonDraft{Email: "solo@example.test"}}))).Msg.GetPerson()
 	as2 := get(a.assign.AssignPeople(ctx, connect.NewRequest(&v1.AssignPeopleRequest{ExamId: e2.GetId(), PersonIds: []string{p2.GetId()}}))).Msg.GetAssignments()[0]
 
+	// A webhook in A, with one delivery, that B will try to reach.
+	hookA := get(a.hooks.CreateWebhook(ctx, connect.NewRequest(&v1.CreateWebhookRequest{
+		Url: "https://hooks.alpha.example/am", Events: []string{EventAttemptSubmitted}}))).Msg.GetEndpoint()
+	pingA := get(a.hooks.PingWebhook(ctx, connect.NewRequest(&v1.PingWebhookRequest{Id: hookA.GetId()}))).Msg.GetDelivery()
+
 	denied := func(name string, err error) {
 		t.Helper()
 		if c := connect.CodeOf(err); c != connect.CodeNotFound {
@@ -229,6 +234,48 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 				Events: []*v1.AttemptEvent{{Kind: "response.changed", ItemId: "q1", Values: []string{"a"}}}}))
 			denied("AppendEvents", err)
 		},
+		"/assessmatrix.v1.WebhookService/ListWebhooks": func() {
+			for _, e := range get(b.hooks.ListWebhooks(ctx, connect.NewRequest(&v1.ListWebhooksRequest{}))).Msg.GetEndpoints() {
+				if e.GetId() == hookA.GetId() {
+					t.Error("ListWebhooks: B sees A's webhook")
+				}
+			}
+		},
+		"/assessmatrix.v1.WebhookService/CreateWebhook": func() {
+			get(b.hooks.CreateWebhook(ctx, connect.NewRequest(&v1.CreateWebhookRequest{
+				Url: "https://hooks.beta.example/am", Events: []string{EventAttemptSubmitted}})))
+			if n := len(get(a.hooks.ListWebhooks(ctx, connect.NewRequest(&v1.ListWebhooksRequest{}))).Msg.GetEndpoints()); n != 1 {
+				t.Errorf("CreateWebhook: A has %d webhooks after B created one", n)
+			}
+		},
+		"/assessmatrix.v1.WebhookService/UpdateWebhook": func() {
+			_, err := b.hooks.UpdateWebhook(ctx, connect.NewRequest(&v1.UpdateWebhookRequest{Id: hookA.GetId(),
+				Url: "https://evil.example/steal", Events: []string{EventAttemptSubmitted}, Active: true}))
+			denied("UpdateWebhook", err)
+		},
+		"/assessmatrix.v1.WebhookService/RotateWebhookSecret": func() {
+			_, err := b.hooks.RotateWebhookSecret(ctx, connect.NewRequest(&v1.RotateWebhookSecretRequest{Id: hookA.GetId()}))
+			denied("RotateWebhookSecret", err)
+		},
+		"/assessmatrix.v1.WebhookService/DeleteWebhook": func() {
+			_, err := b.hooks.DeleteWebhook(ctx, connect.NewRequest(&v1.DeleteWebhookRequest{Id: hookA.GetId()}))
+			denied("DeleteWebhook", err)
+		},
+		"/assessmatrix.v1.WebhookService/ListDeliveries": func() {
+			for _, req := range []*v1.ListDeliveriesRequest{{}, {EndpointId: hookA.GetId()}} {
+				if n := len(get(b.hooks.ListDeliveries(ctx, connect.NewRequest(req))).Msg.GetDeliveries()); n != 0 {
+					t.Errorf("ListDeliveries: B sees %d of A's deliveries", n)
+				}
+			}
+		},
+		"/assessmatrix.v1.WebhookService/Redeliver": func() {
+			_, err := b.hooks.Redeliver(ctx, connect.NewRequest(&v1.RedeliverRequest{DeliveryId: pingA.GetId()}))
+			denied("Redeliver", err)
+		},
+		"/assessmatrix.v1.WebhookService/PingWebhook": func() {
+			_, err := b.hooks.PingWebhook(ctx, connect.NewRequest(&v1.PingWebhookRequest{Id: hookA.GetId()}))
+			denied("PingWebhook", err)
+		},
 		"/assessmatrix.v1.CandidateService/SubmitAttempt": func() {
 			_, err := candB.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: attA.GetId()}))
 			denied("SubmitAttempt", err)
@@ -259,6 +306,10 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 	if !log.Msg.GetChainIntact() {
 		t.Error("A's attempt log no longer verifies")
 	}
+	if r := get(a.hooks.ListWebhooks(ctx, connect.NewRequest(&v1.ListWebhooksRequest{}))); len(r.Msg.GetEndpoints()) != 1 ||
+		r.Msg.GetEndpoints()[0].GetUrl() != hookA.GetUrl() || r.Msg.GetEndpoints()[0].GetSecretHint() != hookA.GetSecretHint() {
+		t.Error("A's webhook was changed by B")
+	}
 }
 
 // Without a tenant set, the application role sees no rows at all: a query
@@ -267,7 +318,8 @@ func TestNoTenantSeesNothing(t *testing.T) {
 	h := newHarness(t)
 	h.publishedFixture(h.tenant("Visible"))
 	ctx := context.Background()
-	for _, table := range []string{"tenants", "staff", "exams", "people", "assignments", "attempts", "attempt_events", "outbox", "audit_log"} {
+	for _, table := range []string{"tenants", "staff", "exams", "people", "assignments", "attempts", "attempt_events", "outbox", "audit_log",
+		"webhook_endpoints", "webhook_events", "webhook_deliveries"} {
 		var n int
 		err := h.srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
 			return tx.QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()).Scan(&n)
