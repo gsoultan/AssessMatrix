@@ -5,3 +5,4 @@ dist/
 .serena/
 .vite/
 .env
+.dev/

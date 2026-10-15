@@ -1,14 +1,20 @@
 # AssessMatrix — run `make` to see everything available.
 .DEFAULT_GOAL := help
-.PHONY: help dev check build preview e2e e2e-core load clean core-test proto
+.PHONY: help up down dev check build preview e2e e2e-core load clean core-test proto
 
 help: ## Show this help
 	@echo "AssessMatrix"
 	@echo
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1m%-9s\033[0m %s\n", $$1, $$2}'
+	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[1m%-10s\033[0m %s\n", $$1, $$2}'
 	@echo
 	@echo "  Override the port with:  PORT=3000 make dev"
+
+up: ## Everything: Postgres, migrations, a demo admin, the core and the web apps, hot reload
+	@./scripts/up.sh
+
+down: ## Stop the Postgres that `make up` started (RESET=1 also wipes its data)
+	@./scripts/down.sh
 
 dev: ## Start the UI on http://localhost:5180
 	@./scripts/dev.sh
