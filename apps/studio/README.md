@@ -168,6 +168,21 @@ copy is what candidates actually get.
   version it was issued against. Editing the working copy cannot rewrite the paper underneath
   someone who is mid-exam. The assignment table shows which version each invitation opens.
 - The Library shows `v2 live · v3 draft` when the working copy has moved ahead.
+- **Versions** in a Library card's menu lists every published version, newest first, with the
+  live one marked. Each can be read question by question, and any but the one being edited can be
+  brought back with **Restore as draft**: its content becomes the next working draft, and
+  candidates keep getting the live version until it is published.
+- A new sitting can be given an **earlier published version**: the invite panel has a Version
+  picker when there is more than one. A working draft can never be sat.
+
+## Sittings
+
+A person has **one open sitting per instrument**. Once it is closed (handed in, or its link ran
+out before it was used), inviting them again adds **sitting 2**: its own row, link, attempt and
+score, on the version picked. Earlier sittings and their answers are never touched. A revoked or
+unsent invitation is still open; resend it instead. The core enforces the same rule under a row
+lock on the latest sitting (`services/core/internal/api/assignments.go`), with a unique key on
+`(exam, person, sitting)` for two requests racing.
 
 This closes the gap the live-edit warning used to only *describe*.
 

@@ -9,7 +9,7 @@ import { ConnectError, Code } from '@connectrpc/connect'
 import { api } from '../api/client'
 import * as store from '../store'
 import type { Assignment, Attempt, Exam, ExamVersion, Kind, Person, PersonDraft, Status } from '../store'
-import { revokeInvite, sendInvites } from '../invite'
+import { revokeInvite, sendInvites, sittingClosed } from '../invite'
 import { SaveMode } from '@assessmatrix/proto/exam_pb'
 import { CORE } from './mode'
 import { assignmentIn, examIn, examOut, kind, personIn, responseIn, status, versionIn } from './convert'
@@ -37,7 +37,8 @@ export type Repo = {
 
   listAssignments(): Promise<Assignment[]>
   /** Assign and mail each new assignee. `sent` is 0 for a draft. */
-  assign(examId: string, personIds: string[], dueAt?: number): Promise<{ invited: number; sent: number }>
+  /** `examVersion` picks an earlier published version; omitted, the live one. */
+  assign(examId: string, personIds: string[], dueAt?: number, examVersion?: number): Promise<{ invited: number; sent: number }>
   unassign(id: string): Promise<void>
   sendInvites(ids: string[]): Promise<number>
   revokeInvite(id: string): Promise<void>
@@ -136,9 +137,13 @@ const local: Repo = {
   async listAssignments() {
     return store.listAssignments()
   },
-  async assign(examId, personIds, dueAt) {
+  async assign(examId, personIds, dueAt, examVersion) {
     const e = find(examId)
-    const fresh = store.assignPeople(examId, personIds, dueAt, e?.publishedVersion ?? e?.version ?? 1)
+    // Only a frozen version can be sat: the working copy may still change under them.
+    if (examVersion !== undefined && !store.listVersions(examId).some((v) => v.version === examVersion && v.version <= (e?.publishedVersion ?? 0)))
+      throw new Error('That version has not been published.')
+    const version = examVersion ?? e?.publishedVersion ?? e?.version ?? 1
+    const fresh = store.assignPeople(examId, personIds, dueAt, version, (a) => sittingClosed(a))
     const sent = await sendInvites(fresh.map((a) => a.id))
     return { invited: fresh.length, sent }
   },
@@ -210,9 +215,9 @@ const core: Repo = {
   async listAssignments() {
     return (await api.assignments.listAssignments({})).assignments.map(assignmentIn)
   },
-  async assign(examId, personIds, dueAt) {
+  async assign(examId, personIds, dueAt, examVersion) {
     if (personIds.length === 0) return { invited: 0, sent: 0 }
-    const r = await api.assignments.assignPeople({ examId, personIds, dueAt: BigInt(dueAt ?? 0) })
+    const r = await api.assignments.assignPeople({ examId, personIds, dueAt: BigInt(dueAt ?? 0), examVersion: examVersion ?? 0 })
     return { invited: r.assignments.length, sent: r.sent }
   },
   async unassign(id) {

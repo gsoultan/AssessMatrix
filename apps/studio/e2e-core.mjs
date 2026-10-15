@@ -474,6 +474,13 @@ try {
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
+  await page.getByRole('button', { name: /^Invite people$/ }).first().click()
+  await page.waitForTimeout(500)
+  ;(await page.getByRole('dialog', { name: /Invite people/ }).getByText(/Sitting 2 · last one completed/).count())
+    ? ok('the server lets someone who completed be invited for a second sitting')
+    : bad('a person who completed was not offered a second sitting')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 
   /* ---------------- scoring: the worker's item analysis ---------------- */
   await nav(/Scoring/)

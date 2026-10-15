@@ -130,6 +130,8 @@ export type Assignment = {
   /** The version this invitation opens. Pinned when assigned. */
   examVersion: number
   personId: string
+  /** 1 for this person's first sitting of the instrument, 2 for the next, and so on. */
+  sitting: number
   assignedAt: number
   dueAt?: number
   status: AssignStatus
@@ -756,6 +758,7 @@ const normaliseAssignment = (a: Assignment): Assignment => {
     otpSends: rest.otpSends ?? 0,
     selfServes: rest.selfServes ?? 0,
     history: rest.history ?? [],
+    sitting: rest.sitting ?? 1,
   }
 }
 
@@ -768,25 +771,34 @@ export const writeAssignments = (xs: Assignment[]) => write(ASSIGN_KEY, xs)
 export const assignmentsFor = (examId: string) => listAssignments().filter((a) => a.examId === examId)
 
 /**
- * One assignment per person per instrument; re-assigning someone is a no-op.
+ * One open sitting per person per instrument. Assigning someone whose last
+ * sitting is still open is a no-op; once it is `closed` (invite.ts decides),
+ * they get the next sitting, and the earlier ones are left as they were.
  * This only records who is to sit what. The link is minted when the invitation
  * is sent (invite.ts), so an assignment to a draft holds no token at all.
  */
 export function assignPeople(
   examId: string,
   personIds: string[],
-  dueAt?: number,
-  examVersion = 1,
+  dueAt: number | undefined,
+  examVersion: number,
+  closed: (a: Assignment) => boolean,
 ): Assignment[] {
   const all = listAssignments()
-  const have = new Set(all.filter((a) => a.examId === examId).map((a) => a.personId))
-  const fresh = personIds
-    .filter((pid) => !have.has(pid))
+  const last = new Map<string, Assignment>()
+  for (const a of all) {
+    if (a.examId !== examId) continue
+    const prev = last.get(a.personId)
+    if (!prev || a.sitting > prev.sitting) last.set(a.personId, a)
+  }
+  const fresh = [...new Set(personIds)]
+    .filter((pid) => !last.has(pid) || closed(last.get(pid)!))
     .map<Assignment>((personId) => ({
       id: uid('as'),
       examId,
       examVersion,
       personId,
+      sitting: (last.get(personId)?.sitting ?? 0) + 1,
       assignedAt: Date.now(),
       dueAt,
       status: 'invited',

@@ -41,11 +41,12 @@ type assignmentRow struct {
 	SessionHash, OTPHash           []byte
 	OTPExpiresAt, OTPSentAt        *time.Time
 	OTPTries, OTPSends, SelfServes int32
+	Sitting                        int32
 }
 
 const assignmentColumns = `id, exam_id, person_id, exam_version, assigned_at, due_at, started_at, submitted_at,
 	status, score_pct, passed, token_hash, sent_at, expires_at, redeemed_at, revoked_at, session_hash,
-	otp_hash, otp_expires_at, otp_sent_at, otp_tries, otp_sends, self_serves`
+	otp_hash, otp_expires_at, otp_sent_at, otp_tries, otp_sends, self_serves, sitting`
 
 func scanAssignment(row pgx.Row) (*assignmentRow, error) {
 	var a assignmentRow
@@ -54,7 +55,7 @@ func scanAssignment(row pgx.Row) (*assignmentRow, error) {
 	err := row.Scan(&a.ID, &a.ExamID, &a.PersonID, &a.ExamVersion, &a.AssignedAt, &a.DueAt, &a.StartedAt,
 		&a.SubmittedAt, &status, &score, &a.Passed, &a.TokenHash, &a.SentAt, &a.ExpiresAt, &a.RedeemedAt,
 		&a.RevokedAt, &a.SessionHash, &a.OTPHash, &a.OTPExpiresAt, &a.OTPSentAt, &a.OTPTries, &a.OTPSends,
-		&a.SelfServes)
+		&a.SelfServes, &a.Sitting)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +103,16 @@ func (a *assignmentRow) linkState(now time.Time) v1.LinkState {
 	return v1.LinkState_LINK_STATE_LIVE
 }
 
+// closed: this sitting can no longer be sat, so the person may be given
+// another. Handed in, or a link that ran out before anyone used it. A revoked
+// or unsent invitation is still open: resend it rather than add a sitting.
+func (a *assignmentRow) closed(now time.Time) bool {
+	if a.Status == v1.AssignStatus_ASSIGN_STATUS_SUBMITTED {
+		return true
+	}
+	return a.Status == v1.AssignStatus_ASSIGN_STATUS_INVITED && a.linkState(now) == v1.LinkState_LINK_STATE_EXPIRED
+}
+
 func ptrMs(t *time.Time) int64 { return msPtr(t) }
 
 func (a *assignmentRow) proto(now time.Time, history []*v1.InviteEvent) *v1.Assignment {
@@ -111,7 +122,7 @@ func (a *assignmentRow) proto(now time.Time, history []*v1.InviteEvent) *v1.Assi
 		StartedAt: ptrMs(a.StartedAt), SubmittedAt: ptrMs(a.SubmittedAt), ScorePct: a.ScorePct, Passed: a.Passed,
 		SentAt: ptrMs(a.SentAt), ExpiresAt: ptrMs(a.ExpiresAt), RedeemedAt: ptrMs(a.RedeemedAt),
 		RevokedAt: ptrMs(a.RevokedAt), LinkState: a.linkState(now), OtpSends: a.OTPSends,
-		SelfServes: a.SelfServes, History: history,
+		SelfServes: a.SelfServes, History: history, Sitting: a.Sitting,
 	}
 	return out
 }

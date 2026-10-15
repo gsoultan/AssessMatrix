@@ -20,8 +20,10 @@ import {
   IconPencilMinus,
   IconFileImport,
   IconFileExport,
+  IconVersions,
 } from '@tabler/icons-react'
 import { useApp, useResponseCount } from '../state'
+import { VersionsDrawer } from '../components/VersionsDrawer'
 import {
   type Exam,
   type Kind,
@@ -85,6 +87,7 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
   const [kind, setKind] = useState<Kind | 'all'>('all')
   const [view, setView] = useState<'active' | 'archived'>('active')
   const [q, setQ] = useState('')
+  const [versionsOf, setVersionsOf] = useState('')
 
   const inView = (e: Exam) => (view === 'archived' ? e.status === 'archived' : e.status !== 'archived')
   const archivedCount = exams.filter((e) => e.status === 'archived').length
@@ -200,6 +203,11 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
             <Menu.Item leftSection={<IconSend size={14} stroke={1.9} />} onClick={() => openAssignments(e.id)}>
               Assign people
             </Menu.Item>
+            {e.publishedVersion !== undefined && (
+              <Menu.Item leftSection={<IconVersions size={14} stroke={1.9} />} onClick={() => setVersionsOf(e.id)}>
+                Versions
+              </Menu.Item>
+            )}
             {e.status === 'draft' ? (
               <Menu.Item
                 leftSection={<IconRocket size={14} stroke={1.9} />}
@@ -268,6 +276,7 @@ export function Library({ isDesktop }: { isDesktop: boolean }) {
         </div>
         {newMenu}
         {qtiPicker}
+        <VersionsDrawer exam={exams.find((x) => x.id === versionsOf)} onClose={() => setVersionsOf('')} />
       </header>
 
       <div className="mb-3 flex items-center gap-2">

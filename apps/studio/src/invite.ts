@@ -144,6 +144,15 @@ export function linkState(a: Assignment, now = Date.now()): LinkState {
 }
 
 /**
+ * This sitting can no longer be sat, so the person may be given another:
+ * handed in, or a link that ran out before anyone used it. A revoked or unsent
+ * invitation is still open; resend it rather than add a sitting. Mirrors
+ * `closed` in the core (services/core/internal/api/invite.go).
+ */
+export const sittingClosed = (a: Assignment, now = Date.now()) =>
+  a.status === 'submitted' || (a.status === 'invited' && linkState(a, now) === 'expired')
+
+/**
  * A link is good until the end of the due date, or for a week when there is
  * none. Expiry stops a link being *redeemed*; it never ends a session already
  * running, because cutting someone off mid-exam is the worst thing this system
