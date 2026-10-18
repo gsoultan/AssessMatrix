@@ -41,6 +41,8 @@ stored. Caps: 5 MB per file, 5,000 rows, 30 MB inflated per workbook entry (zip 
    that prefetch links cannot burn it.
 4. Verifying starts **one session per invitation**. Reloading or reopening a killed browser
    comes back through that session (`#/session`), with saved answers intact.
+   Ending the session clears it on the server too, so a copied cookie opens nothing; the way
+   back is a new link to the address on file.
 5. A spent or replaced link offers "send me a new link", which only ever mails the address
    on file (at most 5 times), and ends the old session.
 
@@ -63,7 +65,7 @@ every row below is enforced by the server, with the same shapes and the same ord
 | Assignments, people, history in `localStorage` | Postgres under row-level security on `tenant_id`; history is an append-only table | `internal/db/migrations` |
 | Code hash = SHA-256(`assignmentId:code`) | HMAC-SHA-256 under a key derived from `AM_SECRET`, one key each for links, codes and sessions, so a stolen table cannot be brute-forced offline | `internal/secure` |
 | Limits (tries, cooldown, sends) counted on the row | The same counters, read `FOR UPDATE` and written in one transaction; then a per-address limit (`AM_LIMIT_PER_IP`, 60 a minute) on every link call and a per-tenant limit (`AM_LIMIT_PER_TENANT`, 600 a minute) on codes mailed or guessed and links reissued | `candidate.go`, `internal/limit` |
-| Session secret in `localStorage` | `HttpOnly`, `Secure`, `SameSite=Strict` cookie whose HMAC is stored on the assignment, so revoking or resending ends it | `internal/auth` |
+| Session secret in `localStorage` | `HttpOnly`, `Secure`, `SameSite=Strict` cookie whose HMAC is stored on the assignment, so revoking, resending or ending the session ends it on the server, not only in the browser | `internal/auth` |
 | Outbox panel on Assignments, stub code in the candidate preview bar | Outbox row and delivery job written in the same transaction, sent by a worker, body cleared once sent. Both stubs are deleted: the studio shows no mail in any build | `internal/api/outbox.go`, `internal/mail` |
 | Roster files parsed in the browser | Parsed in the browser and re-validated on the server; the raw file is never stored | `internal/api/people.go` |
 | Emails, names in one store | PII kept in its region; attempt records and sent mail expire, and a person can be erased. **Not yet:** a retention rule for unused roster entries and expired invitations | `internal/api/retention.go` |
@@ -77,6 +79,7 @@ exact because they live in Postgres. An exam hall behind one NAT address makes a
 calls per candidate in the minute everyone gets in: raise `AM_LIMIT_PER_IP` to cover the room.
 
 Proven in CI by `services/core/internal/api/invite_test.go` (a revoked or replaced link cannot
-start or submit; 25 wrong guesses lock the link; one tenant's limit does not slow another),
+start or submit; an ended session stays ended; 25 wrong guesses lock the link; one tenant's
+limit does not slow another),
 `isolation_test.go` (every invite method is tenant-scoped), `outbox_test.go`, and the
 kill-the-browser gate in `apps/studio/e2e-core.mjs`, which runs with the real session cookie.

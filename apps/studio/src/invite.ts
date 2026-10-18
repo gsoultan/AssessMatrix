@@ -124,6 +124,7 @@ export const EVENT_LABEL: Record<string, string> = {
   'link.redeemed': 'Code verified — link spent, session started',
   'code.sent': 'Verification code emailed',
   'code.wrong': 'Wrong code entered',
+  'session.ended': 'Session ended by the candidate; a new link is the way back in',
 }
 
 export type LinkState = 'unsent' | 'live' | 'used' | 'expired' | 'locked' | 'revoked'

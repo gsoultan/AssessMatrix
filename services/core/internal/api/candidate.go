@@ -358,7 +358,30 @@ func (s *candidateService) RequestNewLink(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(out), nil
 }
 
+// EndSession ends the session on the server as well as clearing the cookie,
+// so a copy of the cookie opens nothing afterwards. The way back in is a new
+// link, mailed to the address on file.
 func (s *candidateService) EndSession(ctx context.Context, req *connect.Request[v1.EndSessionRequest]) (*connect.Response[v1.EndSessionResponse], error) {
+	if token := auth.CookieValue(req.Header(), auth.CandidateCookie); secure.ValidToken(token) {
+		hash := s.Keys.SessionHash(token)
+		var tenant db.TenantID
+		var id string
+		err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT tenant_id, assignment_id FROM am_assignment_by_session($1)`, hash).Scan(&tenant, &id)
+		})
+		if err == nil {
+			err = s.DB.InTenant(ctx, tenant, func(tx pgx.Tx) error {
+				tag, err := tx.Exec(ctx, `UPDATE assignments SET session_hash = NULL WHERE id = $1 AND session_hash = $2`, id, hash)
+				if err != nil || tag.RowsAffected() == 0 {
+					return err
+				}
+				return logInvite(ctx, tx, id, "session.ended", "by the candidate")
+			})
+		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, s.internal(ctx, "EndSession", err)
+		}
+	}
 	res := connect.NewResponse(&v1.EndSessionResponse{})
 	s.Auth.ClearCookie(res.Header(), auth.CandidateCookie)
 	return res, nil

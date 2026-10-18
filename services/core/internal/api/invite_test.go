@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
@@ -32,6 +33,34 @@ func TestRevokedLinkCannotStartOrSubmit(t *testing.T) {
 	open := get(h.browser().candidate.OpenLink(ctx, connect.NewRequest(&v1.OpenLinkRequest{Token: token})))
 	if open.Msg.GetOk() || open.Msg.GetRefusal() != v1.Refusal_REFUSAL_REVOKED {
 		t.Fatalf("a revoked link must say so, got %v", open.Msg.GetRefusal())
+	}
+}
+
+// Ending a session ends it on the server: a copy of the cookie taken before
+// opens nothing, and a new link (mailed to the address on file) is the way back.
+func TestEndSessionRevokesItOnTheServer(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	staff := h.tenant("End")
+	f := h.publishedFixture(staff)
+	token := h.lastLink(f.email)
+	cand := h.redeem(f)
+	u, _ := url.Parse(h.http.URL)
+	kept := cand.http.Jar.Cookies(u)
+	if len(kept) == 0 {
+		t.Fatal("redeeming must set a session cookie")
+	}
+
+	get(cand.candidate.EndSession(ctx, connect.NewRequest(&v1.EndSessionRequest{})))
+
+	thief := h.browser()
+	thief.http.Jar.SetCookies(u, kept)
+	if _, err := thief.candidate.StartAttempt(ctx, connect.NewRequest(&v1.StartAttemptRequest{Consents: allConsents})); code(err) != connect.CodeUnauthenticated {
+		t.Fatalf("an ended session must not start an attempt from a copied cookie, got %v", err)
+	}
+	h.clock.add(OTPCooldown)
+	if r := get(h.browser().candidate.RequestNewLink(ctx, connect.NewRequest(&v1.RequestNewLinkRequest{Token: token}))); !r.Msg.GetOk() {
+		t.Fatalf("a new link must be the way back in, got %v", r.Msg.GetRefusal())
 	}
 }
 
