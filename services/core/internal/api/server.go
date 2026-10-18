@@ -120,7 +120,7 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.TenantServiceListMyTenantsProcedure,
 		assessmatrixv1connect.TenantServiceSwitchTenantProcedure,
 	)
-	// Who may work here, new tenants, and what leaves this tenant for another:
+	// Who may work here, and what leaves this tenant for another:
 	// an instrument shared out, or candidate data sent to a webhook receiver
 	// (whose signing secret a member must never see).
 	set(auth.Admin,
@@ -132,11 +132,15 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.WebhookServiceListDeliveriesProcedure,
 		assessmatrixv1connect.WebhookServiceRedeliverProcedure,
 		assessmatrixv1connect.WebhookServicePingWebhookProcedure,
-		assessmatrixv1connect.TenantServiceCreateTenantProcedure,
 		assessmatrixv1connect.TenantServiceListAccessProcedure,
 		assessmatrixv1connect.TenantServiceSetAccessProcedure,
 		assessmatrixv1connect.TenantServiceListExamCopiesProcedure,
 		assessmatrixv1connect.TenantServiceShareExamProcedure,
+	)
+	// Tenants themselves. Who administers each is checked in SetAccess, which
+	// an administrator may also call for their members.
+	set(auth.SuperAdmin,
+		assessmatrixv1connect.TenantServiceCreateTenantProcedure,
 	)
 	return p
 }

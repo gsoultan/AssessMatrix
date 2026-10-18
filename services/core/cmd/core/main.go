@@ -3,6 +3,7 @@
 //	core migrate                       apply schema migrations as the owner
 //	core serve                         run the API and the mail worker
 //	core tenant <name> <staff-email>   create a tenant and its first staff member
+//	core super-admin <staff-email>     let someone who already works here run the installation
 //	core setup-code                    print the code first-run setup at /setup asks for
 //
 // Configuration is environment only; see config.go.
@@ -59,10 +60,12 @@ func main() {
 		err = serve(ctx, log)
 	case "tenant":
 		err = createTenant(ctx, log, os.Args[2:])
+	case "super-admin":
+		err = addSuperAdmin(ctx, log, os.Args[2:])
 	case "setup-code":
 		err = printSetupCode()
 	default:
-		err = fmt.Errorf("unknown command %q (want migrate, serve, tenant or setup-code)", cmd)
+		err = fmt.Errorf("unknown command %q (want migrate, serve, tenant, super-admin or setup-code)", cmd)
 	}
 	if err != nil {
 		log.Error("exit", "cmd", cmd, "err", err)
@@ -132,6 +135,39 @@ func createTenant(ctx context.Context, log *slog.Logger, args []string) error {
 		return err
 	}
 	log.Info("tenant created", "tenant", tenant, "staff", staff)
+	return nil
+}
+
+// addSuperAdmin makes a staff member a super administrator, as the owner: the
+// way back in when nobody who can manage tenants is left, and the way to add
+// a second one.
+func addSuperAdmin(ctx context.Context, log *slog.Logger, args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: core super-admin <staff-email>")
+	}
+	cfg, err := loadConfig(false)
+	if err != nil {
+		return err
+	}
+	conn, err := pgx.Connect(ctx, cfg.MigrateURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+	tag, err := conn.Exec(ctx, `INSERT INTO super_admins (email)
+		SELECT lower($1::text) WHERE EXISTS (SELECT 1 FROM staff WHERE lower(email) = lower($1) AND disabled_at IS NULL)
+		ON CONFLICT DO NOTHING`, args[0])
+	if err != nil {
+		return err
+	}
+	var known bool
+	if err := conn.QueryRow(ctx, `SELECT am_super_admin($1)`, args[0]).Scan(&known); err != nil {
+		return err
+	}
+	if !known {
+		return fmt.Errorf("%s has no access to any tenant; give them access first, or use `core tenant`", args[0])
+	}
+	log.Info("super administrator", "email", strings.ToLower(args[0]), "added", tag.RowsAffected() == 1)
 	return nil
 }
 

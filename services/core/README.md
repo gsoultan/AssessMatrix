@@ -31,9 +31,11 @@ psql -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
 
 export AM_MIGRATE_DATABASE_URL=postgres://am_owner:owner@localhost/assessmatrix
 go run ./cmd/core migrate
-# Either create the first organisation and its administrator here, or skip
-# this and use /setup (below). More tenants, and who works in which, are
-# managed from the studio (Access, and the tenant menu).
+# Either create the first tenant and its administrator here, or skip this and
+# use /setup (below). The first person made either way is also the super
+# administrator, who creates more tenants and picks their administrators
+# from the studio (Access); administrators add members to their tenants.
+# `core super-admin <email>` adds another super administrator.
 go run ./cmd/core tenant "Your Org" you@example.id
 
 AM_DATABASE_URL=postgres://am_app:app@localhost/assessmatrix \
@@ -48,10 +50,11 @@ With `AM_DEV=1 AM_MAILER=mailbox`, mail is kept in memory and readable at
 
 ## First run: /setup
 
-On a database with no organisation, `serve` logs a warning with the setup URL and a
+On a database with no tenant, `serve` logs a warning with the setup URL and a
 `setup_code`. Open `<AM_PUBLIC_URL>/setup` (the sign-in page sends you there too), enter the
-code, and name the organisation and its first administrator; you are signed in as that
-administrator straight away. `core setup-code` prints the same code; it is derived from
+code, and give your name and email; that makes you the super administrator and the
+administrator of the default tenant (named "Default" unless you change it), and signs you in
+straight away. `core setup-code` prints the same code; it is derived from
 `AM_SECRET`, so every replica agrees on it.
 
 Setup works once. The database makes that so: `am_setup_first_tenant` locks `tenants` and

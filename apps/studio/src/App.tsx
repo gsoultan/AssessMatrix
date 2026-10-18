@@ -48,6 +48,7 @@ import { Access } from './screens/Access'
 import { TenantSwitcher } from './components/TenantSwitcher'
 import { useApp } from './state'
 import { CORE, SHOW_MOCKS } from './backend/mode'
+import { administers } from './backend/staff'
 
 /** Design mock-ups with canned data. Shown in a local build; hidden against the core unless asked for. */
 // The monitor is real against the core (LiveMonitor); only the local build's is a mock.
@@ -141,7 +142,7 @@ function Shell() {
   const [opened, { toggle, close }] = useDisclosure(false)
   const isDesktop = useMediaQuery('(min-width: 1024px)')
   // Administrators' screens are not shown to members (the core refuses them anyway).
-  const allowed = (s: (typeof SCREENS)[number]) => !('admin' in s) || staff?.role === 'admin'
+  const allowed = (s: (typeof SCREENS)[number]) => !('admin' in s) || administers(staff)
   const current = SCREENS.filter(allowed).find((s) => s.key === active) ?? SCREENS[0]!
   const Screen = current.El as React.ComponentType<{ isDesktop: boolean }>
 

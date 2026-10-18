@@ -167,6 +167,8 @@ func Migrate(ctx context.Context, ownerURL, appRole string) ([]string, error) {
 		// on top of the triggers that refuse it for everyone.
 		`REVOKE UPDATE, DELETE, TRUNCATE ON attempt_events, audit_log FROM ` + role,
 		`REVOKE ALL ON schema_migrations FROM ` + role,
+		// Who runs the installation is read and changed only through its functions.
+		`REVOKE ALL ON super_admins FROM ` + role,
 		// Tenants are made by the owner (`core tenant`), or once by setup.
 		`REVOKE EXECUTE ON FUNCTION am_create_tenant(text, text, text, text) FROM ` + role,
 	}

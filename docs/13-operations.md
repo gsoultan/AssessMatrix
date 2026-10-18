@@ -8,7 +8,7 @@ docs/12.
 
 | Piece | Image | Notes |
 | :--- | :--- | :--- |
-| core | `assessmatrix` (`deploy/Dockerfile`) | Go binary plus the three web apps it serves: studio at `/`, runner at `/take/`, credential check at `/verify/`. Distroless, non-root. Commands: `migrate`, `serve`, `tenant`, `setup-code` |
+| core | `assessmatrix` (`deploy/Dockerfile`) | Go binary plus the three web apps it serves: studio at `/`, runner at `/take/`, credential check at `/verify/`. Distroless, non-root. Commands: `migrate`, `serve`, `tenant`, `super-admin`, `setup-code` |
 | psychometrics | `assessmatrix-psychometrics` | Python worker; item statistics only |
 | Postgres 17 | managed, or `postgres:17` in compose | All state. In the tenants' region (Indonesia for `id`) |
 | Object storage | S3-compatible bucket in the same region | Images; required with more than one core replica |
@@ -26,8 +26,12 @@ own volume; see §3 for getting it off the machine.
 
 **First run.** Open `https://AM_DOMAIN/setup`. The core prints the setup code in its log
 (`docker compose logs core | grep setup_code`, or `docker compose exec core /core setup-code`).
-The page shows the database is connected and migrated, then creates the organisation and its
-first administrator and signs them in. It works once; afterwards it says the server is set up.
+The page shows the database is connected and migrated, then creates the super administrator
+and the default tenant (which they also administer) and signs them in. It works once; afterwards
+it says the server is set up. The super administrator creates further tenants and chooses each
+one's administrators from Access; administrators add users to their own tenants as members.
+`core super-admin <email>` makes another existing user a super administrator, or recovers the
+role if nobody holding it can sign in.
 
 **Kubernetes** (`deploy/k8s`, kustomize): 3 core replicas across zones with a disruption budget,
 the restricted pod security profile, read-only root filesystems, network policies, and an

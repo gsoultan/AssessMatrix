@@ -302,7 +302,7 @@ export const useApp = create<AppState>((set, get) => {
   })
 
   return {
-    staff: CORE ? undefined : { id: 'local', email: '', name: 'This browser', tenantId: 'local', tenantName: 'Local data', role: 'admin' },
+    staff: CORE ? undefined : { id: 'local', email: '', name: 'This browser', tenantId: 'local', tenantName: 'Local data', role: 'admin', superAdmin: false },
     notice: '',
     dismissNotice: () => set({ notice: '' }),
 
