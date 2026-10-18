@@ -23,8 +23,9 @@ const matches = (q: string, ...fields: string[]) => {
 }
 
 /**
- * Who may work in which tenant. One tenant, or one person, at a time: with
- * dozens of tenants a person-by-tenant grid stops fitting, so each view lists
+ * Which studio users (staff, never test takers) may work in which tenant. One
+ * tenant, or one user, at a time: with dozens of tenants a user-by-tenant grid
+ * stops fitting, so each view lists
  * only what has access and adds the rest from a search.
  */
 export function Access({ isDesktop }: { isDesktop: boolean }) {
@@ -87,8 +88,9 @@ export function Access({ isDesktop }: { isDesktop: boolean }) {
         <div>
           <h1 className="text-[15px] font-semibold tracking-tight">Access</h1>
           <p className="mt-0.5 max-w-[70ch] text-[12.5px] leading-snug text-ink-muted">
-            Who can work in each tenant you administer. Members build, invite and score in the tenants given to
-            them and nowhere else; administrators also manage access and share instruments between tenants.
+            Which studio users can work in each tenant you administer. Members build, invite and score in the
+            tenants given to them and nowhere else; administrators also manage access and share instruments between
+            tenants. Test takers are not users: they are in People and only ever see the tests they are invited to.
           </p>
         </div>
         <button
@@ -115,7 +117,7 @@ export function Access({ isDesktop }: { isDesktop: boolean }) {
         onChange={(v) => setView(v as 'tenant' | 'person')}
         data={[
           { value: 'tenant', label: `By tenant (${tenants.length})` },
-          { value: 'person', label: `By person (${staff?.length ?? 0})` },
+          { value: 'person', label: `By user (${staff?.length ?? 0})` },
         ]}
       />
 
@@ -209,7 +211,7 @@ function More({ total }: { total: number }) {
   return <p className="px-3 py-2 text-[11.5px] text-ink-muted">{total - SHOWN} more. Search to narrow the list.</p>
 }
 
-const tenantSub = (t: Tenant, n: number) => `${n} ${n === 1 ? 'person' : 'people'}${t.current ? ' · you are here' : ''}`
+const tenantSub = (t: Tenant, n: number) => `${n} ${n === 1 ? 'user' : 'users'}${t.current ? ' · you are here' : ''}`
 
 function ByTenant({
   tenants,
@@ -284,8 +286,8 @@ function ByTenant({
             actions={
               <TextInput
                 size="xs"
-                aria-label={`Search people in ${tenant.name}`}
-                placeholder="Search people"
+                aria-label={`Search users in ${tenant.name}`}
+                placeholder="Search users"
                 leftSection={<IconSearch size={14} stroke={1.8} />}
                 value={pq}
                 onChange={(e) => setPq(e.currentTarget.value)}
@@ -295,7 +297,7 @@ function ByTenant({
           >
             <form
               className="flex flex-wrap items-end gap-2 border-b border-hair px-4 py-3 sm:px-5"
-              aria-label={`Give someone access to ${tenant.name}`}
+              aria-label={`Give a user access to ${tenant.name}`}
               onSubmit={(ev) => {
                 ev.preventDefault()
                 void add()
@@ -308,7 +310,7 @@ function ByTenant({
               {err && <p role="alert" className="w-full text-[12px] text-ink">{err}</p>}
             </form>
             {people.length === 0 ? (
-              <p className="px-4 py-3 text-[12.5px] text-ink-muted sm:px-5">{pq ? 'No one matches.' : 'No one has access yet.'}</p>
+              <p className="px-4 py-3 text-[12.5px] text-ink-muted sm:px-5">{pq ? 'No user matches.' : 'No user has access yet.'}</p>
             ) : (
               <ul>
                 {people.slice(0, SHOWN).map((s) => (
@@ -353,12 +355,12 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
   }
   const list = (
     <>
-      <ListSearch value={q} onChange={setQ} placeholder="Find a person" />
+      <ListSearch value={q} onChange={setQ} placeholder="Find a user" />
       <ul className="min-h-0 overflow-y-auto py-1">
         {found.slice(0, SHOWN).map((s) => (
           <ListItem key={s.email} active={s.email === person?.email} onClick={() => onSelect(s.email)} title={s.name || s.email} sub={sub(s)} />
         ))}
-        {found.length === 0 && <p className="px-3 py-2 text-[12px] text-ink-muted">No one matches.</p>}
+        {found.length === 0 && <p className="px-3 py-2 text-[12px] text-ink-muted">No user matches.</p>}
       </ul>
       <More total={found.length} />
     </>
@@ -366,10 +368,10 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
   const picker = (
     <Select
       size="sm"
-      label="Person"
+      label="User"
       searchable
       allowDeselect={false}
-      nothingFoundMessage="No one matches"
+      nothingFoundMessage="No user matches"
       data={staff.map((s) => ({ value: s.email, label: s.name ? `${s.name} (${s.email})` : s.email }))}
       value={person?.email ?? null}
       onChange={(v) => v && onSelect(v)}
@@ -379,7 +381,7 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
   return (
     <TwoPane isDesktop={isDesktop} list={list} picker={picker}>
       {!person ? (
-        <p className="text-[12.5px] text-ink-muted">No one has access to the tenants you administer yet.</p>
+        <p className="text-[12.5px] text-ink-muted">No user has access to the tenants you administer yet.</p>
       ) : (
         <Panel
           pad={false}

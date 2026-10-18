@@ -72,7 +72,7 @@ const ALL_SCREENS = [
   { key: 'monitor', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
   { key: 'player', name: 'Candidate preview', sub: 'See it as a candidate does', Icon: IconDeviceLaptop, El: CandidateApp },
   // Tenants exist only on the core, and only an administrator manages them.
-  ...(CORE ? [{ key: 'access', admin: true, name: 'Access', sub: 'Tenants · who works where', Icon: IconShieldLock, El: Access } as const] : []),
+  ...(CORE ? [{ key: 'access', admin: true, name: 'Access', sub: 'Studio users · which tenants', Icon: IconShieldLock, El: Access } as const] : []),
   { key: 'author', more: true, name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },
   { key: 'aitask', more: true, name: 'AI-in-the-loop task', sub: 'Score the collaboration', Icon: IconSparkles, El: AiTask },
   { key: 'profile', more: true, name: 'Evidence profile', sub: 'Skill graph · credentials', Icon: IconCertificate, El: EvidenceProfile },
