@@ -87,6 +87,8 @@ def analyze(items: list[Item], scores: list[Score], exam_version: int) -> dict:
         p = _mean(xs)
         rpb = _corr(xs, rest)
         stat: dict = {"itemId": it.id, "number": it.number, "n": n, "pValue": _r(p), "pointBiserial": _r(rpb or 0.0)}
+        if rpb is None:
+            stat["noSpread"] = True
         notes: list[str] = []
         if n:
             if p >= 0.9:

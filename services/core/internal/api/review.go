@@ -136,6 +136,7 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		}
 		answers, _ := domain.Fold(events, att.deadline())
 		reviews := domain.Reviews(events)
+		before := storedScore(att.Score)
 		out.Score = domain.Score(e, answers, reviews)
 		if err := storeScore(ctx, tx, att, e, answers, reviews, out.Score); err != nil {
 			return err
@@ -149,6 +150,16 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		}
 		if cred != "" {
 			out.CredentialUrl = s.CredentialURL(cred)
+		}
+		// A review that decides or changes the final result tells the
+		// candidate. A pass is told by the credential's own mail; anything
+		// else (a fail, or a pass taken back) is told here.
+		final := out.Score.GetPendingHuman() == 0
+		changed := before == nil || before.GetPendingHuman() > 0 || before.GetPct() != out.Score.GetPct() || before.GetPassed() != out.Score.GetPassed()
+		if final && changed && cred == "" {
+			if err := s.mailResult(ctx, tx, att, e, out.Score); err != nil {
+				return err
+			}
 		}
 		return audit(ctx, tx, "attempt.reviewed", att.ID, map[string]any{"item": item.GetId(), "points": m.GetPoints()})
 	})
@@ -197,4 +208,31 @@ func (s *resultService) GetItemAnalysis(ctx context.Context, req *connect.Reques
 		return nil, s.internal(ctx, "GetItemAnalysis", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// storedScore is the score as last stored, or nil.
+func storedScore(stored []byte) *v1.Score {
+	var sc v1.Score
+	if stored == nil || protojson.Unmarshal(stored, &sc) != nil {
+		return nil
+	}
+	return &sc
+}
+
+// mailResult tells the candidate their final result once nothing is left to
+// score, for a result that earned no credential.
+func (s *Server) mailResult(ctx context.Context, tx pgx.Tx, att *attemptRow, e *v1.Exam, sc *v1.Score) error {
+	var tenantName, email string
+	if err := tx.QueryRow(ctx, `SELECT t.name, p.email FROM tenants t, assignments a JOIN people p ON p.id = a.person_id
+		WHERE t.id = am_tenant() AND a.id = $1`, att.AssignmentID).Scan(&tenantName, &email); err != nil {
+		return err
+	}
+	verdict := "belum mencapai ambang lulus"
+	if sc.GetPassed() {
+		verdict = "lulus"
+	}
+	body := fmt.Sprintf("Penilaian %s sudah selesai.\n\nSkor akhir Anda %d%% (%d dari %d poin); ambang lulus %d%%. Hasil: %s.\n\n"+
+		"Jika ada yang ingin Anda tanyakan tentang penilaian ini, hubungi penyelenggara.\n\n— %s",
+		e.GetTitle(), sc.GetPct(), sc.GetRaw(), sc.GetMax(), e.GetPassPct(), verdict, tenantName)
+	return s.queueMail(ctx, tx, "result", email, "Hasil Anda: "+e.GetTitle(), body)
 }

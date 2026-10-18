@@ -60,8 +60,8 @@ func TestAuthorInviteSitScore(t *testing.T) {
 
 	sub := get(cand.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: att.GetId()})))
 	sc := sub.Msg.GetAttempt().GetScore()
-	if !sub.Msg.GetOk() || sc.GetRaw() != 4 || sc.GetMax() != 4 || sc.GetPct() != 100 || !sc.GetPassed() || sc.GetPendingHuman() != 5 {
-		t.Fatalf("score = %+v, want 4/4 100%% passed with 5 points pending review", sc)
+	if !sub.Msg.GetOk() || sc.GetRaw() != 4 || sc.GetMax() != 4 || sc.GetPct() != 100 || sc.GetPassed() || sc.GetPendingHuman() != 5 {
+		t.Fatalf("score = %+v, want 4/4 100%% with 5 points pending review and no verdict yet", sc)
 	}
 	resub := get(cand.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: att.GetId()})))
 	if resub.Msg.GetAttempt().GetSubmittedAt() != sub.Msg.GetAttempt().GetSubmittedAt() {

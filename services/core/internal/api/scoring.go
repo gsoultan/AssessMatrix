@@ -24,8 +24,14 @@ func storeScore(ctx context.Context, tx pgx.Tx, att *attemptRow, e *v1.Exam, ans
 		return err
 	}
 	att.Score = body
+	// No verdict (NULL) while points wait for a person.
+	var passed *bool
+	if score.GetPendingHuman() == 0 {
+		p := score.GetPassed()
+		passed = &p
+	}
 	if _, err := tx.Exec(ctx, `UPDATE assignments SET score_pct = $2, passed = $3 WHERE id = $1`,
-		att.AssignmentID, int16(score.GetPct()), score.GetPassed()); err != nil {
+		att.AssignmentID, int16(score.GetPct()), passed); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM item_scores WHERE attempt_id = $1`, att.ID); err != nil {

@@ -931,7 +931,9 @@ type ItemStat struct {
 	PointBiserial float64       `protobuf:"fixed64,5,opt,name=point_biserial,json=pointBiserial,proto3" json:"point_biserial,omitempty"`
 	Choices       []*ChoiceStat `protobuf:"bytes,6,rep,name=choices,proto3" json:"choices,omitempty"`
 	// Plain-language reading of the numbers, for authors.
-	Notes         []string `protobuf:"bytes,7,rep,name=notes,proto3" json:"notes,omitempty"`
+	Notes []string `protobuf:"bytes,7,rep,name=notes,proto3" json:"notes,omitempty"`
+	// Everyone scored the same, so point_biserial is undefined (sent as 0).
+	NoSpread      bool `protobuf:"varint,8,opt,name=no_spread,json=noSpread,proto3" json:"no_spread,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1013,6 +1015,13 @@ func (x *ItemStat) GetNotes() []string {
 		return x.Notes
 	}
 	return nil
+}
+
+func (x *ItemStat) GetNoSpread() bool {
+	if x != nil {
+		return x.NoSpread
+	}
+	return false
 }
 
 type ChoiceStat struct {
@@ -1170,7 +1179,7 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\x05items\x18\x04 \x03(\v2\x19.assessmatrix.v1.ItemStatR\x05items\x12\x12\n" +
 	"\x04kr20\x18\x05 \x01(\x01R\x04kr20\x12\x17\n" +
 	"\atoo_few\x18\x06 \x01(\bR\x06tooFew\x12\x18\n" +
-	"\apending\x18\a \x01(\bR\apending\"\xd6\x01\n" +
+	"\apending\x18\a \x01(\bR\apending\"\xf3\x01\n" +
 	"\bItemStat\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x05R\x06number\x12\f\n" +
@@ -1178,7 +1187,8 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\ap_value\x18\x04 \x01(\x01R\x06pValue\x12%\n" +
 	"\x0epoint_biserial\x18\x05 \x01(\x01R\rpointBiserial\x125\n" +
 	"\achoices\x18\x06 \x03(\v2\x1b.assessmatrix.v1.ChoiceStatR\achoices\x12\x14\n" +
-	"\x05notes\x18\a \x03(\tR\x05notes\"\x9b\x01\n" +
+	"\x05notes\x18\a \x03(\tR\x05notes\x12\x1b\n" +
+	"\tno_spread\x18\b \x01(\bR\bnoSpread\"\x9b\x01\n" +
 	"\n" +
 	"ChoiceStat\x12\x1b\n" +
 	"\tchoice_id\x18\x01 \x01(\tR\bchoiceId\x12\x18\n" +

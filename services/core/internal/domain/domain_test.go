@@ -36,10 +36,29 @@ func TestScoreMatchesPrototype(t *testing.T) {
 		{"three of four rounds to 75", map[string]*v1.ItemAnswer{"b": {Values: []string{"x", "z"}}, "c": {Text: "Bandung"}}, 3, 75, true},
 	}
 	for _, c := range cases {
+		// The essay waits, so there is no verdict yet, whatever the rest says.
 		s := Score(e, c.answers, nil)
-		if s.GetRaw() != c.raw || s.GetMax() != 4 || s.GetPct() != c.pct || s.GetPassed() != c.passed || s.GetPendingHuman() != 4 {
+		if s.GetRaw() != c.raw || s.GetMax() != 4 || s.GetPct() != c.pct || s.GetPassed() || s.GetPendingHuman() != 4 {
 			t.Errorf("%s: got %+v", c.name, s)
 		}
+		// Reviewed at 0 of 4, the essay counts and the verdict follows the total.
+		s = Score(e, c.answers, map[string]Review{"d": {Points: 0}})
+		if s.GetMax() != 8 || s.GetPendingHuman() != 0 || s.GetPassed() != (c.raw*100 >= 8*e.GetPassPct()) {
+			t.Errorf("%s, reviewed: got %+v", c.name, s)
+		}
+	}
+}
+
+// A full machine score with an essay still waiting is not a pass: the
+// essay's points can turn it either way, so the verdict waits too.
+func TestNoVerdictWhileAnEssayWaits(t *testing.T) {
+	e := exam()
+	all := map[string]*v1.ItemAnswer{"a": {Values: []string{"y"}}, "b": {Values: []string{"z", "x"}}, "c": {Text: "bdg"}}
+	if s := Score(e, all, nil); s.GetPassed() {
+		t.Fatalf("passed with an essay pending: %+v", s)
+	}
+	if s := Score(e, all, map[string]Review{"d": {Points: 4}}); !s.GetPassed() {
+		t.Fatalf("full marks once reviewed must pass: %+v", s)
 	}
 }
 

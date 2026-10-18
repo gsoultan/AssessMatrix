@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/candidate.proto.
  */
 export const file_assessmatrix_v1_candidate: GenFile = /*@__PURE__*/
-  fileDesc("Ch9hc3Nlc3NtYXRyaXgvdjEvY2FuZGlkYXRlLnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiywEKEUludml0YXRpb25TdW1tYXJ5EhIKCmV4YW1fdGl0bGUYASABKAkSDgoGaXNzdWVyGAIgASgJEiMKBGtpbmQYAyABKA4yFS5hc3Nlc3NtYXRyaXgudjEuS2luZBIMCgR0aWVyGAQgASgFEg8KB21pbnV0ZXMYBSABKAUSEAoIcGFzc19wY3QYBiABKAUSEgoKaXRlbV9jb3VudBgHIAEoBRIUCgxtYXNrZWRfZW1haWwYCCABKAkSEgoKZXhwaXJlc19hdBgJIAEoAyIgCg9PcGVuTGlua1JlcXVlc3QSDQoFdG9rZW4YASABKAkilwEKEE9wZW5MaW5rUmVzcG9uc2USCgoCb2sYASABKAgSKQoHcmVmdXNhbBgCIAEoDjIYLmFzc2Vzc21hdHJpeC52MS5SZWZ1c2FsEjYKCmludml0YXRpb24YAyABKAsyIi5hc3Nlc3NtYXRyaXgudjEuSW52aXRhdGlvblN1bW1hcnkSFAoMbWFza2VkX2VtYWlsGAQgASgJIiMKElJlcXVlc3RDb2RlUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJsChNSZXF1ZXN0Q29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBIQCghyZXRyeV9hdBgDIAEoAxIMCgRsZWZ0GAQgASgFIjAKEVZlcmlmeUNvZGVSZXF1ZXN0Eg0KBXRva2VuGAEgASgJEgwKBGNvZGUYAiABKAkiXwoSVmVyaWZ5Q29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBISCgp0cmllc19sZWZ0GAMgASgFIiYKFVJlcXVlc3ROZXdMaW5rUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJhChZSZXF1ZXN0TmV3TGlua1Jlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBIQCghyZXRyeV9hdBgDIAEoAyJQCgpJdGVtQW5zd2VyEg4KBnZhbHVlcxgBIAMoCRIMCgR0ZXh0GAIgASgJEiQKBGZpbGUYAyABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWEiuAEKDEF0dGVtcHRFdmVudBILCgNzZXEYASABKAMSEwoLc2VydmVyX3RpbWUYAiABKAMSEwoLY2xpZW50X3RpbWUYAyABKAMSDAoEa2luZBgEIAEoCRIPCgdpdGVtX2lkGAUgASgJEg4KBnZhbHVlcxgGIAMoCRIMCgR0ZXh0GAcgASgJEiQKBGZpbGUYCCABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWESDgoGZGV0YWlsGAkgASgJIlUKBVNjb3JlEgsKA3JhdxgBIAEoBRILCgNtYXgYAiABKAUSCwoDcGN0GAMgASgFEg4KBnBhc3NlZBgEIAEoCBIVCg1wZW5kaW5nX2h1bWFuGAUgASgFIrkDCgdBdHRlbXB0EgoKAmlkGAEgASgJEhUKDWFzc2lnbm1lbnRfaWQYAiABKAkSDwoHZXhhbV9pZBgDIAEoCRIUCgxleGFtX3ZlcnNpb24YBCABKAUSEgoKc3RhcnRlZF9hdBgFIAEoAxITCgtkZWFkbGluZV9hdBgGIAEoAxIUCgxzdWJtaXR0ZWRfYXQYByABKAMSNgoHYW5zd2VycxgIIAMoCzIlLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0LkFuc3dlcnNFbnRyeRIPCgdmbGFnZ2VkGAkgAygJEiUKBXNjb3JlGAogASgLMhYuYXNzZXNzbWF0cml4LnYxLlNjb3JlEhAKCGxhc3Rfc2VxGAsgASgDEi0KBmV2ZW50cxgMIAMoCzIdLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0RXZlbnQSEQoJcHVyZ2VkX2F0GA0gASgDEhQKDGZsYWdfcmVhc29ucxgOIAMoCRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIhMKEUdldFNlc3Npb25SZXF1ZXN0IscBChJHZXRTZXNzaW9uUmVzcG9uc2USFQoNYXNzaWdubWVudF9pZBgBIAEoCRI2CgppbnZpdGF0aW9uGAIgASgLMiIuYXNzZXNzbWF0cml4LnYxLkludml0YXRpb25TdW1tYXJ5EiMKBGV4YW0YAyABKAsyFS5hc3Nlc3NtYXRyaXgudjEuRXhhbRIpCgdhdHRlbXB0GAQgASgLMhguYXNzZXNzbWF0cml4LnYxLkF0dGVtcHQSEgoKc2VydmVyX25vdxgFIAEoAyInChNTdGFydEF0dGVtcHRSZXF1ZXN0EhAKCGNvbnNlbnRzGAEgAygJIlUKFFN0YXJ0QXR0ZW1wdFJlc3BvbnNlEikKB2F0dGVtcHQYASABKAsyGC5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdBISCgpzZXJ2ZXJfbm93GAIgASgDImoKE0FwcGVuZEV2ZW50c1JlcXVlc3QSEgoKYXR0ZW1wdF9pZBgBIAEoCRIQCghiYXRjaF9pZBgCIAEoCRItCgZldmVudHMYAyADKAsyHS5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdEV2ZW50IlEKFEFwcGVuZEV2ZW50c1Jlc3BvbnNlEhAKCGxhc3Rfc2VxGAEgASgDEhIKCnNlcnZlcl9ub3cYAiABKAMSEwoLZGVhZGxpbmVfYXQYAyABKAMiOQoUU3VibWl0QXR0ZW1wdFJlcXVlc3QSEgoKYXR0ZW1wdF9pZBgBIAEoCRINCgVmb3JjZRgCIAEoCCKAAQoVU3VibWl0QXR0ZW1wdFJlc3BvbnNlEgoKAm9rGAEgASgIEhgKEG1pc3NpbmdfaXRlbV9pZHMYAiADKAkSKQoHYXR0ZW1wdBgDIAEoCzIYLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0EhYKDmNyZWRlbnRpYWxfdXJsGAQgASgJIhMKEUVuZFNlc3Npb25SZXF1ZXN0IhQKEkVuZFNlc3Npb25SZXNwb25zZSqjAgoHUmVmdXNhbBIXChNSRUZVU0FMX1VOU1BFQ0lGSUVEEAASEwoPUkVGVVNBTF9VTktOT1dOEAESEwoPUkVGVVNBTF9SRVZPS0VEEAISEwoPUkVGVVNBTF9FWFBJUkVEEAMSEgoOUkVGVVNBTF9MT0NLRUQQBBIQCgxSRUZVU0FMX1VTRUQQBRIWChJSRUZVU0FMX1NVUEVSU0VERUQQBhIVChFSRUZVU0FMX1NVQk1JVFRFRBAHEhIKDlJFRlVTQUxfQ0xPU0VEEAgSFAoQUkVGVVNBTF9DT09MRE9XThAJEhEKDVJFRlVTQUxfTElNSVQQChIWChJSRUZVU0FMX1dST05HX0NPREUQCxIWChJSRUZVU0FMX1NUQUxFX0NPREUQDDK/BgoQQ2FuZGlkYXRlU2VydmljZRJPCghPcGVuTGluaxIgLmFzc2Vzc21hdHJpeC52MS5PcGVuTGlua1JlcXVlc3QaIS5hc3Nlc3NtYXRyaXgudjEuT3BlbkxpbmtSZXNwb25zZRJYCgtSZXF1ZXN0Q29kZRIjLmFzc2Vzc21hdHJpeC52MS5SZXF1ZXN0Q29kZVJlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdENvZGVSZXNwb25zZRJVCgpWZXJpZnlDb2RlEiIuYXNzZXNzbWF0cml4LnYxLlZlcmlmeUNvZGVSZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLlZlcmlmeUNvZGVSZXNwb25zZRJhCg5SZXF1ZXN0TmV3TGluaxImLmFzc2Vzc21hdHJpeC52MS5SZXF1ZXN0TmV3TGlua1JlcXVlc3QaJy5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdE5ld0xpbmtSZXNwb25zZRJVCgpHZXRTZXNzaW9uEiIuYXNzZXNzbWF0cml4LnYxLkdldFNlc3Npb25SZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLkdldFNlc3Npb25SZXNwb25zZRJbCgxTdGFydEF0dGVtcHQSJC5hc3Nlc3NtYXRyaXgudjEuU3RhcnRBdHRlbXB0UmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5TdGFydEF0dGVtcHRSZXNwb25zZRJbCgxBcHBlbmRFdmVudHMSJC5hc3Nlc3NtYXRyaXgudjEuQXBwZW5kRXZlbnRzUmVxdWVzdBolLmFzc2Vzc21hdHJpeC52MS5BcHBlbmRFdmVudHNSZXNwb25zZRJeCg1TdWJtaXRBdHRlbXB0EiUuYXNzZXNzbWF0cml4LnYxLlN1Ym1pdEF0dGVtcHRSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLlN1Ym1pdEF0dGVtcHRSZXNwb25zZRJVCgpFbmRTZXNzaW9uEiIuYXNzZXNzbWF0cml4LnYxLkVuZFNlc3Npb25SZXF1ZXN0GiMuYXNzZXNzbWF0cml4LnYxLkVuZFNlc3Npb25SZXNwb25zZULVAQoTY29tLmFzc2Vzc21hdHJpeC52MUIOQ2FuZGlkYXRlUHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z", [file_assessmatrix_v1_exam]);
+  fileDesc("Ch9hc3Nlc3NtYXRyaXgvdjEvY2FuZGlkYXRlLnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiywEKEUludml0YXRpb25TdW1tYXJ5EhIKCmV4YW1fdGl0bGUYASABKAkSDgoGaXNzdWVyGAIgASgJEiMKBGtpbmQYAyABKA4yFS5hc3Nlc3NtYXRyaXgudjEuS2luZBIMCgR0aWVyGAQgASgFEg8KB21pbnV0ZXMYBSABKAUSEAoIcGFzc19wY3QYBiABKAUSEgoKaXRlbV9jb3VudBgHIAEoBRIUCgxtYXNrZWRfZW1haWwYCCABKAkSEgoKZXhwaXJlc19hdBgJIAEoAyIgCg9PcGVuTGlua1JlcXVlc3QSDQoFdG9rZW4YASABKAkilwEKEE9wZW5MaW5rUmVzcG9uc2USCgoCb2sYASABKAgSKQoHcmVmdXNhbBgCIAEoDjIYLmFzc2Vzc21hdHJpeC52MS5SZWZ1c2FsEjYKCmludml0YXRpb24YAyABKAsyIi5hc3Nlc3NtYXRyaXgudjEuSW52aXRhdGlvblN1bW1hcnkSFAoMbWFza2VkX2VtYWlsGAQgASgJIiMKElJlcXVlc3RDb2RlUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJsChNSZXF1ZXN0Q29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBIQCghyZXRyeV9hdBgDIAEoAxIMCgRsZWZ0GAQgASgFIjAKEVZlcmlmeUNvZGVSZXF1ZXN0Eg0KBXRva2VuGAEgASgJEgwKBGNvZGUYAiABKAkiXwoSVmVyaWZ5Q29kZVJlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBISCgp0cmllc19sZWZ0GAMgASgFIiYKFVJlcXVlc3ROZXdMaW5rUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJhChZSZXF1ZXN0TmV3TGlua1Jlc3BvbnNlEgoKAm9rGAEgASgIEikKB3JlZnVzYWwYAiABKA4yGC5hc3Nlc3NtYXRyaXgudjEuUmVmdXNhbBIQCghyZXRyeV9hdBgDIAEoAyJQCgpJdGVtQW5zd2VyEg4KBnZhbHVlcxgBIAMoCRIMCgR0ZXh0GAIgASgJEiQKBGZpbGUYAyABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWEiuAEKDEF0dGVtcHRFdmVudBILCgNzZXEYASABKAMSEwoLc2VydmVyX3RpbWUYAiABKAMSEwoLY2xpZW50X3RpbWUYAyABKAMSDAoEa2luZBgEIAEoCRIPCgdpdGVtX2lkGAUgASgJEg4KBnZhbHVlcxgGIAMoCRIMCgR0ZXh0GAcgASgJEiQKBGZpbGUYCCABKAsyFi5hc3Nlc3NtYXRyaXgudjEuTWVkaWESDgoGZGV0YWlsGAkgASgJIlUKBVNjb3JlEgsKA3JhdxgBIAEoBRILCgNtYXgYAiABKAUSCwoDcGN0GAMgASgFEg4KBnBhc3NlZBgEIAEoCBIVCg1wZW5kaW5nX2h1bWFuGAUgASgFIucDCgdBdHRlbXB0EgoKAmlkGAEgASgJEhUKDWFzc2lnbm1lbnRfaWQYAiABKAkSDwoHZXhhbV9pZBgDIAEoCRIUCgxleGFtX3ZlcnNpb24YBCABKAUSEgoKc3RhcnRlZF9hdBgFIAEoAxITCgtkZWFkbGluZV9hdBgGIAEoAxIUCgxzdWJtaXR0ZWRfYXQYByABKAMSNgoHYW5zd2VycxgIIAMoCzIlLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0LkFuc3dlcnNFbnRyeRIPCgdmbGFnZ2VkGAkgAygJEiUKBXNjb3JlGAogASgLMhYuYXNzZXNzbWF0cml4LnYxLlNjb3JlEhAKCGxhc3Rfc2VxGAsgASgDEi0KBmV2ZW50cxgMIAMoCzIdLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0RXZlbnQSEQoJcHVyZ2VkX2F0GA0gASgDEhQKDGZsYWdfcmVhc29ucxgOIAMoCRIsCgdyZXZpZXdzGA8gAygLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1SZXZpZXcaSwoMQW5zd2Vyc0VudHJ5EgsKA2tleRgBIAEoCRIqCgV2YWx1ZRgCIAEoCzIbLmFzc2Vzc21hdHJpeC52MS5JdGVtQW5zd2VyOgI4ASJPCgpJdGVtUmV2aWV3Eg8KB2l0ZW1faWQYASABKAkSDgoGcG9pbnRzGAIgASgFEhIKCm1heF9wb2ludHMYAyABKAUSDAoEbm90ZRgEIAEoCSITChFHZXRTZXNzaW9uUmVxdWVzdCLfAQoSR2V0U2Vzc2lvblJlc3BvbnNlEhUKDWFzc2lnbm1lbnRfaWQYASABKAkSNgoKaW52aXRhdGlvbhgCIAEoCzIiLmFzc2Vzc21hdHJpeC52MS5JbnZpdGF0aW9uU3VtbWFyeRIjCgRleGFtGAMgASgLMhUuYXNzZXNzbWF0cml4LnYxLkV4YW0SKQoHYXR0ZW1wdBgEIAEoCzIYLmFzc2Vzc21hdHJpeC52MS5BdHRlbXB0EhIKCnNlcnZlcl9ub3cYBSABKAMSFgoOY3JlZGVudGlhbF91cmwYBiABKAkiJwoTU3RhcnRBdHRlbXB0UmVxdWVzdBIQCghjb25zZW50cxgBIAMoCSJVChRTdGFydEF0dGVtcHRSZXNwb25zZRIpCgdhdHRlbXB0GAEgASgLMhguYXNzZXNzbWF0cml4LnYxLkF0dGVtcHQSEgoKc2VydmVyX25vdxgCIAEoAyJqChNBcHBlbmRFdmVudHNSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSEAoIYmF0Y2hfaWQYAiABKAkSLQoGZXZlbnRzGAMgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudCJRChRBcHBlbmRFdmVudHNSZXNwb25zZRIQCghsYXN0X3NlcRgBIAEoAxISCgpzZXJ2ZXJfbm93GAIgASgDEhMKC2RlYWRsaW5lX2F0GAMgASgDIjkKFFN1Ym1pdEF0dGVtcHRSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSDQoFZm9yY2UYAiABKAgigAEKFVN1Ym1pdEF0dGVtcHRSZXNwb25zZRIKCgJvaxgBIAEoCBIYChBtaXNzaW5nX2l0ZW1faWRzGAIgAygJEikKB2F0dGVtcHQYAyABKAsyGC5hc3Nlc3NtYXRyaXgudjEuQXR0ZW1wdBIWCg5jcmVkZW50aWFsX3VybBgEIAEoCSITChFFbmRTZXNzaW9uUmVxdWVzdCIUChJFbmRTZXNzaW9uUmVzcG9uc2UqowIKB1JlZnVzYWwSFwoTUkVGVVNBTF9VTlNQRUNJRklFRBAAEhMKD1JFRlVTQUxfVU5LTk9XThABEhMKD1JFRlVTQUxfUkVWT0tFRBACEhMKD1JFRlVTQUxfRVhQSVJFRBADEhIKDlJFRlVTQUxfTE9DS0VEEAQSEAoMUkVGVVNBTF9VU0VEEAUSFgoSUkVGVVNBTF9TVVBFUlNFREVEEAYSFQoRUkVGVVNBTF9TVUJNSVRURUQQBxISCg5SRUZVU0FMX0NMT1NFRBAIEhQKEFJFRlVTQUxfQ09PTERPV04QCRIRCg1SRUZVU0FMX0xJTUlUEAoSFgoSUkVGVVNBTF9XUk9OR19DT0RFEAsSFgoSUkVGVVNBTF9TVEFMRV9DT0RFEAwyvwYKEENhbmRpZGF0ZVNlcnZpY2USTwoIT3BlbkxpbmsSIC5hc3Nlc3NtYXRyaXgudjEuT3BlbkxpbmtSZXF1ZXN0GiEuYXNzZXNzbWF0cml4LnYxLk9wZW5MaW5rUmVzcG9uc2USWAoLUmVxdWVzdENvZGUSIy5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdENvZGVSZXF1ZXN0GiQuYXNzZXNzbWF0cml4LnYxLlJlcXVlc3RDb2RlUmVzcG9uc2USVQoKVmVyaWZ5Q29kZRIiLmFzc2Vzc21hdHJpeC52MS5WZXJpZnlDb2RlUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5WZXJpZnlDb2RlUmVzcG9uc2USYQoOUmVxdWVzdE5ld0xpbmsSJi5hc3Nlc3NtYXRyaXgudjEuUmVxdWVzdE5ld0xpbmtSZXF1ZXN0GicuYXNzZXNzbWF0cml4LnYxLlJlcXVlc3ROZXdMaW5rUmVzcG9uc2USVQoKR2V0U2Vzc2lvbhIiLmFzc2Vzc21hdHJpeC52MS5HZXRTZXNzaW9uUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5HZXRTZXNzaW9uUmVzcG9uc2USWwoMU3RhcnRBdHRlbXB0EiQuYXNzZXNzbWF0cml4LnYxLlN0YXJ0QXR0ZW1wdFJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuU3RhcnRBdHRlbXB0UmVzcG9uc2USWwoMQXBwZW5kRXZlbnRzEiQuYXNzZXNzbWF0cml4LnYxLkFwcGVuZEV2ZW50c1JlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuQXBwZW5kRXZlbnRzUmVzcG9uc2USXgoNU3VibWl0QXR0ZW1wdBIlLmFzc2Vzc21hdHJpeC52MS5TdWJtaXRBdHRlbXB0UmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5TdWJtaXRBdHRlbXB0UmVzcG9uc2USVQoKRW5kU2Vzc2lvbhIiLmFzc2Vzc21hdHJpeC52MS5FbmRTZXNzaW9uUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5FbmRTZXNzaW9uUmVzcG9uc2VC1QEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCDkNhbmRpZGF0ZVByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw", [file_assessmatrix_v1_exam]);
 
 /**
  * What the invitation screen shows before anything is collected.
@@ -490,6 +490,14 @@ export type Attempt = Message<"assessmatrix.v1.Attempt"> & {
    * @generated from field: repeated string flag_reasons = 14;
    */
   flagReasons: string[];
+
+  /**
+   * Served to the candidate once they hand in: what a person gave each
+   * answer they scored, with the reviewer's note.
+   *
+   * @generated from field: repeated assessmatrix.v1.ItemReview reviews = 15;
+   */
+  reviews: ItemReview[];
 };
 
 /**
@@ -498,6 +506,38 @@ export type Attempt = Message<"assessmatrix.v1.Attempt"> & {
  */
 export const AttemptSchema: GenMessage<Attempt> = /*@__PURE__*/
   messageDesc(file_assessmatrix_v1_candidate, 12);
+
+/**
+ * @generated from message assessmatrix.v1.ItemReview
+ */
+export type ItemReview = Message<"assessmatrix.v1.ItemReview"> & {
+  /**
+   * @generated from field: string item_id = 1;
+   */
+  itemId: string;
+
+  /**
+   * @generated from field: int32 points = 2;
+   */
+  points: number;
+
+  /**
+   * @generated from field: int32 max_points = 3;
+   */
+  maxPoints: number;
+
+  /**
+   * @generated from field: string note = 4;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message assessmatrix.v1.ItemReview.
+ * Use `create(ItemReviewSchema)` to create a new message.
+ */
+export const ItemReviewSchema: GenMessage<ItemReview> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_candidate, 13);
 
 /**
  * @generated from message assessmatrix.v1.GetSessionRequest
@@ -510,7 +550,7 @@ export type GetSessionRequest = Message<"assessmatrix.v1.GetSessionRequest"> & {
  * Use `create(GetSessionRequestSchema)` to create a new message.
  */
 export const GetSessionRequestSchema: GenMessage<GetSessionRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 13);
+  messageDesc(file_assessmatrix_v1_candidate, 14);
 
 /**
  * @generated from message assessmatrix.v1.GetSessionResponse
@@ -544,6 +584,13 @@ export type GetSessionResponse = Message<"assessmatrix.v1.GetSessionResponse"> &
    * @generated from field: int64 server_now = 5;
    */
   serverNow: bigint;
+
+  /**
+   * Where the credential this attempt earned can be checked, once it has one.
+   *
+   * @generated from field: string credential_url = 6;
+   */
+  credentialUrl: string;
 };
 
 /**
@@ -551,7 +598,7 @@ export type GetSessionResponse = Message<"assessmatrix.v1.GetSessionResponse"> &
  * Use `create(GetSessionResponseSchema)` to create a new message.
  */
 export const GetSessionResponseSchema: GenMessage<GetSessionResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 14);
+  messageDesc(file_assessmatrix_v1_candidate, 15);
 
 /**
  * @generated from message assessmatrix.v1.StartAttemptRequest
@@ -573,7 +620,7 @@ export type StartAttemptRequest = Message<"assessmatrix.v1.StartAttemptRequest">
  * Use `create(StartAttemptRequestSchema)` to create a new message.
  */
 export const StartAttemptRequestSchema: GenMessage<StartAttemptRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 15);
+  messageDesc(file_assessmatrix_v1_candidate, 16);
 
 /**
  * @generated from message assessmatrix.v1.StartAttemptResponse
@@ -595,7 +642,7 @@ export type StartAttemptResponse = Message<"assessmatrix.v1.StartAttemptResponse
  * Use `create(StartAttemptResponseSchema)` to create a new message.
  */
 export const StartAttemptResponseSchema: GenMessage<StartAttemptResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 16);
+  messageDesc(file_assessmatrix_v1_candidate, 17);
 
 /**
  * @generated from message assessmatrix.v1.AppendEventsRequest
@@ -626,7 +673,7 @@ export type AppendEventsRequest = Message<"assessmatrix.v1.AppendEventsRequest">
  * Use `create(AppendEventsRequestSchema)` to create a new message.
  */
 export const AppendEventsRequestSchema: GenMessage<AppendEventsRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 17);
+  messageDesc(file_assessmatrix_v1_candidate, 18);
 
 /**
  * @generated from message assessmatrix.v1.AppendEventsResponse
@@ -653,7 +700,7 @@ export type AppendEventsResponse = Message<"assessmatrix.v1.AppendEventsResponse
  * Use `create(AppendEventsResponseSchema)` to create a new message.
  */
 export const AppendEventsResponseSchema: GenMessage<AppendEventsResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 18);
+  messageDesc(file_assessmatrix_v1_candidate, 19);
 
 /**
  * @generated from message assessmatrix.v1.SubmitAttemptRequest
@@ -678,7 +725,7 @@ export type SubmitAttemptRequest = Message<"assessmatrix.v1.SubmitAttemptRequest
  * Use `create(SubmitAttemptRequestSchema)` to create a new message.
  */
 export const SubmitAttemptRequestSchema: GenMessage<SubmitAttemptRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 19);
+  messageDesc(file_assessmatrix_v1_candidate, 20);
 
 /**
  * @generated from message assessmatrix.v1.SubmitAttemptResponse
@@ -715,7 +762,7 @@ export type SubmitAttemptResponse = Message<"assessmatrix.v1.SubmitAttemptRespon
  * Use `create(SubmitAttemptResponseSchema)` to create a new message.
  */
 export const SubmitAttemptResponseSchema: GenMessage<SubmitAttemptResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 20);
+  messageDesc(file_assessmatrix_v1_candidate, 21);
 
 /**
  * @generated from message assessmatrix.v1.EndSessionRequest
@@ -728,7 +775,7 @@ export type EndSessionRequest = Message<"assessmatrix.v1.EndSessionRequest"> & {
  * Use `create(EndSessionRequestSchema)` to create a new message.
  */
 export const EndSessionRequestSchema: GenMessage<EndSessionRequest> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 21);
+  messageDesc(file_assessmatrix_v1_candidate, 22);
 
 /**
  * @generated from message assessmatrix.v1.EndSessionResponse
@@ -741,7 +788,7 @@ export type EndSessionResponse = Message<"assessmatrix.v1.EndSessionResponse"> &
  * Use `create(EndSessionResponseSchema)` to create a new message.
  */
 export const EndSessionResponseSchema: GenMessage<EndSessionResponse> = /*@__PURE__*/
-  messageDesc(file_assessmatrix_v1_candidate, 22);
+  messageDesc(file_assessmatrix_v1_candidate, 23);
 
 /**
  * Why a link was refused. Everything short of UNKNOWN is told only to

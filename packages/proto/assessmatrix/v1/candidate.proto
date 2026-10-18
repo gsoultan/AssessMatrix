@@ -172,6 +172,16 @@ message Attempt {
   // Served to the candidate once they hand in: the reason for each integrity
   // flag on their attempt, in Indonesian, so they can see and contest it.
   repeated string flag_reasons = 14;
+  // Served to the candidate once they hand in: what a person gave each
+  // answer they scored, with the reviewer's note.
+  repeated ItemReview reviews = 15;
+}
+
+message ItemReview {
+  string item_id = 1;
+  int32 points = 2;
+  int32 max_points = 3;
+  string note = 4;
 }
 
 message GetSessionRequest {}
@@ -184,6 +194,8 @@ message GetSessionResponse {
   // The attempt so far, if one was started.
   Attempt attempt = 4;
   int64 server_now = 5;
+  // Where the credential this attempt earned can be checked, once it has one.
+  string credential_url = 6;
 }
 
 message StartAttemptRequest {

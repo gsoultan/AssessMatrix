@@ -249,8 +249,11 @@ function Analysis({ examId }: { examId: string }) {
                   ))}
                 </td>
                 <td className="tnum px-2 py-2.5">{fmt(it.pValue)}</td>
-                <td className="tnum px-2 py-2.5" style={{ color: it.pointBiserial < 0.2 ? 'var(--color-serious)' : undefined }}>
-                  {fmt(it.pointBiserial)}
+                <td
+                  className="tnum px-2 py-2.5"
+                  style={{ color: !it.noSpread && it.pointBiserial < 0.2 ? 'var(--color-serious)' : undefined }}
+                >
+                  {it.noSpread ? '—' : fmt(it.pointBiserial)}
                 </td>
                 <td className="tnum px-4 py-2.5 text-ink-2">
                   {it.choices.map((c, i) => (

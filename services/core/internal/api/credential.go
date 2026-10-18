@@ -35,6 +35,12 @@ const (
 // IssuerURL is the issuer's id: a URL that serves its profile.
 func (s *Server) IssuerURL(tenant string) string { return s.PublicURL + "/issuers/" + tenant }
 
+// CredentialStatusURL is the credential's revocation list (1EdTech
+// Revocation List Status Method): empty while it stands.
+func (s *Server) CredentialStatusURL(id string) string {
+	return s.PublicURL + "/credentials/" + id + "/status"
+}
+
 // CredentialURL is where a person checks a credential.
 func (s *Server) CredentialURL(id string) string { return s.PublicURL + "/verify/#" + id }
 
@@ -191,6 +197,8 @@ func (s *Server) settleCredential(ctx context.Context, tx pgx.Tx, att *attemptRo
 		"issuer":    map[string]any{"id": issuer, "type": []string{"Profile"}, "name": tenantName},
 		"validFrom": now.Format(time.RFC3339),
 		"name":      title,
+		// Revocation that any verifier can check, not only ours.
+		"credentialStatus": map[string]any{"id": s.CredentialStatusURL(id), "type": "1EdTechRevocationList"},
 		"credentialSubject": map[string]any{
 			"type": []string{"AchievementSubject"},
 			"identifier": []map[string]any{{

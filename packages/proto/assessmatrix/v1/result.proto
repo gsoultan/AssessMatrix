@@ -152,6 +152,8 @@ message ItemStat {
   repeated ChoiceStat choices = 6;
   // Plain-language reading of the numbers, for authors.
   repeated string notes = 7;
+  // Everyone scored the same, so point_biserial is undefined (sent as 0).
+  bool no_spread = 8;
 }
 
 message ChoiceStat {

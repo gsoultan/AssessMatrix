@@ -379,8 +379,18 @@ func (s *candidateService) GetSession(ctx context.Context, _ *connect.Request[v1
 		if err != nil {
 			return err
 		}
-		out.Attempt, err = s.candidateAttempt(ctx, tx, att, e)
-		return err
+		if out.Attempt, err = s.candidateAttempt(ctx, tx, att, e); err != nil {
+			return err
+		}
+		// A credential can arrive after hand-in (an essay reviewed later).
+		var cred string
+		err = tx.QueryRow(ctx, `SELECT id FROM credentials WHERE attempt_id = $1 AND revoked_at IS NULL`, att.ID).Scan(&cred)
+		if err == nil {
+			out.CredentialUrl = s.CredentialURL(cred)
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "GetSession", err)
@@ -725,6 +735,13 @@ func (s *candidateService) candidateAttempt(ctx context.Context, tx pgx.Tx, att 
 	}
 	for _, f := range domain.Flags(events, questionNumbers(e), intact, brokenAt) {
 		out.FlagReasons = append(out.FlagReasons, f.ReasonID)
+	}
+	reviews := domain.Reviews(events)
+	for _, it := range domain.AllItems(e) {
+		if r, ok := reviews[it.GetId()]; ok {
+			out.Reviews = append(out.Reviews, &v1.ItemReview{ItemId: it.GetId(), Points: min(max(r.Points, 0), it.GetPoints()),
+				MaxPoints: it.GetPoints(), Note: r.Note})
+		}
 	}
 	return out, nil
 }

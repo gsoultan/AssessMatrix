@@ -938,7 +938,10 @@ type Attempt struct {
 	PurgedAt int64 `protobuf:"varint,13,opt,name=purged_at,json=purgedAt,proto3" json:"purged_at,omitempty"`
 	// Served to the candidate once they hand in: the reason for each integrity
 	// flag on their attempt, in Indonesian, so they can see and contest it.
-	FlagReasons   []string `protobuf:"bytes,14,rep,name=flag_reasons,json=flagReasons,proto3" json:"flag_reasons,omitempty"`
+	FlagReasons []string `protobuf:"bytes,14,rep,name=flag_reasons,json=flagReasons,proto3" json:"flag_reasons,omitempty"`
+	// Served to the candidate once they hand in: what a person gave each
+	// answer they scored, with the reviewer's note.
+	Reviews       []*ItemReview `protobuf:"bytes,15,rep,name=reviews,proto3" json:"reviews,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1071,6 +1074,81 @@ func (x *Attempt) GetFlagReasons() []string {
 	return nil
 }
 
+func (x *Attempt) GetReviews() []*ItemReview {
+	if x != nil {
+		return x.Reviews
+	}
+	return nil
+}
+
+type ItemReview struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	Points        int32                  `protobuf:"varint,2,opt,name=points,proto3" json:"points,omitempty"`
+	MaxPoints     int32                  `protobuf:"varint,3,opt,name=max_points,json=maxPoints,proto3" json:"max_points,omitempty"`
+	Note          string                 `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemReview) Reset() {
+	*x = ItemReview{}
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemReview) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemReview) ProtoMessage() {}
+
+func (x *ItemReview) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemReview.ProtoReflect.Descriptor instead.
+func (*ItemReview) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ItemReview) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *ItemReview) GetPoints() int32 {
+	if x != nil {
+		return x.Points
+	}
+	return 0
+}
+
+func (x *ItemReview) GetMaxPoints() int32 {
+	if x != nil {
+		return x.MaxPoints
+	}
+	return 0
+}
+
+func (x *ItemReview) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
 type GetSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1079,7 +1157,7 @@ type GetSessionRequest struct {
 
 func (x *GetSessionRequest) Reset() {
 	*x = GetSessionRequest{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[13]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1091,7 +1169,7 @@ func (x *GetSessionRequest) String() string {
 func (*GetSessionRequest) ProtoMessage() {}
 
 func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[13]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1104,7 +1182,7 @@ func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetSessionRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{13}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{14}
 }
 
 type GetSessionResponse struct {
@@ -1114,15 +1192,17 @@ type GetSessionResponse struct {
 	// The pinned version, with every answer key removed.
 	Exam *Exam `protobuf:"bytes,3,opt,name=exam,proto3" json:"exam,omitempty"`
 	// The attempt so far, if one was started.
-	Attempt       *Attempt `protobuf:"bytes,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
-	ServerNow     int64    `protobuf:"varint,5,opt,name=server_now,json=serverNow,proto3" json:"server_now,omitempty"`
+	Attempt   *Attempt `protobuf:"bytes,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	ServerNow int64    `protobuf:"varint,5,opt,name=server_now,json=serverNow,proto3" json:"server_now,omitempty"`
+	// Where the credential this attempt earned can be checked, once it has one.
+	CredentialUrl string `protobuf:"bytes,6,opt,name=credential_url,json=credentialUrl,proto3" json:"credential_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetSessionResponse) Reset() {
 	*x = GetSessionResponse{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[14]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1134,7 +1214,7 @@ func (x *GetSessionResponse) String() string {
 func (*GetSessionResponse) ProtoMessage() {}
 
 func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[14]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1147,7 +1227,7 @@ func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetSessionResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{14}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetSessionResponse) GetAssignmentId() string {
@@ -1185,6 +1265,13 @@ func (x *GetSessionResponse) GetServerNow() int64 {
 	return 0
 }
 
+func (x *GetSessionResponse) GetCredentialUrl() string {
+	if x != nil {
+		return x.CredentialUrl
+	}
+	return ""
+}
+
 type StartAttemptRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The purposes the candidate agreed to on the consent screen, each
@@ -1198,7 +1285,7 @@ type StartAttemptRequest struct {
 
 func (x *StartAttemptRequest) Reset() {
 	*x = StartAttemptRequest{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[15]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1210,7 +1297,7 @@ func (x *StartAttemptRequest) String() string {
 func (*StartAttemptRequest) ProtoMessage() {}
 
 func (x *StartAttemptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[15]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1223,7 +1310,7 @@ func (x *StartAttemptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartAttemptRequest.ProtoReflect.Descriptor instead.
 func (*StartAttemptRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{15}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartAttemptRequest) GetConsents() []string {
@@ -1243,7 +1330,7 @@ type StartAttemptResponse struct {
 
 func (x *StartAttemptResponse) Reset() {
 	*x = StartAttemptResponse{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[16]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1255,7 +1342,7 @@ func (x *StartAttemptResponse) String() string {
 func (*StartAttemptResponse) ProtoMessage() {}
 
 func (x *StartAttemptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[16]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1268,7 +1355,7 @@ func (x *StartAttemptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartAttemptResponse.ProtoReflect.Descriptor instead.
 func (*StartAttemptResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{16}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StartAttemptResponse) GetAttempt() *Attempt {
@@ -1298,7 +1385,7 @@ type AppendEventsRequest struct {
 
 func (x *AppendEventsRequest) Reset() {
 	*x = AppendEventsRequest{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[17]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1310,7 +1397,7 @@ func (x *AppendEventsRequest) String() string {
 func (*AppendEventsRequest) ProtoMessage() {}
 
 func (x *AppendEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[17]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1323,7 +1410,7 @@ func (x *AppendEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendEventsRequest.ProtoReflect.Descriptor instead.
 func (*AppendEventsRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{17}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AppendEventsRequest) GetAttemptId() string {
@@ -1358,7 +1445,7 @@ type AppendEventsResponse struct {
 
 func (x *AppendEventsResponse) Reset() {
 	*x = AppendEventsResponse{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[18]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1370,7 +1457,7 @@ func (x *AppendEventsResponse) String() string {
 func (*AppendEventsResponse) ProtoMessage() {}
 
 func (x *AppendEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[18]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1383,7 +1470,7 @@ func (x *AppendEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendEventsResponse.ProtoReflect.Descriptor instead.
 func (*AppendEventsResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{18}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AppendEventsResponse) GetLastSeq() int64 {
@@ -1419,7 +1506,7 @@ type SubmitAttemptRequest struct {
 
 func (x *SubmitAttemptRequest) Reset() {
 	*x = SubmitAttemptRequest{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[19]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1431,7 +1518,7 @@ func (x *SubmitAttemptRequest) String() string {
 func (*SubmitAttemptRequest) ProtoMessage() {}
 
 func (x *SubmitAttemptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[19]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1444,7 +1531,7 @@ func (x *SubmitAttemptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitAttemptRequest.ProtoReflect.Descriptor instead.
 func (*SubmitAttemptRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{19}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *SubmitAttemptRequest) GetAttemptId() string {
@@ -1476,7 +1563,7 @@ type SubmitAttemptResponse struct {
 
 func (x *SubmitAttemptResponse) Reset() {
 	*x = SubmitAttemptResponse{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[20]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1488,7 +1575,7 @@ func (x *SubmitAttemptResponse) String() string {
 func (*SubmitAttemptResponse) ProtoMessage() {}
 
 func (x *SubmitAttemptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[20]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1501,7 +1588,7 @@ func (x *SubmitAttemptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitAttemptResponse.ProtoReflect.Descriptor instead.
 func (*SubmitAttemptResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{20}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SubmitAttemptResponse) GetOk() bool {
@@ -1540,7 +1627,7 @@ type EndSessionRequest struct {
 
 func (x *EndSessionRequest) Reset() {
 	*x = EndSessionRequest{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[21]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1552,7 +1639,7 @@ func (x *EndSessionRequest) String() string {
 func (*EndSessionRequest) ProtoMessage() {}
 
 func (x *EndSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[21]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1565,7 +1652,7 @@ func (x *EndSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndSessionRequest.ProtoReflect.Descriptor instead.
 func (*EndSessionRequest) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{21}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{22}
 }
 
 type EndSessionResponse struct {
@@ -1576,7 +1663,7 @@ type EndSessionResponse struct {
 
 func (x *EndSessionResponse) Reset() {
 	*x = EndSessionResponse{}
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[22]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1588,7 +1675,7 @@ func (x *EndSessionResponse) String() string {
 func (*EndSessionResponse) ProtoMessage() {}
 
 func (x *EndSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[22]
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1601,7 +1688,7 @@ func (x *EndSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndSessionResponse.ProtoReflect.Descriptor instead.
 func (*EndSessionResponse) Descriptor() ([]byte, []int) {
-	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{22}
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{23}
 }
 
 var File_assessmatrix_v1_candidate_proto protoreflect.FileDescriptor
@@ -1674,7 +1761,7 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x03max\x18\x02 \x01(\x05R\x03max\x12\x10\n" +
 	"\x03pct\x18\x03 \x01(\x05R\x03pct\x12\x16\n" +
 	"\x06passed\x18\x04 \x01(\bR\x06passed\x12#\n" +
-	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\xd1\x04\n" +
+	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\x88\x05\n" +
 	"\aAttempt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rassignment_id\x18\x02 \x01(\tR\fassignmentId\x12\x17\n" +
@@ -1692,11 +1779,19 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\blast_seq\x18\v \x01(\x03R\alastSeq\x125\n" +
 	"\x06events\x18\f \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x12\x1b\n" +
 	"\tpurged_at\x18\r \x01(\x03R\bpurgedAt\x12!\n" +
-	"\fflag_reasons\x18\x0e \x03(\tR\vflagReasons\x1aW\n" +
+	"\fflag_reasons\x18\x0e \x03(\tR\vflagReasons\x125\n" +
+	"\areviews\x18\x0f \x03(\v2\x1b.assessmatrix.v1.ItemReviewR\areviews\x1aW\n" +
 	"\fAnswersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
-	"\x05value\x18\x02 \x01(\v2\x1b.assessmatrix.v1.ItemAnswerR\x05value:\x028\x01\"\x13\n" +
-	"\x11GetSessionRequest\"\xfb\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x1b.assessmatrix.v1.ItemAnswerR\x05value:\x028\x01\"p\n" +
+	"\n" +
+	"ItemReview\x12\x17\n" +
+	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
+	"\x06points\x18\x02 \x01(\x05R\x06points\x12\x1d\n" +
+	"\n" +
+	"max_points\x18\x03 \x01(\x05R\tmaxPoints\x12\x12\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\"\x13\n" +
+	"\x11GetSessionRequest\"\xa2\x02\n" +
 	"\x12GetSessionResponse\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12B\n" +
 	"\n" +
@@ -1705,7 +1800,8 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x04exam\x18\x03 \x01(\v2\x15.assessmatrix.v1.ExamR\x04exam\x122\n" +
 	"\aattempt\x18\x04 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12\x1d\n" +
 	"\n" +
-	"server_now\x18\x05 \x01(\x03R\tserverNow\"1\n" +
+	"server_now\x18\x05 \x01(\x03R\tserverNow\x12%\n" +
+	"\x0ecredential_url\x18\x06 \x01(\tR\rcredentialUrl\"1\n" +
 	"\x13StartAttemptRequest\x12\x1a\n" +
 	"\bconsents\x18\x01 \x03(\tR\bconsents\"i\n" +
 	"\x14StartAttemptResponse\x122\n" +
@@ -1777,7 +1873,7 @@ func file_assessmatrix_v1_candidate_proto_rawDescGZIP() []byte {
 }
 
 var file_assessmatrix_v1_candidate_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_assessmatrix_v1_candidate_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_assessmatrix_v1_candidate_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_assessmatrix_v1_candidate_proto_goTypes = []any{
 	(Refusal)(0),                   // 0: assessmatrix.v1.Refusal
 	(*InvitationSummary)(nil),      // 1: assessmatrix.v1.InvitationSummary
@@ -1793,63 +1889,65 @@ var file_assessmatrix_v1_candidate_proto_goTypes = []any{
 	(*AttemptEvent)(nil),           // 11: assessmatrix.v1.AttemptEvent
 	(*Score)(nil),                  // 12: assessmatrix.v1.Score
 	(*Attempt)(nil),                // 13: assessmatrix.v1.Attempt
-	(*GetSessionRequest)(nil),      // 14: assessmatrix.v1.GetSessionRequest
-	(*GetSessionResponse)(nil),     // 15: assessmatrix.v1.GetSessionResponse
-	(*StartAttemptRequest)(nil),    // 16: assessmatrix.v1.StartAttemptRequest
-	(*StartAttemptResponse)(nil),   // 17: assessmatrix.v1.StartAttemptResponse
-	(*AppendEventsRequest)(nil),    // 18: assessmatrix.v1.AppendEventsRequest
-	(*AppendEventsResponse)(nil),   // 19: assessmatrix.v1.AppendEventsResponse
-	(*SubmitAttemptRequest)(nil),   // 20: assessmatrix.v1.SubmitAttemptRequest
-	(*SubmitAttemptResponse)(nil),  // 21: assessmatrix.v1.SubmitAttemptResponse
-	(*EndSessionRequest)(nil),      // 22: assessmatrix.v1.EndSessionRequest
-	(*EndSessionResponse)(nil),     // 23: assessmatrix.v1.EndSessionResponse
-	nil,                            // 24: assessmatrix.v1.Attempt.AnswersEntry
-	(Kind)(0),                      // 25: assessmatrix.v1.Kind
-	(*Media)(nil),                  // 26: assessmatrix.v1.Media
-	(*Exam)(nil),                   // 27: assessmatrix.v1.Exam
+	(*ItemReview)(nil),             // 14: assessmatrix.v1.ItemReview
+	(*GetSessionRequest)(nil),      // 15: assessmatrix.v1.GetSessionRequest
+	(*GetSessionResponse)(nil),     // 16: assessmatrix.v1.GetSessionResponse
+	(*StartAttemptRequest)(nil),    // 17: assessmatrix.v1.StartAttemptRequest
+	(*StartAttemptResponse)(nil),   // 18: assessmatrix.v1.StartAttemptResponse
+	(*AppendEventsRequest)(nil),    // 19: assessmatrix.v1.AppendEventsRequest
+	(*AppendEventsResponse)(nil),   // 20: assessmatrix.v1.AppendEventsResponse
+	(*SubmitAttemptRequest)(nil),   // 21: assessmatrix.v1.SubmitAttemptRequest
+	(*SubmitAttemptResponse)(nil),  // 22: assessmatrix.v1.SubmitAttemptResponse
+	(*EndSessionRequest)(nil),      // 23: assessmatrix.v1.EndSessionRequest
+	(*EndSessionResponse)(nil),     // 24: assessmatrix.v1.EndSessionResponse
+	nil,                            // 25: assessmatrix.v1.Attempt.AnswersEntry
+	(Kind)(0),                      // 26: assessmatrix.v1.Kind
+	(*Media)(nil),                  // 27: assessmatrix.v1.Media
+	(*Exam)(nil),                   // 28: assessmatrix.v1.Exam
 }
 var file_assessmatrix_v1_candidate_proto_depIdxs = []int32{
-	25, // 0: assessmatrix.v1.InvitationSummary.kind:type_name -> assessmatrix.v1.Kind
+	26, // 0: assessmatrix.v1.InvitationSummary.kind:type_name -> assessmatrix.v1.Kind
 	0,  // 1: assessmatrix.v1.OpenLinkResponse.refusal:type_name -> assessmatrix.v1.Refusal
 	1,  // 2: assessmatrix.v1.OpenLinkResponse.invitation:type_name -> assessmatrix.v1.InvitationSummary
 	0,  // 3: assessmatrix.v1.RequestCodeResponse.refusal:type_name -> assessmatrix.v1.Refusal
 	0,  // 4: assessmatrix.v1.VerifyCodeResponse.refusal:type_name -> assessmatrix.v1.Refusal
 	0,  // 5: assessmatrix.v1.RequestNewLinkResponse.refusal:type_name -> assessmatrix.v1.Refusal
-	26, // 6: assessmatrix.v1.ItemAnswer.file:type_name -> assessmatrix.v1.Media
-	26, // 7: assessmatrix.v1.AttemptEvent.file:type_name -> assessmatrix.v1.Media
-	24, // 8: assessmatrix.v1.Attempt.answers:type_name -> assessmatrix.v1.Attempt.AnswersEntry
+	27, // 6: assessmatrix.v1.ItemAnswer.file:type_name -> assessmatrix.v1.Media
+	27, // 7: assessmatrix.v1.AttemptEvent.file:type_name -> assessmatrix.v1.Media
+	25, // 8: assessmatrix.v1.Attempt.answers:type_name -> assessmatrix.v1.Attempt.AnswersEntry
 	12, // 9: assessmatrix.v1.Attempt.score:type_name -> assessmatrix.v1.Score
 	11, // 10: assessmatrix.v1.Attempt.events:type_name -> assessmatrix.v1.AttemptEvent
-	1,  // 11: assessmatrix.v1.GetSessionResponse.invitation:type_name -> assessmatrix.v1.InvitationSummary
-	27, // 12: assessmatrix.v1.GetSessionResponse.exam:type_name -> assessmatrix.v1.Exam
-	13, // 13: assessmatrix.v1.GetSessionResponse.attempt:type_name -> assessmatrix.v1.Attempt
-	13, // 14: assessmatrix.v1.StartAttemptResponse.attempt:type_name -> assessmatrix.v1.Attempt
-	11, // 15: assessmatrix.v1.AppendEventsRequest.events:type_name -> assessmatrix.v1.AttemptEvent
-	13, // 16: assessmatrix.v1.SubmitAttemptResponse.attempt:type_name -> assessmatrix.v1.Attempt
-	10, // 17: assessmatrix.v1.Attempt.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
-	2,  // 18: assessmatrix.v1.CandidateService.OpenLink:input_type -> assessmatrix.v1.OpenLinkRequest
-	4,  // 19: assessmatrix.v1.CandidateService.RequestCode:input_type -> assessmatrix.v1.RequestCodeRequest
-	6,  // 20: assessmatrix.v1.CandidateService.VerifyCode:input_type -> assessmatrix.v1.VerifyCodeRequest
-	8,  // 21: assessmatrix.v1.CandidateService.RequestNewLink:input_type -> assessmatrix.v1.RequestNewLinkRequest
-	14, // 22: assessmatrix.v1.CandidateService.GetSession:input_type -> assessmatrix.v1.GetSessionRequest
-	16, // 23: assessmatrix.v1.CandidateService.StartAttempt:input_type -> assessmatrix.v1.StartAttemptRequest
-	18, // 24: assessmatrix.v1.CandidateService.AppendEvents:input_type -> assessmatrix.v1.AppendEventsRequest
-	20, // 25: assessmatrix.v1.CandidateService.SubmitAttempt:input_type -> assessmatrix.v1.SubmitAttemptRequest
-	22, // 26: assessmatrix.v1.CandidateService.EndSession:input_type -> assessmatrix.v1.EndSessionRequest
-	3,  // 27: assessmatrix.v1.CandidateService.OpenLink:output_type -> assessmatrix.v1.OpenLinkResponse
-	5,  // 28: assessmatrix.v1.CandidateService.RequestCode:output_type -> assessmatrix.v1.RequestCodeResponse
-	7,  // 29: assessmatrix.v1.CandidateService.VerifyCode:output_type -> assessmatrix.v1.VerifyCodeResponse
-	9,  // 30: assessmatrix.v1.CandidateService.RequestNewLink:output_type -> assessmatrix.v1.RequestNewLinkResponse
-	15, // 31: assessmatrix.v1.CandidateService.GetSession:output_type -> assessmatrix.v1.GetSessionResponse
-	17, // 32: assessmatrix.v1.CandidateService.StartAttempt:output_type -> assessmatrix.v1.StartAttemptResponse
-	19, // 33: assessmatrix.v1.CandidateService.AppendEvents:output_type -> assessmatrix.v1.AppendEventsResponse
-	21, // 34: assessmatrix.v1.CandidateService.SubmitAttempt:output_type -> assessmatrix.v1.SubmitAttemptResponse
-	23, // 35: assessmatrix.v1.CandidateService.EndSession:output_type -> assessmatrix.v1.EndSessionResponse
-	27, // [27:36] is the sub-list for method output_type
-	18, // [18:27] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	14, // 11: assessmatrix.v1.Attempt.reviews:type_name -> assessmatrix.v1.ItemReview
+	1,  // 12: assessmatrix.v1.GetSessionResponse.invitation:type_name -> assessmatrix.v1.InvitationSummary
+	28, // 13: assessmatrix.v1.GetSessionResponse.exam:type_name -> assessmatrix.v1.Exam
+	13, // 14: assessmatrix.v1.GetSessionResponse.attempt:type_name -> assessmatrix.v1.Attempt
+	13, // 15: assessmatrix.v1.StartAttemptResponse.attempt:type_name -> assessmatrix.v1.Attempt
+	11, // 16: assessmatrix.v1.AppendEventsRequest.events:type_name -> assessmatrix.v1.AttemptEvent
+	13, // 17: assessmatrix.v1.SubmitAttemptResponse.attempt:type_name -> assessmatrix.v1.Attempt
+	10, // 18: assessmatrix.v1.Attempt.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
+	2,  // 19: assessmatrix.v1.CandidateService.OpenLink:input_type -> assessmatrix.v1.OpenLinkRequest
+	4,  // 20: assessmatrix.v1.CandidateService.RequestCode:input_type -> assessmatrix.v1.RequestCodeRequest
+	6,  // 21: assessmatrix.v1.CandidateService.VerifyCode:input_type -> assessmatrix.v1.VerifyCodeRequest
+	8,  // 22: assessmatrix.v1.CandidateService.RequestNewLink:input_type -> assessmatrix.v1.RequestNewLinkRequest
+	15, // 23: assessmatrix.v1.CandidateService.GetSession:input_type -> assessmatrix.v1.GetSessionRequest
+	17, // 24: assessmatrix.v1.CandidateService.StartAttempt:input_type -> assessmatrix.v1.StartAttemptRequest
+	19, // 25: assessmatrix.v1.CandidateService.AppendEvents:input_type -> assessmatrix.v1.AppendEventsRequest
+	21, // 26: assessmatrix.v1.CandidateService.SubmitAttempt:input_type -> assessmatrix.v1.SubmitAttemptRequest
+	23, // 27: assessmatrix.v1.CandidateService.EndSession:input_type -> assessmatrix.v1.EndSessionRequest
+	3,  // 28: assessmatrix.v1.CandidateService.OpenLink:output_type -> assessmatrix.v1.OpenLinkResponse
+	5,  // 29: assessmatrix.v1.CandidateService.RequestCode:output_type -> assessmatrix.v1.RequestCodeResponse
+	7,  // 30: assessmatrix.v1.CandidateService.VerifyCode:output_type -> assessmatrix.v1.VerifyCodeResponse
+	9,  // 31: assessmatrix.v1.CandidateService.RequestNewLink:output_type -> assessmatrix.v1.RequestNewLinkResponse
+	16, // 32: assessmatrix.v1.CandidateService.GetSession:output_type -> assessmatrix.v1.GetSessionResponse
+	18, // 33: assessmatrix.v1.CandidateService.StartAttempt:output_type -> assessmatrix.v1.StartAttemptResponse
+	20, // 34: assessmatrix.v1.CandidateService.AppendEvents:output_type -> assessmatrix.v1.AppendEventsResponse
+	22, // 35: assessmatrix.v1.CandidateService.SubmitAttempt:output_type -> assessmatrix.v1.SubmitAttemptResponse
+	24, // 36: assessmatrix.v1.CandidateService.EndSession:output_type -> assessmatrix.v1.EndSessionResponse
+	28, // [28:37] is the sub-list for method output_type
+	19, // [19:28] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_candidate_proto_init() }
@@ -1864,7 +1962,7 @@ func file_assessmatrix_v1_candidate_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_candidate_proto_rawDesc), len(file_assessmatrix_v1_candidate_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   24,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

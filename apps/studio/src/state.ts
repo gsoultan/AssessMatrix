@@ -750,7 +750,7 @@ export const useApp = create<AppState>((set, get) => {
         ...a,
         secondsLeft: force ? 0 : a.secondsLeft,
         submittedAt: Date.now(),
-        score: survey ? undefined : { raw: s.raw, max: s.max, pct: s.pct, passed: s.passed },
+        score: survey ? undefined : { raw: s.raw, max: s.max, pct: s.pct, passed: s.passed, pendingHuman: s.pendingHuman },
         queued: 0,
         events: append(a, force ? 'attempt.expired' : 'attempt.submitted', survey ? 'response recorded' : `${s.pct}%`),
       }
@@ -767,7 +767,8 @@ export const useApp = create<AppState>((set, get) => {
           status: 'submitted',
           submittedAt: Date.now(),
           scorePct: next.score?.pct,
-          passed: next.score?.passed,
+          // No verdict while essays wait for a person.
+          passed: next.score?.pendingHuman ? undefined : next.score?.passed,
         })
         set({ assignments: listAssignments() })
       }
