@@ -165,8 +165,10 @@ const expiryFor = (a: Assignment, now: number) =>
 
 /**
  * Stands in for the mail provider and the candidate's inbox at once, which is
- * the one place a raw token or code is ever at rest. With a server the message
- * is handed to the provider and nothing here exists.
+ * the one place a raw token or code is ever at rest. The studio never shows it:
+ * a local build's mail is read where a real inbox would be, by the browser
+ * test from storage, or by a developer from the console. With the core the
+ * message goes through its outbox to a provider and nothing here exists.
  */
 export type Mail = {
   id: string
@@ -185,7 +187,7 @@ export type Mail = {
 const OUTBOX_KEY = 'am.outbox.v1'
 const OUTBOX_KEPT = 200
 
-export function listOutbox(): Mail[] {
+function listOutbox(): Mail[] {
   try {
     return JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as Mail[]
   } catch {
@@ -196,6 +198,7 @@ export function listOutbox(): Mail[] {
 function send(mails: Omit<Mail, 'id' | 'at'>[]) {
   const stamped = mails.map<Mail>((m) => ({ ...m, id: randomToken().slice(0, 12), at: Date.now() }))
   localStorage.setItem(OUTBOX_KEY, JSON.stringify([...stamped.reverse(), ...listOutbox()].slice(0, OUTBOX_KEPT)))
+  if (import.meta.env.DEV) for (const m of stamped) console.info(`[mail to ${m.to}] ${m.subject}\n${m.link ?? m.code ?? ''}`)
 }
 
 function inviteMail(a: Assignment, token: string, again: boolean): Omit<Mail, 'id' | 'at'> | null {

@@ -49,6 +49,15 @@ func (s *candidateService) limited(peer connect.Peer, h interface{ Get(string) s
 	return nil
 }
 
+// tenantLimited counts one costly call (a code mailed or guessed, a link
+// reissued) against the tenant the link belongs to.
+func (s *candidateService) tenantLimited(t db.TenantID) error {
+	if !s.tenantLimit.Allow(string(t)) {
+		return errSlowDown
+	}
+	return nil
+}
+
 // link is a resolved invitation token.
 type link struct {
 	tenant  db.TenantID
@@ -179,6 +188,9 @@ func (s *candidateService) RequestCode(ctx context.Context, req *connect.Request
 	if l == nil {
 		return connect.NewResponse(out), nil
 	}
+	if err := s.tenantLimited(l.tenant); err != nil {
+		return nil, err
+	}
 	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
@@ -240,6 +252,9 @@ func (s *candidateService) VerifyCode(ctx context.Context, req *connect.Request[
 	}
 	if l == nil {
 		return connect.NewResponse(out), nil
+	}
+	if err := s.tenantLimited(l.tenant); err != nil {
+		return nil, err
 	}
 	var session string
 	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
@@ -303,6 +318,9 @@ func (s *candidateService) RequestNewLink(ctx context.Context, req *connect.Requ
 	}
 	if l == nil {
 		return connect.NewResponse(out), nil
+	}
+	if err := s.tenantLimited(l.tenant); err != nil {
+		return nil, err
 	}
 	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
 		c, err := s.check(ctx, tx, l)

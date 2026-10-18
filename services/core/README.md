@@ -13,7 +13,7 @@ invitations, candidate sessions, attempts and results. It implements the
 | An attempt is tamper-evident | Append-only `attempt_events` (trigger and grants) holding a keyed HMAC hash chain | `TestTamperedAttemptIsDetected` |
 | Candidates never receive answer keys | `domain.ForCandidate` on everything served to them | `TestAuthorInviteSitScore` |
 | The server clock ends an exam, and offline work done in time is kept | `domain.Counts` | `TestDeadlineIsServerTime`, `TestCountsLateAnswers` |
-| Invitation rules from `docs/08` | `internal/api/candidate.go`, `invite.go` | `invite_test.go`, including the revoked-link and 25-wrong-guesses tests |
+| Invitation rules from `docs/08` | `internal/api/candidate.go`, `invite.go`; per-row counters in the transaction, then per-address and per-tenant limits | `invite_test.go`, including the revoked-link, 25-wrong-guesses and per-tenant limit tests |
 | An image is readable only inside its tenant, and stored only in the tenant's region | `media` rows under row-level security decide every read of `/media/{id}`; uploads are sniffed (WebP, JPEG, PNG only) and refused when the tenant's region is not the store's | `media_test.go` |
 | Mail goes out only if the change commits, and a link or code is at rest only until sent | Outbox row and River job in the same transaction; the body is cleared on send | `outbox_test.go`: a rolled-back change queues nothing; a sent invitation is delivered once and leaves no link in the clear |
 
@@ -85,6 +85,8 @@ database tests skip locally and fail in CI.
 | `AM_SMTP_ADDR`, `AM_SMTP_FROM`, `AM_SMTP_USER`, `AM_SMTP_PASS` | SMTP relay |
 | `AM_STATIC_DIR` | Serve the built web app from here, on the same origin |
 | `AM_TRUST_PROXY` | `1` behind a proxy that sets `X-Forwarded-For` |
+| `AM_LIMIT_PER_IP` | Calls a minute from one address to the candidate and sign-in endpoints (default 60). An exam hall behind one NAT address needs about four per candidate in the minute they all get in |
+| `AM_LIMIT_PER_TENANT` | Codes mailed or guessed and links reissued a minute across all of one tenant's invitations, from any address (default 600) |
 | `AM_DEV` | `1` allows http cookies and the dev mailbox |
 | `AM_MEDIA_STORE` | `fs`, `s3`, or `none` (default; image uploads are refused) |
 | `AM_MEDIA_REGION` | The region the store is in (default `id`). Tenants whose `region` differs cannot upload |

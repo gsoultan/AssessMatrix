@@ -7,7 +7,8 @@
 #
 # Same environment as e2e-core: AM_E2E_MIGRATE_DATABASE_URL, AM_E2E_DATABASE_URL.
 # For a staging run, point loadsim at the staging core directly (it must run
-# with AM_DEV=1 AM_MAILER=mailbox AM_TRUST_PROXY=1 for the duration).
+# with AM_DEV=1 AM_MAILER=mailbox AM_TRUST_PROXY=1, and AM_LIMIT_PER_TENANT
+# above 4× the cohort, for the duration).
 source "$(dirname "${BASH_SOURCE[0]}")/_lib.sh"
 : "${AM_E2E_MIGRATE_DATABASE_URL:?set AM_E2E_MIGRATE_DATABASE_URL to the owner role}"
 : "${AM_E2E_DATABASE_URL:?set AM_E2E_DATABASE_URL to the app role}"
@@ -25,7 +26,7 @@ AM_MIGRATE_DATABASE_URL="$AM_E2E_MIGRATE_DATABASE_URL" "$WORK/core" tenant "Load
 
 AM_DATABASE_URL="$AM_E2E_DATABASE_URL" AM_SECRET="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" \
 AM_LISTEN=":$PORT" AM_METRICS_LISTEN=":$((PORT + 1))" AM_PUBLIC_URL="http://localhost:$PORT" \
-AM_DEV=1 AM_MAILER=mailbox AM_DEV_MAILBOX_KEEP=$((N * 4 + 100)) AM_TRUST_PROXY=1 \
+AM_DEV=1 AM_MAILER=mailbox AM_DEV_MAILBOX_KEEP=$((N * 4 + 100)) AM_TRUST_PROXY=1 AM_LIMIT_PER_TENANT=$((N * 4 + 100)) \
   "$WORK/core" serve >"$WORK/core.log" 2>&1 &
 CORE=$!
 trap 'kill $CORE 2>/dev/null; wait $CORE 2>/dev/null; rm -rf "$WORK"' EXIT

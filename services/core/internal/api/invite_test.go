@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/limit"
 )
 
 // docs/08 §4: "a test that a revoked or replaced link cannot start or submit".
@@ -95,6 +96,32 @@ func TestTwentyFiveWrongGuessesLockTheLink(t *testing.T) {
 	}
 	if r := get(c.candidate.RequestCode(ctx, connect.NewRequest(&v1.RequestCodeRequest{Token: token}))); r.Msg.GetOk() {
 		t.Fatal("a locked link must not send another code")
+	}
+}
+
+// docs/08 §4: per-tenant rate limits on top of the per-row counters. One
+// tenant's links used up its allowance; another tenant's candidates still get in.
+func TestTenantRateLimitIsPerTenant(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.srv.tenantLimit = limit.New(3, time.Minute, 100)
+	busy := h.publishedFixture(h.tenant("Busy"))
+	quiet := h.publishedFixture(h.tenant("Quiet"))
+	c := h.browser()
+	tok := h.lastLink(busy.email)
+	get(c.candidate.RequestCode(ctx, connect.NewRequest(&v1.RequestCodeRequest{Token: tok})))
+	for i := 0; i < 2; i++ {
+		get(c.candidate.VerifyCode(ctx, connect.NewRequest(&v1.VerifyCodeRequest{Token: tok, Code: "abc"})))
+	}
+	if _, err := c.candidate.VerifyCode(ctx, connect.NewRequest(&v1.VerifyCodeRequest{Token: tok, Code: "abc"})); code(err) != connect.CodeResourceExhausted {
+		t.Fatalf("a tenant past its limit must be slowed down, got %v", err)
+	}
+	if r := get(c.candidate.RequestCode(ctx, connect.NewRequest(&v1.RequestCodeRequest{Token: h.lastLink(quiet.email)}))); !r.Msg.GetOk() {
+		t.Fatalf("another tenant's candidate must not be slowed down, got %v", r.Msg.GetRefusal())
+	}
+	// An unknown link costs no tenant anything, and is not slowed by one.
+	if r := get(c.candidate.RequestCode(ctx, connect.NewRequest(&v1.RequestCodeRequest{Token: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}))); r.Msg.GetRefusal() != v1.Refusal_REFUSAL_UNKNOWN {
+		t.Fatalf("an unknown link must read as unknown, got %v", r.Msg.GetRefusal())
 	}
 }
 

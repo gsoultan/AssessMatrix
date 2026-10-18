@@ -6,6 +6,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -47,11 +48,21 @@ type Server struct {
 	// WebhookPolicy says which receiver URLs staff may register.
 	WebhookPolicy webhook.Policy
 
+	// PerIPPerMinute and PerTenantPerMinute size the limits below; zero means
+	// 60 and 600. An exam hall behind one NAT address needs a higher per-IP
+	// figure: each candidate makes about four calls to get in.
+	PerIPPerMinute, PerTenantPerMinute int
+
 	// Per-IP limits on the unauthenticated candidate and sign-in endpoints.
 	// The per-row counters (tries, sends, cooldowns) are the real defence;
 	// these stop one client hammering many rows.
 	ipLimit    *limit.Limiter
 	emailLimit *limit.Limiter
+	// tenantLimit bounds what all of one tenant's invitations can cost
+	// together (codes mailed, codes guessed, links reissued), from however
+	// many addresses, so one tenant's links cannot flood mail or crowd out
+	// another tenant's candidates.
+	tenantLimit *limit.Limiter
 }
 
 func (s *Server) now() time.Time {
@@ -166,8 +177,11 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) limits() {
 	if s.ipLimit == nil {
-		s.ipLimit = limit.New(60, time.Minute, 100_000)
+		s.ipLimit = limit.New(cmp.Or(s.PerIPPerMinute, 60), time.Minute, 100_000)
 		s.emailLimit = limit.New(10, time.Hour, 100_000)
+	}
+	if s.tenantLimit == nil {
+		s.tenantLimit = limit.New(cmp.Or(s.PerTenantPerMinute, 600), time.Minute, 100_000)
 	}
 }
 

@@ -30,7 +30,7 @@ import { ItemImage } from '../components/ItemImage'
 import { Meter } from '../components/Viz'
 import type { Media } from '../media'
 import { SESSION_HASH, useApp, useResponses } from '../state'
-import { type Refusal, OTP_TRIES, listOutbox } from '../invite'
+import { type Refusal, OTP_TRIES } from '../invite'
 import { type Seat, gate as door } from '../backend/gate'
 import { CORE } from '../backend/mode'
 import { claim } from '../backend/onetab'
@@ -56,16 +56,13 @@ type Stage = 'pick' | 'gate' | 'invite' | 'consent' | 'ready' | 'attempt' | 'rev
 
 /**
  * Where someone holding a link stands before they are let in. The token lives
- * here, in memory, for exactly as long as the code step takes.
- *
- * `stub` is the assignment id, set only in a local build so the prototype's
- * stand-in inbox can show the right code. Against the core a client learns
+ * here, in memory, for exactly as long as the code step takes. A client learns
  * nothing but the masked address until the code is verified.
  */
 type Gate =
   | { at: 'checking' }
-  | { at: 'send'; token: string; email: string; stub?: string }
-  | { at: 'code'; token: string; email: string; stub?: string; retryAt: number }
+  | { at: 'send'; token: string; email: string }
+  | { at: 'code'; token: string; email: string; retryAt: number }
   | { at: 'refused'; why: Refusal | 'session' | 'offline' | 'elsewhere'; token?: string; email?: string; resent?: boolean }
 
 /** Why a link did not open, said to the person holding it, with what to do next. */
@@ -408,7 +405,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     void door.openLink(token).then(
       (r) => {
         syncLocal()
-        setGate(r.ok ? { at: 'send', token, email: r.email, stub: r.stub } : { at: 'refused', why: r.why, token, email: r.email })
+        setGate(r.ok ? { at: 'send', token, email: r.email } : { at: 'refused', why: r.why, token, email: r.email })
       },
       () => setGate({ at: 'refused', why: 'offline', token }),
     )
@@ -440,7 +437,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     return () => window.clearInterval(t)
   }, [stage, gate.at])
 
-  const sendCode = async (token: string, email: string, stub?: string) => {
+  const sendCode = async (token: string, email: string) => {
     const r = await door.requestCode(token).catch(() => null)
     if (!r) return setGate({ at: 'refused', why: 'offline', token, email })
     syncLocal()
@@ -448,9 +445,9 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     if (r.ok) {
       setCode('')
       setCodeNote('')
-      setGate({ at: 'code', token, email, stub, retryAt: r.retryAt })
+      setGate({ at: 'code', token, email, retryAt: r.retryAt })
     } else if (r.why === 'cooldown')
-      setGate({ at: 'code', token, email, stub, retryAt: r.retryAt ?? Date.now() })
+      setGate({ at: 'code', token, email, retryAt: r.retryAt ?? Date.now() })
     else setGate({ at: 'refused', why: r.why, token, email })
   }
 
@@ -663,13 +660,6 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
 
   const toggleFlag = () => item && toggleFlagIn(item, idx + 1)
 
-  // The prototype has no mailbox to check, so the bar above the candidate's
-  // screen shows the code that was "sent". It goes when real mail arrives.
-  const stubCode =
-    stage === 'gate' && gate.at === 'code' && gate.stub
-      ? listOutbox().find((m) => m.kind === 'code' && m.assignmentId === gate.stub)?.code
-      : undefined
-
   /** Leave the preview. A candidate's session started here (a local build's emailed link) is ended on the way out. */
   const exitPreview = () => {
     if (assignment || location.hash === SESSION_HASH) return setScreen('library')
@@ -692,12 +682,6 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       <span className="min-w-0 flex-1 truncate text-[11.5px] opacity-80">
         Candidate preview{exam ? ` · ${exam.title}` : ''} — candidates see only what is below this bar
       </span>
-      {stubCode && (
-        <span className="tnum shrink-0 text-[11.5px]" title="No mail is sent in the prototype. This is what the candidate's inbox would show.">
-          <span className="opacity-70">Stub inbox · code </span>
-          <span data-testid="stub-code" className="font-semibold">{stubCode}</span>
-        </span>
-      )}
       {exam && !assignment && stage !== 'invite' && (
         <button
           onClick={() => {
@@ -757,7 +741,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
               oleh siapa pun.
             </p>
             <div className="mt-6">
-              <Primary onClick={() => sendCode(gate.token, gate.email, gate.stub)}>
+              <Primary onClick={() => sendCode(gate.token, gate.email)}>
                 Kirim kode <IconArrowRight size={17} stroke={2.2} />
               </Primary>
             </div>
@@ -802,7 +786,7 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
             <button
               type="button"
               disabled={now < gate.retryAt}
-              onClick={() => sendCode(gate.token, gate.email, gate.stub)}
+              onClick={() => sendCode(gate.token, gate.email)}
               className="tnum mt-3 flex h-11 w-full items-center justify-center text-[13.5px] font-medium text-ink-2 disabled:opacity-60"
             >
               {now < gate.retryAt

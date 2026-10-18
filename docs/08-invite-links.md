@@ -51,22 +51,32 @@ words. Repeats fold into a count so a link opened a thousand times cannot grow t
 leaked or forwarded link, not a compromised mailbox. Tier 3 exams add identity matching on
 top of this.
 
-## 4. What moves to the backend
+## 4. What moved to the backend
 
-Nothing below is a security boundary while it runs in the browser: whoever holds the device
-can edit `localStorage`. The shapes and the order of checks carry over unchanged.
+The local build still runs the whole flow in the browser, and nothing there is a security
+boundary: whoever holds the device can edit `localStorage`. Against the core (`services/core`)
+every row below is enforced by the server, with the same shapes and the same order of checks.
 
-| Today (prototype) | With a server |
-| :--- | :--- |
-| `sendInvites`, `revokeInvite`, `openLink`, `requestCode`, `verifyCode`, `requestNewLink` in `invite.ts` | Connect RPC methods on an `InviteService`; the client keeps only the screens |
-| Assignments, people, history in `localStorage` | Postgres, every query scoped by `tenant_id`; history is an append-only table |
-| Code hash = SHA-256(`assignmentId:code`) | HMAC-SHA-256 with a server secret, so a stolen table cannot be brute-forced offline |
-| Limits (tries, cooldown, sends) counted on the row | Same counters, enforced in a transaction, plus per-IP and per-tenant rate limits |
-| Session secret in `localStorage` | `HttpOnly`, `Secure`, `SameSite=Strict` cookie bound to the assignment |
-| Outbox panel on Assignments, stub code in the candidate preview bar | A mail provider via the outbox pattern (row written in the same transaction, sent by a worker, retried idempotently); both stubs are deleted |
-| Roster files parsed in the browser | Parsed server-side with the same caps, or in the browser and re-validated on the server; the raw file is never stored |
-| Emails, names in one store | PII kept in its region (the `sec` and `privacy` vetoes in `AGENTS.md`); a retention rule for unused roster entries and expired invitations |
+| Prototype (local build) | Core | Where |
+| :--- | :--- | :--- |
+| `sendInvites`, `revokeInvite`, `openLink`, `requestCode`, `verifyCode`, `requestNewLink` in `invite.ts` | Connect methods on `AssignmentService` and `CandidateService`; the client keeps only the screens | `internal/api/invite.go`, `candidate.go` |
+| Assignments, people, history in `localStorage` | Postgres under row-level security on `tenant_id`; history is an append-only table | `internal/db/migrations` |
+| Code hash = SHA-256(`assignmentId:code`) | HMAC-SHA-256 under a key derived from `AM_SECRET`, one key each for links, codes and sessions, so a stolen table cannot be brute-forced offline | `internal/secure` |
+| Limits (tries, cooldown, sends) counted on the row | The same counters, read `FOR UPDATE` and written in one transaction; then a per-address limit (`AM_LIMIT_PER_IP`, 60 a minute) on every link call and a per-tenant limit (`AM_LIMIT_PER_TENANT`, 600 a minute) on codes mailed or guessed and links reissued | `candidate.go`, `internal/limit` |
+| Session secret in `localStorage` | `HttpOnly`, `Secure`, `SameSite=Strict` cookie whose HMAC is stored on the assignment, so revoking or resending ends it | `internal/auth` |
+| Outbox panel on Assignments, stub code in the candidate preview bar | Outbox row and delivery job written in the same transaction, sent by a worker, body cleared once sent. Both stubs are deleted: the studio shows no mail in any build | `internal/api/outbox.go`, `internal/mail` |
+| Roster files parsed in the browser | Parsed in the browser and re-validated on the server; the raw file is never stored | `internal/api/people.go` |
+| Emails, names in one store | PII kept in its region; attempt records and sent mail expire, and a person can be erased. **Not yet:** a retention rule for unused roster entries and expired invitations | `internal/api/retention.go` |
 
-Before launch the server version needs: a tenant-isolation test on every invite method, a
-test that a revoked or replaced link cannot start or submit, a lock test (25 wrong guesses),
-and the existing kill-the-browser test run against the real session cookie.
+A local build has no mail at all: its stand-in inbox is in storage, read by the browser test,
+and logged to the console in development. Nothing on any screen shows a link or a code.
+
+The limits are counted in each server process. One machine (the pilot's shape) enforces them
+exactly; behind several replicas each enforces its own share, while the per-row counters stay
+exact because they live in Postgres. An exam hall behind one NAT address makes about four
+calls per candidate in the minute everyone gets in: raise `AM_LIMIT_PER_IP` to cover the room.
+
+Proven in CI by `services/core/internal/api/invite_test.go` (a revoked or replaced link cannot
+start or submit; 25 wrong guesses lock the link; one tenant's limit does not slow another),
+`isolation_test.go` (every invite method is tenant-scoped), `outbox_test.go`, and the
+kill-the-browser gate in `apps/studio/e2e-core.mjs`, which runs with the real session cookie.

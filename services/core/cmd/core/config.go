@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gsoultan/assessmatrix/services/core/internal/mail"
@@ -32,6 +33,11 @@ type config struct {
 	// addresses, for a receiver on a developer's machine. Needs AM_DEV=1.
 	WebhookAllowPrivate bool
 	Media               mediaConfig
+	// AM_LIMIT_PER_IP: calls a minute from one address to the candidate and
+	// sign-in endpoints (default 60); raise it for an exam hall behind one NAT
+	// address. AM_LIMIT_PER_TENANT: codes mailed or guessed and links reissued
+	// a minute across all of one tenant's invitations (default 600).
+	PerIP, PerTenant int
 }
 
 // mediaConfig picks where uploaded images go. One store serves one region;
@@ -99,6 +105,18 @@ func loadConfig(serving bool) (*config, error) {
 		c.RunnerURL = c.PublicURL
 	} else if !c.Dev && !strings.HasPrefix(c.RunnerURL, "https://") {
 		errs = append(errs, errors.New("AM_RUNNER_URL must be https outside development"))
+	}
+	for _, l := range []struct {
+		key string
+		to  *int
+	}{{"AM_LIMIT_PER_IP", &c.PerIP}, {"AM_LIMIT_PER_TENANT", &c.PerTenant}} {
+		if v := os.Getenv(l.key); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 {
+				errs = append(errs, fmt.Errorf("%s must be a whole number of calls a minute, got %q", l.key, v))
+			}
+			*l.to = n
+		}
 	}
 	secret, err := decodeSecret(os.Getenv("AM_SECRET"))
 	if err != nil {

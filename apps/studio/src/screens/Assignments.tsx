@@ -11,7 +11,6 @@ import {
   IconMailForward,
   IconBan,
   IconHistory,
-  IconInbox,
   IconListDetails,
   IconArrowLeft,
   IconChevronRight,
@@ -22,7 +21,7 @@ import { AnswerSheet } from '../components/AnswerSheet'
 import { CORE } from '../backend/mode'
 import { Panel } from '../components/Panel'
 import { RosterImport } from '../components/RosterImport'
-import { type LinkState, EVENT_LABEL, linkState, listOutbox, sittingClosed } from '../invite'
+import { type LinkState, EVENT_LABEL, linkState, sittingClosed } from '../invite'
 import {
   type AssignStatus,
   type Assignment,
@@ -315,7 +314,6 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const [find, setFind] = useState('')
   const [adhocOpen, setAdhocOpen] = useState(false)
   const [adhoc, setAdhoc] = useState('')
-  const [tab, setTab] = useState<'people' | 'outbox'>('people')
   // Arriving from the Library's "Assign people" goes straight to inviting.
   const [inviting, setInviting] = useState(() => !!assignTarget)
 
@@ -363,13 +361,6 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
     }
   }, [inviting, shownId, published, listVersions])
   const unsent = rows.filter((r) => linkState(r) === 'unsent' && r.status !== 'submitted')
-  // Every send writes an assignment, so this re-reads exactly when there is something new.
-  const mails = useMemo(() => {
-    const mine = new Set(rows.map((r) => r.id))
-    // Against the core, mail goes to real inboxes; there is no outbox to show.
-    return CORE ? [] : listOutbox().filter((m) => mine.has(m.assignmentId)).slice(0, 12)
-  }, [rows])
-
   const resend = async (a: Assignment, name: string) => {
     const n = await sendInvite([a.id])
     setNote(n ? `New link emailed to ${name}. The previous one no longer works.` : 'Nothing sent — publish the instrument first.')
@@ -398,7 +389,6 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
     setAnswersOf('')
     setShow('all')
     setFind('')
-    setTab('people')
     setInviting(false)
   }
 
@@ -418,10 +408,7 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   // Close the drawer once something went out, so the new rows are in view.
   const invited = (msg: string, done: boolean) => {
     setNote(msg)
-    if (done) {
-      setInviting(false)
-      setTab('people')
-    }
+    if (done) setInviting(false)
   }
 
   return (
@@ -494,304 +481,261 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
 
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-hair">
         <div role="tablist" aria-label="Instrument sections" className="flex gap-4">
-          {(CORE ? (['people'] as const) : (['people', 'outbox'] as const)).map((t) => {
-            const on = tab === t
-            return (
-              <button
-                key={t}
-                role="tab"
-                aria-selected={on}
-                onClick={() => setTab(t)}
-                className="-mb-px inline-flex items-center gap-1.5 border-b-2 px-0.5 pb-2 text-[13px] font-medium"
-                style={on ? { borderColor: 'var(--color-s1)', color: 'var(--color-ink)' } : { borderColor: 'transparent', color: 'var(--color-ink-muted)' }}
-              >
-                {t === 'people' ? <IconUsers size={14} stroke={1.9} /> : <IconInbox size={14} stroke={1.9} />}
-                {t === 'people' ? 'People' : 'Outbox'}
-                <span className="tnum rounded-full px-1.5 text-[11px]" style={{ background: 'var(--color-sunken)' }}>
-                  {t === 'people' ? rows.length : mails.length}
-                </span>
-              </button>
-            )
-          })}
+          <button
+            role="tab"
+            aria-selected
+            className="-mb-px inline-flex items-center gap-1.5 border-b-2 px-0.5 pb-2 text-[13px] font-medium"
+            style={{ borderColor: 'var(--color-s1)', color: 'var(--color-ink)' }}
+          >
+            <IconUsers size={14} stroke={1.9} />
+            People
+            <span className="tnum rounded-full px-1.5 text-[11px]" style={{ background: 'var(--color-sunken)' }}>
+              {rows.length}
+            </span>
+          </button>
         </div>
-        {tab === 'people' && held && <div className="pb-2">{held}</div>}
+        {held && <div className="pb-2">{held}</div>}
       </div>
 
-      {tab === 'people' && (
-        <Panel pad={rows.length === 0}>
-          {rows.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-hair px-4 py-2.5 sm:px-5">
-              <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1">
-                {(['all', 'invited', 'opened', 'started', 'submitted', 'expired'] as const)
-                  .filter((v) => v === 'all' || v !== 'expired' || count('expired') > 0)
-                  .map((v) => {
-                    const on = show === v
-                    const n = v === 'all' ? rows.length : count(v)
-                    return (
-                      <button
-                        key={v}
-                        onClick={() => setShow(v)}
-                        aria-pressed={on}
-                        title={v === 'all' ? undefined : SEEN_HINT[v]}
-                        className="hair inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium"
-                        style={on ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
-                      >
-                        {v !== 'all' && <span className="h-2 w-2 rounded-full" style={{ background: STATUS_DOT[v] }} />}
-                        {v === 'all' ? 'All' : SEEN_LABEL[v]}
-                        <span className="tnum text-ink-muted">{n}</span>
-                      </button>
-                    )
-                  })}
-              </div>
-              <TextInput
-                size="xs"
-                className="ml-auto w-full sm:w-[200px]"
-                placeholder="Find a person"
-                aria-label="Find a person"
-                leftSection={<IconSearch size={13} stroke={1.8} />}
-                value={find}
-                onChange={(e) => setFind(e.currentTarget.value)}
-              />
+      <Panel pad={rows.length === 0}>
+        {rows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-hair px-4 py-2.5 sm:px-5">
+            <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1">
+              {(['all', 'invited', 'opened', 'started', 'submitted', 'expired'] as const)
+                .filter((v) => v === 'all' || v !== 'expired' || count('expired') > 0)
+                .map((v) => {
+                  const on = show === v
+                  const n = v === 'all' ? rows.length : count(v)
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => setShow(v)}
+                      aria-pressed={on}
+                      title={v === 'all' ? undefined : SEEN_HINT[v]}
+                      className="hair inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium"
+                      style={on ? { background: 'var(--color-wash)', color: 'var(--color-brand-text)' } : { color: 'var(--color-ink-2)' }}
+                    >
+                      {v !== 'all' && <span className="h-2 w-2 rounded-full" style={{ background: STATUS_DOT[v] }} />}
+                      {v === 'all' ? 'All' : SEEN_LABEL[v]}
+                      <span className="tnum text-ink-muted">{n}</span>
+                    </button>
+                  )
+                })}
             </div>
-          )}
-          {rows.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-10 text-center">
-              <p className="text-[12.5px] text-ink-muted">No one invited yet. Each person you invite is emailed their own link.</p>
-              <button
-                onClick={() => { setNote(''); setInviting(true) }}
-                className="inline-flex h-[30px] items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold text-on-brand"
-                style={{ background: 'var(--color-s1)' }}
-              >
-                <IconUserPlus size={14} stroke={2} /> Invite people
-              </button>
-            </div>
-          ) : shown.length === 0 ? (
-            <p className="py-10 text-center text-[12.5px] text-ink-muted">No one here matches.</p>
-          ) : isDesktop ? (
-            <div className="scroll-thin overflow-x-auto">
-              <table className="w-full min-w-[620px] text-left">
-                <thead>
-                  <tr className="border-b border-hair text-[11px] uppercase tracking-wider text-ink-muted">
-                    <th className="px-4 py-2 font-medium sm:px-5">Person</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Version</th>
-                    <th className="px-3 py-2 font-medium">Started</th>
-                    <th className="px-3 py-2 font-medium">Submitted</th>
-                    {isScored(exam) && <th className="px-3 py-2 text-right font-medium">Score</th>}
-                    <th className="px-4 py-2 text-right font-medium sm:px-5">Invitation</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((r) => {
-                    const p = personOf(r.personId)
-                    const name = `${p?.name ?? 'Unknown'}${r.sitting > 1 ? ` (sitting ${r.sitting})` : ''}`
-                    const state = linkState(r)
-                    const cols = isScored(exam) ? 7 : 6
-                    return (
-                      <Fragment key={r.id}>
-                      <tr className="border-b border-hair/60 last:border-0">
-                        <td className="px-4 py-3 sm:px-5">
-                          <p className="text-[13px] font-medium text-ink">{p?.name ?? 'Unknown'}</p>
-                          <p className="tnum text-[11px] text-ink-muted">{p?.email}</p>
-                          {r.status === 'submitted' && !exam.anonymous && (
-                            <button
-                              onClick={() => setAnswersOf(r.id)}
-                              aria-label={`View answers from ${name}`}
-                              className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-medium"
-                              style={{ color: 'var(--color-brand-text)' }}
-                            >
-                              <IconListDetails size={13} stroke={1.9} /> View answers
-                            </button>
+            <TextInput
+              size="xs"
+              className="ml-auto w-full sm:w-[200px]"
+              placeholder="Find a person"
+              aria-label="Find a person"
+              leftSection={<IconSearch size={13} stroke={1.8} />}
+              value={find}
+              onChange={(e) => setFind(e.currentTarget.value)}
+            />
+          </div>
+        )}
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-[12.5px] text-ink-muted">No one invited yet. Each person you invite is emailed their own link.</p>
+            <button
+              onClick={() => { setNote(''); setInviting(true) }}
+              className="inline-flex h-[30px] items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold text-on-brand"
+              style={{ background: 'var(--color-s1)' }}
+            >
+              <IconUserPlus size={14} stroke={2} /> Invite people
+            </button>
+          </div>
+        ) : shown.length === 0 ? (
+          <p className="py-10 text-center text-[12.5px] text-ink-muted">No one here matches.</p>
+        ) : isDesktop ? (
+          <div className="scroll-thin overflow-x-auto">
+            <table className="w-full min-w-[620px] text-left">
+              <thead>
+                <tr className="border-b border-hair text-[11px] uppercase tracking-wider text-ink-muted">
+                  <th className="px-4 py-2 font-medium sm:px-5">Person</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                  <th className="px-3 py-2 font-medium">Version</th>
+                  <th className="px-3 py-2 font-medium">Started</th>
+                  <th className="px-3 py-2 font-medium">Submitted</th>
+                  {isScored(exam) && <th className="px-3 py-2 text-right font-medium">Score</th>}
+                  <th className="px-4 py-2 text-right font-medium sm:px-5">Invitation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((r) => {
+                  const p = personOf(r.personId)
+                  const name = `${p?.name ?? 'Unknown'}${r.sitting > 1 ? ` (sitting ${r.sitting})` : ''}`
+                  const state = linkState(r)
+                  const cols = isScored(exam) ? 7 : 6
+                  return (
+                    <Fragment key={r.id}>
+                    <tr className="border-b border-hair/60 last:border-0">
+                      <td className="px-4 py-3 sm:px-5">
+                        <p className="text-[13px] font-medium text-ink">{p?.name ?? 'Unknown'}</p>
+                        <p className="tnum text-[11px] text-ink-muted">{p?.email}</p>
+                        {r.status === 'submitted' && !exam.anonymous && (
+                          <button
+                            onClick={() => setAnswersOf(r.id)}
+                            aria-label={`View answers from ${name}`}
+                            className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-medium"
+                            style={{ color: 'var(--color-brand-text)' }}
+                          >
+                            <IconListDetails size={13} stroke={1.9} /> View answers
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <StatusPill status={seen(r)} />
+                        <LinkLine a={r} />
+                      </td>
+                      <td className="tnum px-3 py-3 text-[12px] text-ink-muted">
+                        v{r.examVersion}
+                        {multi(r) && <span className="block text-[11px]">Sitting {r.sitting}</span>}
+                      </td>
+                      <td className="tnum px-3 py-3 text-[12px] text-ink-2">{when(r.startedAt)}</td>
+                      <td className="tnum px-3 py-3 text-[12px] text-ink-2">{when(r.submittedAt)}</td>
+                      {isScored(exam) && (
+                        <td className="tnum px-3 py-3 text-right text-[12.5px]">
+                          {r.scorePct === undefined ? (
+                            <span className="text-ink-muted">—</span>
+                          ) : (
+                            <span style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
+                              {r.scorePct}%
+                            </span>
                           )}
                         </td>
-                        <td className="px-3 py-3">
-                          <StatusPill status={seen(r)} />
-                          <LinkLine a={r} />
-                        </td>
-                        <td className="tnum px-3 py-3 text-[12px] text-ink-muted">
-                          v{r.examVersion}
-                          {multi(r) && <span className="block text-[11px]">Sitting {r.sitting}</span>}
-                        </td>
-                        <td className="tnum px-3 py-3 text-[12px] text-ink-2">{when(r.startedAt)}</td>
-                        <td className="tnum px-3 py-3 text-[12px] text-ink-2">{when(r.submittedAt)}</td>
-                        {isScored(exam) && (
-                          <td className="tnum px-3 py-3 text-right text-[12.5px]">
-                            {r.scorePct === undefined ? (
-                              <span className="text-ink-muted">—</span>
-                            ) : (
-                              <span style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
-                                {r.scorePct}%
-                              </span>
-                            )}
-                          </td>
-                        )}
-                        <td className="px-4 py-3 sm:px-5">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {r.status !== 'submitted' && (
-                              <Tooltip
-                                multiline
-                                w={240}
-                                label={
-                                  state === 'unsent' && !r.sentAt
-                                    ? 'Email this person their link'
-                                    : 'Email a new link. The previous link stops working, and so does any session it opened. Answers saved on their device are kept.'
-                                }
-                                withArrow
-                              >
-                                <button
-                                  onClick={() => resend(r, name)}
-                                  disabled={!live}
-                                  aria-label={`${r.sentAt ? 'Resend' : 'Send'} invitation to ${name}`}
-                                  className="hair grid h-7 w-7 place-items-center rounded-md bg-surface disabled:opacity-40"
-                                >
-                                  <IconMailForward size={13} stroke={1.9} className="text-ink-2" />
-                                </button>
-                              </Tooltip>
-                            )}
-                            <Tooltip label="What has happened to this invitation" withArrow>
+                      )}
+                      <td className="px-4 py-3 sm:px-5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {r.status !== 'submitted' && (
+                            <Tooltip
+                              multiline
+                              w={240}
+                              label={
+                                state === 'unsent' && !r.sentAt
+                                  ? 'Email this person their link'
+                                  : 'Email a new link. The previous link stops working, and so does any session it opened. Answers saved on their device are kept.'
+                              }
+                              withArrow
+                            >
                               <button
-                                onClick={() => setHistoryOf(historyOf === r.id ? '' : r.id)}
-                                aria-expanded={historyOf === r.id}
-                                aria-label={`Invitation history for ${name}`}
+                                onClick={() => resend(r, name)}
+                                disabled={!live}
+                                aria-label={`${r.sentAt ? 'Resend' : 'Send'} invitation to ${name}`}
+                                className="hair grid h-7 w-7 place-items-center rounded-md bg-surface disabled:opacity-40"
+                              >
+                                <IconMailForward size={13} stroke={1.9} className="text-ink-2" />
+                              </button>
+                            </Tooltip>
+                          )}
+                          <Tooltip label="What has happened to this invitation" withArrow>
+                            <button
+                              onClick={() => setHistoryOf(historyOf === r.id ? '' : r.id)}
+                              aria-expanded={historyOf === r.id}
+                              aria-label={`Invitation history for ${name}`}
+                              className="hair grid h-7 w-7 place-items-center rounded-md bg-surface"
+                            >
+                              <IconHistory size={13} stroke={1.9} className="text-ink-2" />
+                            </button>
+                          </Tooltip>
+                          {state !== 'revoked' && state !== 'unsent' && r.status !== 'submitted' && (
+                            <Tooltip
+                              multiline
+                              w={240}
+                              label="Revoke: the link and any open session stop working at once. The row and its history are kept."
+                              withArrow
+                            >
+                              <button
+                                onClick={() => revokeInviteFor(r.id)}
+                                aria-label={`Revoke invitation for ${name}`}
                                 className="hair grid h-7 w-7 place-items-center rounded-md bg-surface"
                               >
-                                <IconHistory size={13} stroke={1.9} className="text-ink-2" />
+                                <IconBan size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
                               </button>
                             </Tooltip>
-                            {state !== 'revoked' && state !== 'unsent' && r.status !== 'submitted' && (
-                              <Tooltip
-                                multiline
-                                w={240}
-                                label="Revoke: the link and any open session stop working at once. The row and its history are kept."
-                                withArrow
-                              >
-                                <button
-                                  onClick={() => revokeInviteFor(r.id)}
-                                  aria-label={`Revoke invitation for ${name}`}
-                                  className="hair grid h-7 w-7 place-items-center rounded-md bg-surface"
-                                >
-                                  <IconBan size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
-                                </button>
-                              </Tooltip>
-                            )}
-                            <Tooltip label="Remove the assignment and its history" withArrow>
-                              <button onClick={() => unassignOne(r.id)} aria-label={`Unassign ${name}`} className="hair grid h-7 w-7 place-items-center rounded-md bg-surface">
-                                <IconTrash size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
-                              </button>
-                            </Tooltip>
-                          </div>
+                          )}
+                          <Tooltip label="Remove the assignment and its history" withArrow>
+                            <button onClick={() => unassignOne(r.id)} aria-label={`Unassign ${name}`} className="hair grid h-7 w-7 place-items-center rounded-md bg-surface">
+                              <IconTrash size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
+                            </button>
+                          </Tooltip>
+                        </div>
+                      </td>
+                    </tr>
+                    {historyOf === r.id && (
+                      <tr className="border-b border-hair/60 last:border-0">
+                        <td colSpan={cols} className="px-4 py-3 sm:px-5" style={{ background: 'var(--color-sunken)' }}>
+                          <History a={r} />
                         </td>
                       </tr>
-                      {historyOf === r.id && (
-                        <tr className="border-b border-hair/60 last:border-0">
-                          <td colSpan={cols} className="px-4 py-3 sm:px-5" style={{ background: 'var(--color-sunken)' }}>
-                            <History a={r} />
-                          </td>
-                        </tr>
-                      )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 p-4">
-              {shown.map((r) => {
-                const p = personOf(r.personId)
-                return (
-                  <div key={r.id} className="hair rounded-xl bg-surface p-3.5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-[13.5px] font-medium text-ink">{p?.name}</p>
-                        <p className="tnum truncate text-[11.5px] text-ink-muted">
-                          {p?.email} · v{r.examVersion}
-                          {multi(r) ? ` · sitting ${r.sitting}` : ''}
-                        </p>
-                      </div>
-                      <StatusPill status={seen(r)} />
-                    </div>
-                    <LinkLine a={r} />
-                    <details className="mt-1.5">
-                      <summary className="cursor-pointer text-[11.5px] font-medium text-ink-muted">History</summary>
-                      <div className="mt-1.5">
-                        <History a={r} />
-                      </div>
-                    </details>
-                    {r.scorePct !== undefined && (
-                      <p className="tnum mt-1.5 text-[12px]" style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
-                        {r.scorePct}% · {r.passed ? 'lulus' : 'belum lulus'}
-                      </p>
                     )}
-                    {r.status === 'submitted' && !exam.anonymous && (
-                      <button
-                        onClick={() => setAnswersOf(r.id)}
-                        aria-label={`View answers from ${p?.name}`}
-                        className="hair mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2"
-                      >
-                        <IconListDetails size={12} stroke={1.9} /> View answers
-                      </button>
-                    )}
-                    <div className="mt-2.5 flex items-center gap-2">
-                      <button
-                        onClick={() => resend(r, p?.name ?? 'them')}
-                        disabled={!live || r.status === 'submitted'}
-                        className="hair flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2 disabled:opacity-40"
-                      >
-                        <IconMailForward size={12} stroke={1.9} /> {r.sentAt ? 'Resend' : 'Send'}
-                      </button>
-                      <button
-                        onClick={() => revokeInviteFor(r.id)}
-                        disabled={linkState(r) === 'revoked' || linkState(r) === 'unsent' || r.status === 'submitted'}
-                        className="hair flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2 disabled:opacity-40"
-                      >
-                        <IconBan size={12} stroke={1.9} /> Revoke
-                      </button>
-                      <button onClick={() => unassignOne(r.id)} aria-label={`Unassign ${p?.name}`} className="hair grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface">
-                        <IconTrash size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </Panel>
-      )}
-
-      {tab === 'outbox' && !CORE && (
-        <Panel
-          hint="No mail is sent yet. This lists what would have gone out, and it is the only place a link or a code can be read: the assignment keeps a hash, not the link. With a mail provider this tab goes away."
-          title="What would have been emailed"
-          pad={mails.length === 0}
-        >
-        {mails.length === 0 ? (
-          <p className="py-4 text-center text-[12.5px] text-ink-muted">Nothing sent for this instrument yet.</p>
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <ul data-testid="outbox">
-            {mails.map((m) => (
-              <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hair/60 px-4 py-2.5 last:border-0 sm:px-5">
-                <span className="tnum w-[104px] shrink-0 text-[11.5px] text-ink-muted">{when(m.at)}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] font-medium text-ink">{m.subject}</span>
-                  <span className="tnum block truncate text-[11.5px] text-ink-muted">to {m.to}</span>
-                </span>
-                {m.link && (
-                  <a
-                    href={m.link}
-                    aria-label={`Open the link emailed to ${m.to}`}
-                    className="hair shrink-0 rounded-md bg-surface px-2.5 py-1 text-[11.5px] font-medium"
-                    style={{ color: 'var(--color-s1)' }}
-                  >
-                    Open as recipient
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="flex flex-col gap-2 p-4">
+            {shown.map((r) => {
+              const p = personOf(r.personId)
+              return (
+                <div key={r.id} className="hair rounded-xl bg-surface p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13.5px] font-medium text-ink">{p?.name}</p>
+                      <p className="tnum truncate text-[11.5px] text-ink-muted">
+                        {p?.email} · v{r.examVersion}
+                        {multi(r) ? ` · sitting ${r.sitting}` : ''}
+                      </p>
+                    </div>
+                    <StatusPill status={seen(r)} />
+                  </div>
+                  <LinkLine a={r} />
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-[11.5px] font-medium text-ink-muted">History</summary>
+                    <div className="mt-1.5">
+                      <History a={r} />
+                    </div>
+                  </details>
+                  {r.scorePct !== undefined && (
+                    <p className="tnum mt-1.5 text-[12px]" style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
+                      {r.scorePct}% · {r.passed ? 'lulus' : 'belum lulus'}
+                    </p>
+                  )}
+                  {r.status === 'submitted' && !exam.anonymous && (
+                    <button
+                      onClick={() => setAnswersOf(r.id)}
+                      aria-label={`View answers from ${p?.name}`}
+                      className="hair mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2"
+                    >
+                      <IconListDetails size={12} stroke={1.9} /> View answers
+                    </button>
+                  )}
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <button
+                      onClick={() => resend(r, p?.name ?? 'them')}
+                      disabled={!live || r.status === 'submitted'}
+                      className="hair flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2 disabled:opacity-40"
+                    >
+                      <IconMailForward size={12} stroke={1.9} /> {r.sentAt ? 'Resend' : 'Send'}
+                    </button>
+                    <button
+                      onClick={() => revokeInviteFor(r.id)}
+                      disabled={linkState(r) === 'revoked' || linkState(r) === 'unsent' || r.status === 'submitted'}
+                      className="hair flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-surface py-2 text-[12px] font-medium text-ink-2 disabled:opacity-40"
+                    >
+                      <IconBan size={12} stroke={1.9} /> Revoke
+                    </button>
+                    <button onClick={() => unassignOne(r.id)} aria-label={`Unassign ${p?.name}`} className="hair grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface">
+                      <IconTrash size={13} stroke={1.9} style={{ color: 'var(--color-critical)' }} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         )}
-        </Panel>
-      )}
+      </Panel>
 
       <Drawer
         opened={!!answersOf}
