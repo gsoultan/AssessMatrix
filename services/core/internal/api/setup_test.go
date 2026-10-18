@@ -62,7 +62,7 @@ func freshInstall(t *testing.T) (*Server, string, *pgx.Conn) {
 	}
 	t.Cleanup(func() { owner.Close(context.Background()) })
 	// Back to a fresh install, whatever an earlier run left.
-	if _, err := owner.Exec(ctx, `TRUNCATE tenants CASCADE`); err != nil {
+	if _, err := owner.Exec(ctx, `TRUNCATE tenants, super_admins CASCADE`); err != nil {
 		t.Fatal(err)
 	}
 	database, err := db.Open(ctx, appURL)
@@ -123,8 +123,8 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 	}
 
 	req := func(code, email string) *connect.Request[v1.CompleteSetupRequest] {
-		return connect.NewRequest(&v1.CompleteSetupRequest{SetupCode: code, OrganizationName: "Lembaga Uji",
-			AdminEmail: email, AdminName: "Admin"})
+		// No tenant name: setup makes the default tenant.
+		return connect.NewRequest(&v1.CompleteSetupRequest{SetupCode: code, AdminEmail: email, AdminName: "Admin"})
 	}
 	if _, err := b.setup.CompleteSetup(ctx, req("AAAA-AAAA-AAAA", "admin@example.test")); code(err) != connect.CodePermissionDenied {
 		t.Fatalf("a wrong setup code: got %v, want PermissionDenied", err)
@@ -169,8 +169,8 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 	if won < 0 {
 		t.Fatalf("neither racing setup succeeded: %v", errs)
 	}
-	if staff[won].GetTenantName() != "Lembaga Uji" {
-		t.Fatalf("the administrator is in %q", staff[won].GetTenantName())
+	if staff[won].GetTenantName() != "Default" {
+		t.Fatalf("the super administrator is in %q, want the default tenant", staff[won].GetTenantName())
 	}
 
 	// The winner is signed in by the cookie setup set.
@@ -182,9 +182,16 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 	if me.GetRole() != v1.Role_ROLE_ADMIN {
 		t.Fatalf("the first staff member is %v, want an administrator", me.GetRole())
 	}
+	// ...and the super administrator, who alone can make further tenants.
+	if !me.GetSuperAdmin() {
+		t.Fatal("the person who set up the install is not its super administrator")
+	}
 	// Only admins may manage access; proves the role is honoured, not just shown.
 	if _, err := browsers[won].tenants.ListAccess(ctx, connect.NewRequest(&v1.ListAccessRequest{})); err != nil {
 		t.Fatalf("the first administrator listing access: %v", err)
+	}
+	if _, err := browsers[won].tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Cabang"})); err != nil {
+		t.Fatalf("the super administrator creating a tenant: %v", err)
 	}
 
 	if after := get(b.setup.GetSetupStatus(ctx, connect.NewRequest(&v1.GetSetupStatusRequest{}))).Msg; after.GetNeeded() {
@@ -196,13 +203,16 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 		t.Fatalf("setup after setup: got %v, want FailedPrecondition", err)
 	}
 
-	var tenants, admins, audits int
+	var tenants, admins, supers, audits int
 	if err := owner.QueryRow(ctx, `SELECT (SELECT count(*) FROM tenants), (SELECT count(*) FROM staff),
-		(SELECT count(*) FROM audit_log WHERE action = 'setup.complete' AND actor = 'setup')`).Scan(&tenants, &admins, &audits); err != nil {
+		(SELECT count(*) FROM super_admins),
+		(SELECT count(*) FROM audit_log WHERE action = 'setup.complete' AND actor = 'setup')`).Scan(&tenants, &admins, &supers, &audits); err != nil {
 		t.Fatal(err)
 	}
-	if tenants != 1 || admins != 1 || audits != 1 {
-		t.Fatalf("after setup: %d tenants, %d staff, %d audit rows; want 1 each", tenants, admins, audits)
+	// The default tenant and the one the super administrator made after.
+	if tenants != 2 || admins != 2 || supers != 1 || audits != 1 {
+		t.Fatalf("after setup: %d tenants, %d staff rows, %d super administrators, %d audit rows; want 2, 2, 1, 1",
+			tenants, admins, supers, audits)
 	}
 
 	// The serving role cannot make organisations by itself, setup or not.
@@ -213,5 +223,13 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) || pg.Code != "42501" {
 		t.Fatalf("the app role calling am_create_tenant: got %v, want permission denied", err)
+	}
+	// Nor make itself a super administrator.
+	err = srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO super_admins (email) VALUES ('x@example.test')`)
+		return err
+	})
+	if !errors.As(err, &pg) || pg.Code != "42501" {
+		t.Fatalf("the app role adding a super administrator: got %v, want permission denied", err)
 	}
 }

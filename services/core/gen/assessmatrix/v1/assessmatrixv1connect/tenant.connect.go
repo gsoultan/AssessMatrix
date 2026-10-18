@@ -60,11 +60,14 @@ type TenantServiceClient interface {
 	ListMyTenants(context.Context, *connect.Request[v1.ListMyTenantsRequest]) (*connect.Response[v1.ListMyTenantsResponse], error)
 	// Ends this session and starts one in another tenant the caller belongs to.
 	SwitchTenant(context.Context, *connect.Request[v1.SwitchTenantRequest]) (*connect.Response[v1.SwitchTenantResponse], error)
-	// Admin. A new tenant, with the caller as its first admin.
+	// Super administrator. A new tenant and its first administrator.
 	CreateTenant(context.Context, *connect.Request[v1.CreateTenantRequest]) (*connect.Response[v1.CreateTenantResponse], error)
-	// Admin. Everyone with access to any tenant the caller administers.
+	// Admin. Everyone with access to any tenant the caller administers; for a
+	// super administrator, every tenant.
 	ListAccess(context.Context, *connect.Request[v1.ListAccessRequest]) (*connect.Response[v1.ListAccessResponse], error)
-	// Admin of the named tenant. Grants, changes or withdraws one person's access.
+	// Admin of the named tenant, or a super administrator. Grants, changes or
+	// withdraws one person's access. Only a super administrator grants the
+	// admin role or changes an administrator's access.
 	SetAccess(context.Context, *connect.Request[v1.SetAccessRequest]) (*connect.Response[v1.SetAccessResponse], error)
 	// Admin. Where an instrument has been shared, among the tenants the caller administers.
 	ListExamCopies(context.Context, *connect.Request[v1.ListExamCopiesRequest]) (*connect.Response[v1.ListExamCopiesResponse], error)
@@ -182,11 +185,14 @@ type TenantServiceHandler interface {
 	ListMyTenants(context.Context, *connect.Request[v1.ListMyTenantsRequest]) (*connect.Response[v1.ListMyTenantsResponse], error)
 	// Ends this session and starts one in another tenant the caller belongs to.
 	SwitchTenant(context.Context, *connect.Request[v1.SwitchTenantRequest]) (*connect.Response[v1.SwitchTenantResponse], error)
-	// Admin. A new tenant, with the caller as its first admin.
+	// Super administrator. A new tenant and its first administrator.
 	CreateTenant(context.Context, *connect.Request[v1.CreateTenantRequest]) (*connect.Response[v1.CreateTenantResponse], error)
-	// Admin. Everyone with access to any tenant the caller administers.
+	// Admin. Everyone with access to any tenant the caller administers; for a
+	// super administrator, every tenant.
 	ListAccess(context.Context, *connect.Request[v1.ListAccessRequest]) (*connect.Response[v1.ListAccessResponse], error)
-	// Admin of the named tenant. Grants, changes or withdraws one person's access.
+	// Admin of the named tenant, or a super administrator. Grants, changes or
+	// withdraws one person's access. Only a super administrator grants the
+	// admin role or changes an administrator's access.
 	SetAccess(context.Context, *connect.Request[v1.SetAccessRequest]) (*connect.Response[v1.SetAccessResponse], error)
 	// Admin. Where an instrument has been shared, among the tenants the caller administers.
 	ListExamCopies(context.Context, *connect.Request[v1.ListExamCopiesRequest]) (*connect.Response[v1.ListExamCopiesResponse], error)

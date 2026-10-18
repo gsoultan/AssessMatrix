@@ -230,11 +230,10 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			denied("SwitchTenant", err)
 		},
 		"/assessmatrix.v1.TenantService/CreateTenant": func() {
-			made := get(b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Beta Two"}))).Msg.GetTenant()
-			for _, tn := range get(a.tenants.ListMyTenants(ctx, connect.NewRequest(&v1.ListMyTenantsRequest{}))).Msg.GetTenants() {
-				if tn.GetId() == made.GetId() {
-					t.Error("CreateTenant: B's new tenant was handed to A")
-				}
+			// Only a super administrator makes tenants; B administers one.
+			_, err := b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Beta Two", AdminEmail: "mole@example.test"}))
+			if code(err) != connect.CodePermissionDenied {
+				t.Errorf("CreateTenant by a tenant's administrator: %v, want permission denied", err)
 			}
 		},
 		"/assessmatrix.v1.TenantService/ListAccess": func() {
@@ -253,7 +252,7 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			}
 		},
 		"/assessmatrix.v1.TenantService/SetAccess": func() {
-			_, err := b.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: "mole@example.test", TenantId: tenantA, Role: v1.Role_ROLE_ADMIN}))
+			_, err := b.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: "mole@example.test", TenantId: tenantA, Role: v1.Role_ROLE_MEMBER}))
 			denied("SetAccess", err)
 		},
 		"/assessmatrix.v1.TenantService/ListExamCopies": func() {

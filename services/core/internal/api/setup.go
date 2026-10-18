@@ -16,9 +16,9 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
-// setupService is first-run setup: the first organisation and its
-// administrator. The database, not this handler, is what makes it happen
-// once: am_setup_first_tenant refuses when any organisation exists.
+// setupService is first-run setup: the super administrator, and the default
+// tenant they also administer. The database, not this handler, is what makes
+// it happen once: am_setup_first_tenant refuses when any tenant exists.
 type setupService struct{ *Server }
 
 var (
@@ -48,6 +48,9 @@ func (s *setupService) GetSetupStatus(ctx context.Context, _ *connect.Request[v1
 	return connect.NewResponse(out), nil
 }
 
+// defaultTenant names the first tenant when setup is given no name.
+const defaultTenant = "Default"
+
 // setupDoneState is the SQLSTATE a second setup gets from the database.
 const setupDoneState = "AM001"
 
@@ -62,6 +65,9 @@ func (s *setupService) CompleteSetup(ctx context.Context, req *connect.Request[v
 			errors.New("that setup code is wrong; it is printed in the server log, or run `core setup-code`"))
 	}
 	org := strings.TrimSpace(m.GetOrganizationName())
+	if org == "" {
+		org = defaultTenant
+	}
 	email := strings.TrimSpace(m.GetAdminEmail())
 	name := strings.TrimSpace(m.GetAdminName())
 	region := strings.TrimSpace(m.GetRegion())
@@ -69,12 +75,12 @@ func (s *setupService) CompleteSetup(ctx context.Context, req *connect.Request[v
 		region = s.region()
 	}
 	switch {
-	case org == "" || len(org) > 200:
-		return nil, invalidArg(errors.New("the organisation needs a name of at most 200 characters"))
+	case len(org) > 200:
+		return nil, invalidArg(errors.New("the default tenant's name is at most 200 characters"))
 	case len(email) > 320 || !staffEmailRe.MatchString(email):
-		return nil, invalidArg(errors.New("the administrator needs a valid email address"))
+		return nil, invalidArg(errors.New("the super administrator needs a valid email address"))
 	case len(name) > 200:
-		return nil, invalidArg(errors.New("the administrator's name is at most 200 characters"))
+		return nil, invalidArg(errors.New("the super administrator's name is at most 200 characters"))
 	case !regionRe.MatchString(region):
 		return nil, invalidArg(errors.New("the region is a two-letter code such as id"))
 	}
@@ -83,7 +89,7 @@ func (s *setupService) CompleteSetup(ctx context.Context, req *connect.Request[v
 	session := secure.Token()
 	var tenant, staffID string
 	var st *v1.Staff
-	// One transaction: the organisation, the administrator, the audit row and
+	// One transaction: the tenant, the super administrator, the audit row and
 	// their first session commit together or not at all.
 	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `SELECT tenant_id, staff_id FROM am_setup_first_tenant($1, $2, $3, $4)`,
