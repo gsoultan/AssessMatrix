@@ -75,8 +75,8 @@ func TestAuthorInviteSitScore(t *testing.T) {
 
 	list := get(staff.assign.ListAssignments(ctx, connect.NewRequest(&v1.ListAssignmentsRequest{ExamId: f.exam.GetId()})))
 	a := list.Msg.GetAssignments()[0]
-	if a.GetStatus() != v1.AssignStatus_ASSIGN_STATUS_SUBMITTED || a.GetScorePct() != 100 || !a.GetPassed() {
-		t.Fatalf("the score must land back on the assignment, got %+v", a)
+	if a.GetStatus() != v1.AssignStatus_ASSIGN_STATUS_SUBMITTED || a.GetScorePct() != 100 || a.Passed != nil {
+		t.Fatalf("the score must land back on the assignment, with no verdict while the essay waits, got %+v", a)
 	}
 	resp := get(staff.results.ListResponses(ctx, connect.NewRequest(&v1.ListResponsesRequest{ExamId: f.exam.GetId()})))
 	if len(resp.Msg.GetResponses()) != 1 {
