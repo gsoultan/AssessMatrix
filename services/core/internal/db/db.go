@@ -167,6 +167,8 @@ func Migrate(ctx context.Context, ownerURL, appRole string) ([]string, error) {
 		// on top of the triggers that refuse it for everyone.
 		`REVOKE UPDATE, DELETE, TRUNCATE ON attempt_events, audit_log FROM ` + role,
 		`REVOKE ALL ON schema_migrations FROM ` + role,
+		// Tenants are made by the owner (`core tenant`), or once by setup.
+		`REVOKE EXECUTE ON FUNCTION am_create_tenant(text, text, text, text) FROM ` + role,
 	}
 	for _, g := range grants {
 		if _, err := conn.Exec(ctx, g); err != nil {
@@ -174,6 +176,17 @@ func Migrate(ctx context.Context, ownerURL, appRole string) ([]string, error) {
 		}
 	}
 	return applied, nil
+}
+
+// LatestMigration is the newest migration this build ships. A database whose
+// am_schema_version() is older has not been migrated for this build.
+func LatestMigration() string {
+	names, _ := fs.Glob(migrations, "migrations/*.sql")
+	sort.Strings(names)
+	if len(names) == 0 {
+		return ""
+	}
+	return strings.TrimPrefix(names[len(names)-1], "migrations/")
 }
 
 func validIdent(s string) bool {

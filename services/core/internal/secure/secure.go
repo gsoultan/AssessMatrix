@@ -18,7 +18,7 @@ import (
 // Keys are derived from one server secret, one per purpose, so a hash made
 // for one thing can never be replayed as another.
 type Keys struct {
-	link, code, session, chain, vault []byte
+	link, code, session, chain, vault, setup []byte
 }
 
 // MinSecretBytes is the least secret the core will start with.
@@ -34,7 +34,7 @@ func NewKeys(secret []byte) (*Keys, error) {
 		return m.Sum(nil)
 	}
 	return &Keys{link: derive("link"), code: derive("code"), session: derive("session"), chain: derive("attempt-chain"),
-		vault: derive("vault")}, nil
+		vault: derive("vault"), setup: derive("setup")}, nil
 }
 
 func mac(key []byte, parts ...[]byte) []byte {
@@ -60,6 +60,42 @@ func (k *Keys) SessionHash(token string) []byte { return mac(k.session, []byte(t
 
 // ChainHash links an attempt event to the one before it.
 func (k *Keys) ChainHash(prev, body []byte) []byte { return mac(k.chain, prev, body) }
+
+// setupAlphabet leaves out 0/O and 1/I/L, so a code read off a log is typed right.
+const setupAlphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+
+// SetupCode opens first-run setup: 12 characters (59 bits) as XXXX-XXXX-XXXX.
+// It is derived from the server secret, so every replica and the
+// `core setup-code` command agree on it, and it is worthless once setup is
+// done, because the database then refuses a second first organisation.
+func (k *Keys) SetupCode() string {
+	sum := mac(k.setup, []byte("first-run"))
+	v := binary.BigEndian.Uint64(sum[:8])
+	var b strings.Builder
+	for i := 0; i < 12; i++ {
+		if i > 0 && i%4 == 0 {
+			b.WriteByte('-')
+		}
+		b.WriteByte(setupAlphabet[v%uint64(len(setupAlphabet))])
+		v /= uint64(len(setupAlphabet))
+	}
+	return b.String()
+}
+
+// SetupCodeMatches compares a typed code in constant time, ignoring case,
+// spaces and dashes.
+func (k *Keys) SetupCodeMatches(typed string) bool {
+	norm := func(s string) []byte {
+		var out []byte
+		for _, r := range strings.ToUpper(s) {
+			if r != '-' && r != ' ' {
+				out = append(out, string(r)...)
+			}
+		}
+		return out
+	}
+	return Equal(norm(typed), norm(k.SetupCode()))
+}
 
 // Equal compares in constant time.
 func Equal(a, b []byte) bool { return len(a) > 0 && hmac.Equal(a, b) }
