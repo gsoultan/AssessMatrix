@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,6 +29,10 @@ const (
 	// Consent rows, written by the server at start from what the candidate
 	// agreed to. One kind per purpose: consent.<purpose>.
 	KindConsentPrefix = "consent."
+	// The candidate taking a consent back mid-attempt, from the runner:
+	// consent.<purpose>.withdrawn. Nothing is collected under the purpose
+	// after it, and it is never given again within the attempt.
+	KindWithdrawnSuffix = ".withdrawn"
 )
 
 // Purposes a candidate consents to, each separately (UU PDP No. 27/2022).
@@ -50,9 +55,47 @@ func RequiredConsents(tier int32) []string {
 	}
 }
 
+// Purposes lists every purpose, with how a reason names it.
+var Purposes = map[string][2]string{
+	PurposeSignals:    {"the activity signals (focus, paste, timing, device)", "sinyal aktivitas (fokus, tempel, waktu, perangkat)"},
+	PurposeFullscreen: {"the full-screen lock", "kunci layar penuh"},
+	PurposeCamera:     {"the camera", "kamera"},
+}
+
+// WithdrawalOf is the purpose a withdrawal event takes back, or "" when the
+// kind is not one.
+func WithdrawalOf(kind string) string {
+	p, ok := strings.CutPrefix(kind, KindConsentPrefix)
+	if !ok {
+		return ""
+	}
+	if p, ok = strings.CutSuffix(p, KindWithdrawnSuffix); !ok {
+		return ""
+	}
+	if _, known := Purposes[p]; !known {
+		return ""
+	}
+	return p
+}
+
+// Withdrawn lists the purposes withdrawn in a log, in the order they were.
+func Withdrawn(events []*v1.AttemptEvent) []string {
+	var out []string
+	for _, ev := range events {
+		if p := WithdrawalOf(ev.GetKind()); p != "" && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // PurposeOf is the consent an event kind is collected under; "" for answers
-// and other events that need none.
+// and other events that need none. A withdrawal is under the purpose it
+// takes back.
 func PurposeOf(kind string) string {
+	if p := WithdrawalOf(kind); p != "" {
+		return p
+	}
 	switch kind {
 	case KindFocusLost, KindFocusReturned, KindPasted, KindItemViewed, KindDeviceSeen, KindSecondTab:
 		return PurposeSignals
@@ -133,10 +176,11 @@ const (
 	FlagFaceMissing   = "face_missing"
 	FlagFacesMultiple = "multiple_faces"
 	FlagCameraStopped = "camera_stopped"
+	FlagWithdrawn     = "consent_withdrawn"
 )
 
 // FlagTypes lists every type, in the order a reviewer reads them.
-var FlagTypes = []string{FlagRecordAltered, FlagFacesMultiple, FlagFaceMissing, FlagCameraStopped, FlagPaste,
+var FlagTypes = []string{FlagRecordAltered, FlagFacesMultiple, FlagFaceMissing, FlagCameraStopped, FlagWithdrawn, FlagPaste,
 	FlagDeviceChanged, FlagFocusAway, FlagFullscreen, FlagRapidAnswers, FlagSecondTab}
 
 func ms(ev *v1.AttemptEvent, i int) time.Duration {
@@ -212,11 +256,19 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 		multiple                  time.Duration
 		mostFaces                 int64
 		stopped                   []string
+		started                   int64
+		withdrawn                 []*v1.AttemptEvent
 		answered                  = map[string]bool{}
 		order                     []string
 	)
 	for _, ev := range events {
+		if WithdrawalOf(ev.GetKind()) != "" {
+			withdrawn = append(withdrawn, ev)
+			continue
+		}
 		switch ev.GetKind() {
+		case KindAttemptStarted:
+			started = ev.GetServerTime()
 		case KindFocusLost:
 			awayN++
 			if awayOpen > 0 {
@@ -294,6 +346,20 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 		out = append(out, Flag{Type: FlagCameraStopped, Severity: SeverityReview,
 			Reason:   fmt.Sprintf("The camera stopped during the exam %s (last: %s). Face presence was not checked while it was off.", en, why[0]),
 			ReasonID: fmt.Sprintf("Kamera berhenti selama ujian %s (terakhir: %s). Kehadiran wajah tidak diperiksa selama kamera mati.", id, why[1])})
+	}
+	// Taking a consent back is the candidate's right, so it is said as what
+	// it is, not as something going wrong; what it means for the result is a
+	// person's call, so it is for review.
+	for _, ev := range withdrawn {
+		what := Purposes[WithdrawalOf(ev.GetKind())]
+		when, whenID := "during the exam", "selama ujian"
+		if at := ev.GetServerTime(); started > 0 && at >= started {
+			en, id := span(time.Duration(at-started) * time.Millisecond)
+			when, whenID = en+" into the exam", id+" setelah ujian dimulai"
+		}
+		out = append(out, Flag{Type: FlagWithdrawn, Severity: SeverityReview,
+			Reason:   fmt.Sprintf("The candidate withdrew their consent to %s %s, as they may; nothing under it was collected after that.", what[0], when),
+			ReasonID: fmt.Sprintf("Peserta menarik persetujuan untuk %s %s, sebagaimana haknya; sejak itu tidak ada yang dikumpulkan untuk keperluan tersebut.", what[1], whenID)})
 	}
 	for _, item := range order {
 		if n := pasted[item]; n >= PasteChars {

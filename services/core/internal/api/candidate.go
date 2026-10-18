@@ -506,6 +506,8 @@ func validateEvent(ev *v1.AttemptEvent) error {
 		return errors.New("event kind is missing or too long")
 	case domain.ServerOnly[k]:
 		return fmt.Errorf("event kind %q is written by the server only", k)
+	case strings.HasPrefix(k, domain.KindConsentPrefix) && domain.WithdrawalOf(k) == "":
+		return fmt.Errorf("event kind %q is not a consent a candidate can withdraw", k)
 	case len(ev.GetItemId()) > domain.MaxIDLen:
 		return errors.New("item id too long")
 	case len(ev.GetValues()) > MaxValuesPerEvent:
@@ -598,11 +600,13 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(out), nil
 }
 
-// consented decides which events of a batch may be stored: a signal collected
-// under a purpose the candidate did not agree to (or that the tier does not
-// collect) is dropped, never stored. It is dropped rather than refused because
-// the batch also carries answers, and a refused batch would block them in the
-// candidate's queue for good. Only a batch with signals costs the lookup.
+// consented decides, in order, which events of a batch may be stored: a
+// signal collected under a purpose the candidate did not agree to (or that
+// the tier does not collect), or withdrew, is dropped, never stored. It is
+// dropped rather than refused because the batch also carries answers, and a
+// refused batch would block them in the candidate's queue for good. A
+// withdrawal is kept once, for a purpose still in force. Only a batch with
+// signals costs the lookup.
 func (s *candidateService) consented(ctx context.Context, tx pgx.Tx, attemptID string, evs []*v1.AttemptEvent) (func(*v1.AttemptEvent) bool, error) {
 	all := func(*v1.AttemptEvent) bool { return true }
 	if !slices.ContainsFunc(evs, func(ev *v1.AttemptEvent) bool { return domain.PurposeOf(ev.GetKind()) != "" }) {
@@ -616,9 +620,26 @@ func (s *candidateService) consented(ctx context.Context, tx pgx.Tx, attemptID s
 	if err != nil {
 		return nil, err
 	}
+	inForce := map[string]bool{}
+	for _, k := range kinds {
+		if p, ok := strings.CutPrefix(k, domain.KindConsentPrefix); ok && domain.WithdrawalOf(k) == "" {
+			inForce[p] = true
+		}
+	}
+	for _, k := range kinds {
+		delete(inForce, domain.WithdrawalOf(k))
+	}
+	// Called once per event, in the batch's order.
 	return func(ev *v1.AttemptEvent) bool {
+		if p := domain.WithdrawalOf(ev.GetKind()); p != "" {
+			if !inForce[p] {
+				return false
+			}
+			delete(inForce, p)
+			return true
+		}
 		p := domain.PurposeOf(ev.GetKind())
-		return p == "" || slices.Contains(kinds, domain.KindConsentPrefix+p)
+		return p == "" || inForce[p]
 	}, nil
 }
 
@@ -744,4 +765,36 @@ func (s *candidateService) candidateAttempt(ctx context.Context, tx pgx.Tx, att 
 		}
 	}
 	return out, nil
+}
+
+// GetRecord is the candidate's own copy of their attempt's record: every
+// event, whether it still checks against its seal and, once handed in, the
+// reason for each flag and every person's score. Only who scored an essay is
+// held back.
+func (s *candidateService) GetRecord(ctx context.Context, _ *connect.Request[v1.GetRecordRequest]) (*connect.Response[v1.GetRecordResponse], error) {
+	out := &v1.GetRecordResponse{}
+	err := s.tx(ctx, func(tx pgx.Tx) error {
+		att, err := attemptBy(ctx, tx, "assignment_id", auth.From(ctx).AssignmentID, false)
+		if err != nil {
+			return err
+		}
+		if out.Attempt, err = s.candidateAttempt(ctx, tx, att, nil); err != nil {
+			return err
+		}
+		events, intact, brokenAt, err := s.loadEvents(ctx, tx, att)
+		if err != nil {
+			return err
+		}
+		for _, ev := range events {
+			if ev.GetKind() == domain.KindReviewScored {
+				ev.Text = ""
+			}
+		}
+		out.Attempt.Events, out.ChainIntact, out.BrokenAtSeq = events, intact, brokenAt
+		return nil
+	})
+	if err != nil {
+		return nil, s.internal(ctx, "GetRecord", err)
+	}
+	return connect.NewResponse(out), nil
 }

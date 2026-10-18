@@ -66,6 +66,10 @@ service CandidateService {
   rpc AppendEvents(AppendEventsRequest) returns (AppendEventsResponse);
   rpc SubmitAttempt(SubmitAttemptRequest) returns (SubmitAttemptResponse);
   rpc EndSession(EndSessionRequest) returns (EndSessionResponse);
+  // Everything recorded about the candidate's attempt: every event, the
+  // check of its seal and, once handed in, the reason for each flag. Their
+  // own copy of their record, to read or download (UU PDP No. 27/2022).
+  rpc GetRecord(GetRecordRequest) returns (GetRecordResponse);
 }
 
 message OpenLinkRequest {
@@ -127,6 +131,9 @@ message ItemAnswer {
 // Kinds that change answers: response.changed (values), response.typed
 // (text), answer.attached / answer.detached (file), item.flagged,
 // item.unflagged. Anything else (focus.lost, paste, ...) is evidence only.
+// consent.<purpose>.withdrawn is the candidate taking back a consent during
+// the attempt (turning the camera off); nothing is collected under that
+// purpose after it.
 message AttemptEvent {
   int64 seq = 1;
   int64 server_time = 2;
@@ -175,6 +182,9 @@ message Attempt {
   // Served to the candidate once they hand in: what a person gave each
   // answer they scored, with the reviewer's note.
   repeated ItemReview reviews = 15;
+  // Purposes the candidate withdrew consent for during the attempt
+  // ("camera"), so a resumed runner does not start collecting them again.
+  repeated string withdrawn = 16;
 }
 
 message ItemReview {
@@ -245,3 +255,14 @@ message SubmitAttemptResponse {
 message EndSessionRequest {}
 
 message EndSessionResponse {}
+
+message GetRecordRequest {}
+
+message GetRecordResponse {
+  // With every event. Who scored an essay is left out: the score and the
+  // note are the candidate's; the reviewer's identity is not.
+  Attempt attempt = 1;
+  // False if any stored event no longer matches its seal.
+  bool chain_intact = 2;
+  int64 broken_at_seq = 3;
+}

@@ -193,6 +193,8 @@ export type Attempt = {
   reviews?: { itemId: string; points: number; maxPoints: number; note: string }[]
   /** After hand-in (core only): why each integrity flag on the attempt was raised, in Indonesian. */
   flagReasons?: string[]
+  /** Consents the candidate took back during the attempt ("camera"); nothing is collected under them after. */
+  withdrawn?: string[]
   events: AttemptEvent[]
   queued: number
   /** Pinned at start. A mid-attempt edit must not change what is being sat. */

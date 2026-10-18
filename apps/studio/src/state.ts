@@ -175,6 +175,8 @@ type AppState = {
   beginAttempt: (exam: Exam, assignment?: Assignment, consents?: Purpose[]) => Promise<void>
   /** Record an integrity signal (already filtered by tier; see backend/signals.ts). */
   signal: (s: Signal) => void
+  /** Take a consent back mid-attempt ("camera"): recorded, and nothing more is collected under it. */
+  withdraw: (purpose: string) => void
   resumeAttempt: (exam: Exam, assignmentId?: string) => boolean
   discardAttempt: (examId: string, assignmentId?: string) => void
   setChoice: (item: Item, choiceId: string, n: number) => void
@@ -686,6 +688,19 @@ export const useApp = create<AppState>((set, get) => {
         return
       }
       commit({ ...a, events: append(a, sig.kind, sig.detail ?? sig.values?.join(' ')) })
+    },
+
+    withdraw: (purpose) => {
+      const a = get().attempt
+      if (!a || a.submittedAt || a.withdrawn?.includes(purpose)) return
+      const kind = `consent.${purpose}.withdrawn`
+      record(a, { kind, detail: 'withdrawn by the candidate during the attempt' })
+      commit({
+        ...a,
+        withdrawn: [...(a.withdrawn ?? []), purpose],
+        queued: queuedFor(a),
+        events: append(a, kind, undefined),
+      })
     },
 
     toggleFlag: (item, n) => {

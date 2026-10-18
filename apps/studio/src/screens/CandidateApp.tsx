@@ -28,6 +28,7 @@ import {
 } from '@tabler/icons-react'
 import { ItemView, mmss } from '../components/ItemView'
 import { ItemImage } from '../components/ItemImage'
+import { MyRecord } from '../components/MyRecord'
 import { Meter } from '../components/Viz'
 import type { Media } from '../media'
 import { SESSION_HASH, useApp, useResponses } from '../state'
@@ -374,6 +375,8 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const [declined, setDeclined] = useState(false)
   const [camera, setCamera] = useState<VisionState | null>(null)
   const signal = useApp((s) => s.signal)
+  const withdraw = useApp((s) => s.withdraw)
+  const [askCameraOff, setAskCameraOff] = useState(false)
 
   /** Past the gate: this tab now acts for one assignment and nothing else. */
   const admit = useCallback(
@@ -530,8 +533,9 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
 
   // Tier 2: the face check, on this device, for as long as the attempt runs.
   const cam = useRef<Camera | null>(null)
+  const cameraWithdrawn = !!attempt?.withdrawn?.includes('camera')
   useEffect(() => {
-    if (!live || tier < 2) return
+    if (!live || tier < 2 || cameraWithdrawn) return
     let gone = false
     void import('../backend/vision').then((v) => {
       if (!gone) cam.current = v.watchCamera(signal, setCamera)
@@ -541,7 +545,15 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       cam.current?.stop()
       cam.current = null
     }
-  }, [live, tier, signal])
+  }, [live, tier, signal, cameraWithdrawn])
+  /** The candidate's right to take the camera consent back: recorded first, then the camera is released. */
+  const cameraOff = () => {
+    setAskCameraOff(false)
+    cam.current?.stop()
+    cam.current = null
+    withdraw('camera')
+    setCamera('off')
+  }
 
   // The device is checked for real: on the start page itself when there is no
   // camera to ask about, and on its own step after consent when there is — the
@@ -1021,14 +1033,47 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           Pertanyaan {idx + 1} dari {items.length}
           {item.skill ? ` · ${item.skill}` : ''}
         </p>
-        {tier >= 2 && camera && (
-          <p role="status" className="mt-1 text-[12px] text-ink-muted">
-            {camera === 'on'
-              ? 'Kamera aktif · diperiksa di perangkat ini, tidak direkam'
-              : camera === 'starting'
-                ? 'Menyalakan kamera…'
-                : 'Kamera tidak aktif · ini dicatat untuk ditinjau'}
-          </p>
+        {tier >= 2 && (camera || cameraWithdrawn) && (
+          <div className="mt-1 text-[12px] text-ink-muted">
+            <p role="status" className="inline">
+              {cameraWithdrawn
+                ? 'Anda telah mematikan kamera · tidak ada lagi yang diperiksa; penyelenggara akan meninjau pengerjaan ini'
+                : camera === 'on'
+                  ? 'Kamera aktif · diperiksa di perangkat ini, tidak direkam'
+                  : camera === 'starting'
+                    ? 'Menyalakan kamera…'
+                    : 'Kamera tidak aktif · ini dicatat untuk ditinjau'}
+            </p>
+            {!cameraWithdrawn && camera !== 'off' && !askCameraOff && (
+              <button onClick={() => setAskCameraOff(true)} className="ml-2 font-medium text-ink-2 underline underline-offset-2">
+                Matikan kamera
+              </button>
+            )}
+            {askCameraOff && !cameraWithdrawn && (
+              <div role="alertdialog" aria-labelledby="camera-off-title" className="hair mt-2 rounded-xl bg-surface p-3.5">
+                <p id="camera-off-title" className="text-[13px] font-medium text-ink">
+                  Matikan kamera sampai ujian selesai?
+                </p>
+                <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
+                  Ini hak Anda. Kamera dilepas sekarang dan tidak dinyalakan lagi untuk ujian ini. Jawaban Anda tetap tersimpan.
+                  Penyelenggara akan melihat bahwa Anda mematikannya, dan merekalah yang memutuskan apakah hasilnya tetap dapat
+                  disahkan.
+                </p>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    onClick={cameraOff}
+                    className="h-9 rounded-lg px-3.5 text-[12.5px] font-medium text-white"
+                    style={{ background: 'var(--color-s1)' }}
+                  >
+                    Ya, matikan
+                  </button>
+                  <button onClick={() => setAskCameraOff(false)} className="h-9 rounded-lg px-3.5 text-[12.5px] font-medium text-ink-2">
+                    Batal
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <p className="mt-2 text-[18px] font-semibold leading-snug text-ink">
           {item.stem}
@@ -1239,22 +1284,29 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           <button
             onClick={() => setShowLog((v) => !v)}
             className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+            aria-expanded={showLog}
           >
             <span className="text-[13px] font-medium text-ink">Apa yang kami catat</span>
             <IconChevronDown size={15} stroke={2} className={`text-ink-muted transition-transform ${showLog ? 'rotate-180' : ''}`} />
           </button>
           <Collapse expanded={showLog} keepMounted={false}>
-            <ol className="border-t border-hair px-4 py-3">
-              {attempt.events.slice(-10).map((e) => (
-                <li key={e.seq} className="tnum flex items-baseline justify-between gap-3 py-1 text-[12px]">
-                  <span className="text-ink-2">{e.kind}</span>
-                  <span className="text-ink-muted">{new Date(e.t).toLocaleTimeString()}</span>
-                </li>
-              ))}
-              <li className="tnum mt-1.5 border-t border-hair pt-2 text-[11.5px] text-ink-muted">
-                {attempt.events.length} peristiwa · tidak ada video yang diunggah
-              </li>
-            </ol>
+            <div className="border-t border-hair">
+              {CORE && attempt.id ? (
+                <MyRecord numberOf={numberOf} />
+              ) : (
+                <ol className="px-4 py-3">
+                  {attempt.events.slice(-10).map((e) => (
+                    <li key={e.seq} className="tnum flex items-baseline justify-between gap-3 py-1 text-[12px]">
+                      <span className="text-ink-2">{e.kind}</span>
+                      <span className="text-ink-muted">{new Date(e.t).toLocaleTimeString()}</span>
+                    </li>
+                  ))}
+                  <li className="tnum mt-1.5 border-t border-hair pt-2 text-[11.5px] text-ink-muted">
+                    {attempt.events.length} peristiwa · tidak ada video yang diunggah
+                  </li>
+                </ol>
+              )}
+            </div>
           </Collapse>
         </div>
 

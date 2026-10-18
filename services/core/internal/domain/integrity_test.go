@@ -46,6 +46,9 @@ var trips = map[string]func() (events []*v1.AttemptEvent, intact bool){
 	FlagCameraStopped: func() ([]*v1.AttemptEvent, bool) {
 		return []*v1.AttemptEvent{{Kind: KindVisionStopped, Detail: "camera_ended"}}, true
 	},
+	FlagWithdrawn: func() ([]*v1.AttemptEvent, bool) {
+		return []*v1.AttemptEvent{{Kind: KindAttemptStarted, ServerTime: 1_000}, {Kind: "consent.camera.withdrawn", ServerTime: 726_000}}, true
+	},
 }
 
 // The integrity gate (AGENTS.md): every flag type renders a plain-language

@@ -28,7 +28,7 @@ export function Scoring() {
       <header className="mb-5">
         <h1 className="text-[15px] font-semibold tracking-tight">Scoring</h1>
         <p className="mt-0.5 max-w-[72ch] text-[12.5px] leading-snug text-ink-muted">
-          Essays are scored by people, blind to who wrote them. Item analysis shows which questions are doing their job.
+          Essays are scored by people, blind to who wrote them and to each other's marks. Item analysis shows which questions are doing their job.
         </p>
       </header>
       {scored.length === 0 ? (
@@ -82,7 +82,7 @@ function Review({ examId }: { examId: string }) {
       </div>
       <Panel
         title="Essays"
-        hint="Labelled by hand-in order, not by name. Your note is shown to the candidate with the score."
+        hint="Numbered per question in a shuffled order, never by name or hand-in order, so one person's answers cannot be lined up. You see only scores you gave yourself. Your note is shown to the candidate with the score."
         actions={
           <label className="flex items-center gap-2 text-[12.5px] text-ink-2">
             <input type="checkbox" checked={done} onChange={(e) => setDone(e.currentTarget.checked)} /> Show scored
@@ -100,7 +100,7 @@ function Review({ examId }: { examId: string }) {
         ) : (
           <ul aria-label="Essays to score" className="flex flex-col gap-4">
             {tasks.map((t) => (
-              <Task key={`${t.attemptId}:${t.itemId}`} task={t} onSaved={load} />
+              <Task key={`${t.itemId}:${t.label}`} task={t} onSaved={load} />
             ))}
           </ul>
         )}
@@ -119,7 +119,7 @@ function Task({ task, onSaved }: { task: ReviewTask; onSaved: () => void }) {
     setBusy(true)
     setError('')
     try {
-      await api.results.scoreAnswer({ attemptId: task.attemptId, itemId: task.itemId, points: Number(points), note })
+      await api.results.scoreAnswer({ task: task.task, points: Number(points), note })
       onSaved()
     } catch (err) {
       setError(explain(err))
@@ -135,7 +135,7 @@ function Task({ task, onSaved }: { task: ReviewTask; onSaved: () => void }) {
         </p>
         {task.reviewed && (
           <Badge size="sm" variant="light">
-            Scored {task.given}/{task.points}
+            {task.scoredByOther ? 'Scored by another reviewer' : `Scored ${task.given}/${task.points}`}
           </Badge>
         )}
       </div>
@@ -162,7 +162,7 @@ function Task({ task, onSaved }: { task: ReviewTask; onSaved: () => void }) {
           className="h-9 rounded-lg px-4 text-[13px] font-medium text-white disabled:opacity-50"
           style={{ background: 'var(--color-s1)' }}
         >
-          {task.reviewed ? 'Update score' : 'Save score'}
+          {task.reviewed && !task.scoredByOther ? 'Update score' : task.reviewed ? 'Replace their score' : 'Save score'}
         </button>
       </div>
       {error && (

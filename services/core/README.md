@@ -12,6 +12,9 @@ invitations, candidate sessions, attempts and results. It implements the
 | Every RPC has an access rule | `api.Policy()`; the interceptor refuses unknown procedures | `TestEveryProcedureHasAPolicy` |
 | An attempt is tamper-evident | Append-only `attempt_events` (trigger and grants) holding a keyed HMAC hash chain, and a keyed seal on the attempt row over the chain's head and purge time, so cut-off events and a hand-made purge show too | `TestTamperedAttemptIsDetected`, `TestEveryKindOfTamperingIsDetected` |
 | An altered record earns no credential | `settleCredential` requires an intact record and revokes on a break | `TestAlteredRecordEarnsNoCredential` |
+| A withdrawn consent stops collection under it, and the attempt goes on | `candidateService.consented` drops every signal under a purpose after `consent.<purpose>.withdrawn`, in batch order | `TestCameraConsentCanBeWithdrawnMidExam`, `TestOnlyAGivenConsentCanBeWithdrawn` |
+| A candidate can read their whole record | `CandidateService.GetRecord`, scoped to the session's invitation; only the reviewer's identity is held back | `TestCandidateReadsTheirWholeRecord`, `TestTenantIsolationAcrossEveryEndpoint` |
+| Essay review is blind | The queue hands out a sealed task, no attempt id or hand-in time, numbered per question in a keyed order; a reviewer sees only their own marks | `TestReviewQueueIsBlind` |
 | Candidates never receive answer keys | `domain.ForCandidate` on everything served to them | `TestAuthorInviteSitScore` |
 | The server clock ends an exam, and offline work done in time is kept | `domain.Counts` | `TestDeadlineIsServerTime`, `TestCountsLateAnswers` |
 | Invitation rules from `docs/08` | `internal/api/candidate.go`, `invite.go` | `invite_test.go`, including the revoked-link and 25-wrong-guesses tests |

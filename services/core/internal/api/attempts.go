@@ -177,6 +177,7 @@ func (s *Server) attemptProto(a *attemptRow, events []*v1.AttemptEvent, withEven
 		Id: a.ID, AssignmentId: a.AssignmentID, ExamId: a.ExamID, ExamVersion: a.ExamVersion,
 		StartedAt: a.StartedAt.UnixMilli(), DeadlineAt: msPtr(a.DeadlineAt), SubmittedAt: msPtr(a.SubmittedAt),
 		Answers: answers, Flagged: flagged, LastSeq: a.LastSeq, PurgedAt: msPtr(a.PurgedAt),
+		Withdrawn: domain.Withdrawn(events),
 	}
 	if a.Score != nil {
 		var sc v1.Score

@@ -729,6 +729,9 @@ func (x *ItemAnswer) GetFile() *Media {
 // Kinds that change answers: response.changed (values), response.typed
 // (text), answer.attached / answer.detached (file), item.flagged,
 // item.unflagged. Anything else (focus.lost, paste, ...) is evidence only.
+// consent.<purpose>.withdrawn is the candidate taking back a consent during
+// the attempt (turning the camera off); nothing is collected under that
+// purpose after it.
 type AttemptEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Seq           int64                  `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
@@ -941,7 +944,10 @@ type Attempt struct {
 	FlagReasons []string `protobuf:"bytes,14,rep,name=flag_reasons,json=flagReasons,proto3" json:"flag_reasons,omitempty"`
 	// Served to the candidate once they hand in: what a person gave each
 	// answer they scored, with the reviewer's note.
-	Reviews       []*ItemReview `protobuf:"bytes,15,rep,name=reviews,proto3" json:"reviews,omitempty"`
+	Reviews []*ItemReview `protobuf:"bytes,15,rep,name=reviews,proto3" json:"reviews,omitempty"`
+	// Purposes the candidate withdrew consent for during the attempt
+	// ("camera"), so a resumed runner does not start collecting them again.
+	Withdrawn     []string `protobuf:"bytes,16,rep,name=withdrawn,proto3" json:"withdrawn,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1077,6 +1083,13 @@ func (x *Attempt) GetFlagReasons() []string {
 func (x *Attempt) GetReviews() []*ItemReview {
 	if x != nil {
 		return x.Reviews
+	}
+	return nil
+}
+
+func (x *Attempt) GetWithdrawn() []string {
+	if x != nil {
+		return x.Withdrawn
 	}
 	return nil
 }
@@ -1691,6 +1704,105 @@ func (*EndSessionResponse) Descriptor() ([]byte, []int) {
 	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{23}
 }
 
+type GetRecordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRecordRequest) Reset() {
+	*x = GetRecordRequest{}
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRecordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRecordRequest) ProtoMessage() {}
+
+func (x *GetRecordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRecordRequest.ProtoReflect.Descriptor instead.
+func (*GetRecordRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{24}
+}
+
+type GetRecordResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// With every event. Who scored an essay is left out: the score and the
+	// note are the candidate's; the reviewer's identity is not.
+	Attempt *Attempt `protobuf:"bytes,1,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	// False if any stored event no longer matches its seal.
+	ChainIntact   bool  `protobuf:"varint,2,opt,name=chain_intact,json=chainIntact,proto3" json:"chain_intact,omitempty"`
+	BrokenAtSeq   int64 `protobuf:"varint,3,opt,name=broken_at_seq,json=brokenAtSeq,proto3" json:"broken_at_seq,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRecordResponse) Reset() {
+	*x = GetRecordResponse{}
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRecordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRecordResponse) ProtoMessage() {}
+
+func (x *GetRecordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_candidate_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRecordResponse.ProtoReflect.Descriptor instead.
+func (*GetRecordResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_candidate_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetRecordResponse) GetAttempt() *Attempt {
+	if x != nil {
+		return x.Attempt
+	}
+	return nil
+}
+
+func (x *GetRecordResponse) GetChainIntact() bool {
+	if x != nil {
+		return x.ChainIntact
+	}
+	return false
+}
+
+func (x *GetRecordResponse) GetBrokenAtSeq() int64 {
+	if x != nil {
+		return x.BrokenAtSeq
+	}
+	return 0
+}
+
 var File_assessmatrix_v1_candidate_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
@@ -1761,7 +1873,7 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x03max\x18\x02 \x01(\x05R\x03max\x12\x10\n" +
 	"\x03pct\x18\x03 \x01(\x05R\x03pct\x12\x16\n" +
 	"\x06passed\x18\x04 \x01(\bR\x06passed\x12#\n" +
-	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\x88\x05\n" +
+	"\rpending_human\x18\x05 \x01(\x05R\fpendingHuman\"\xa6\x05\n" +
 	"\aAttempt\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rassignment_id\x18\x02 \x01(\tR\fassignmentId\x12\x17\n" +
@@ -1780,7 +1892,8 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\x06events\x18\f \x03(\v2\x1d.assessmatrix.v1.AttemptEventR\x06events\x12\x1b\n" +
 	"\tpurged_at\x18\r \x01(\x03R\bpurgedAt\x12!\n" +
 	"\fflag_reasons\x18\x0e \x03(\tR\vflagReasons\x125\n" +
-	"\areviews\x18\x0f \x03(\v2\x1b.assessmatrix.v1.ItemReviewR\areviews\x1aW\n" +
+	"\areviews\x18\x0f \x03(\v2\x1b.assessmatrix.v1.ItemReviewR\areviews\x12\x1c\n" +
+	"\twithdrawn\x18\x10 \x03(\tR\twithdrawn\x1aW\n" +
 	"\fAnswersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x121\n" +
 	"\x05value\x18\x02 \x01(\v2\x1b.assessmatrix.v1.ItemAnswerR\x05value:\x028\x01\"p\n" +
@@ -1829,7 +1942,12 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\aattempt\x18\x03 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12%\n" +
 	"\x0ecredential_url\x18\x04 \x01(\tR\rcredentialUrl\"\x13\n" +
 	"\x11EndSessionRequest\"\x14\n" +
-	"\x12EndSessionResponse*\xa3\x02\n" +
+	"\x12EndSessionResponse\"\x12\n" +
+	"\x10GetRecordRequest\"\x8e\x01\n" +
+	"\x11GetRecordResponse\x122\n" +
+	"\aattempt\x18\x01 \x01(\v2\x18.assessmatrix.v1.AttemptR\aattempt\x12!\n" +
+	"\fchain_intact\x18\x02 \x01(\bR\vchainIntact\x12\"\n" +
+	"\rbroken_at_seq\x18\x03 \x01(\x03R\vbrokenAtSeq*\xa3\x02\n" +
 	"\aRefusal\x12\x17\n" +
 	"\x13REFUSAL_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fREFUSAL_UNKNOWN\x10\x01\x12\x13\n" +
@@ -1844,7 +1962,7 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\rREFUSAL_LIMIT\x10\n" +
 	"\x12\x16\n" +
 	"\x12REFUSAL_WRONG_CODE\x10\v\x12\x16\n" +
-	"\x12REFUSAL_STALE_CODE\x10\f2\xbf\x06\n" +
+	"\x12REFUSAL_STALE_CODE\x10\f2\x93\a\n" +
 	"\x10CandidateService\x12O\n" +
 	"\bOpenLink\x12 .assessmatrix.v1.OpenLinkRequest\x1a!.assessmatrix.v1.OpenLinkResponse\x12X\n" +
 	"\vRequestCode\x12#.assessmatrix.v1.RequestCodeRequest\x1a$.assessmatrix.v1.RequestCodeResponse\x12U\n" +
@@ -1857,7 +1975,8 @@ const file_assessmatrix_v1_candidate_proto_rawDesc = "" +
 	"\fAppendEvents\x12$.assessmatrix.v1.AppendEventsRequest\x1a%.assessmatrix.v1.AppendEventsResponse\x12^\n" +
 	"\rSubmitAttempt\x12%.assessmatrix.v1.SubmitAttemptRequest\x1a&.assessmatrix.v1.SubmitAttemptResponse\x12U\n" +
 	"\n" +
-	"EndSession\x12\".assessmatrix.v1.EndSessionRequest\x1a#.assessmatrix.v1.EndSessionResponseB\xd5\x01\n" +
+	"EndSession\x12\".assessmatrix.v1.EndSessionRequest\x1a#.assessmatrix.v1.EndSessionResponse\x12R\n" +
+	"\tGetRecord\x12!.assessmatrix.v1.GetRecordRequest\x1a\".assessmatrix.v1.GetRecordResponseB\xd5\x01\n" +
 	"\x13com.assessmatrix.v1B\x0eCandidateProtoP\x01ZQgithub.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1;assessmatrixv1\xa2\x02\x03AXX\xaa\x02\x0fAssessmatrix.V1\xca\x02\x0fAssessmatrix\\V1\xe2\x02\x1bAssessmatrix\\V1\\GPBMetadata\xea\x02\x10Assessmatrix::V1b\x06proto3"
 
 var (
@@ -1873,7 +1992,7 @@ func file_assessmatrix_v1_candidate_proto_rawDescGZIP() []byte {
 }
 
 var file_assessmatrix_v1_candidate_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_assessmatrix_v1_candidate_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_assessmatrix_v1_candidate_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_assessmatrix_v1_candidate_proto_goTypes = []any{
 	(Refusal)(0),                   // 0: assessmatrix.v1.Refusal
 	(*InvitationSummary)(nil),      // 1: assessmatrix.v1.InvitationSummary
@@ -1900,54 +2019,59 @@ var file_assessmatrix_v1_candidate_proto_goTypes = []any{
 	(*SubmitAttemptResponse)(nil),  // 22: assessmatrix.v1.SubmitAttemptResponse
 	(*EndSessionRequest)(nil),      // 23: assessmatrix.v1.EndSessionRequest
 	(*EndSessionResponse)(nil),     // 24: assessmatrix.v1.EndSessionResponse
-	nil,                            // 25: assessmatrix.v1.Attempt.AnswersEntry
-	(Kind)(0),                      // 26: assessmatrix.v1.Kind
-	(*Media)(nil),                  // 27: assessmatrix.v1.Media
-	(*Exam)(nil),                   // 28: assessmatrix.v1.Exam
+	(*GetRecordRequest)(nil),       // 25: assessmatrix.v1.GetRecordRequest
+	(*GetRecordResponse)(nil),      // 26: assessmatrix.v1.GetRecordResponse
+	nil,                            // 27: assessmatrix.v1.Attempt.AnswersEntry
+	(Kind)(0),                      // 28: assessmatrix.v1.Kind
+	(*Media)(nil),                  // 29: assessmatrix.v1.Media
+	(*Exam)(nil),                   // 30: assessmatrix.v1.Exam
 }
 var file_assessmatrix_v1_candidate_proto_depIdxs = []int32{
-	26, // 0: assessmatrix.v1.InvitationSummary.kind:type_name -> assessmatrix.v1.Kind
+	28, // 0: assessmatrix.v1.InvitationSummary.kind:type_name -> assessmatrix.v1.Kind
 	0,  // 1: assessmatrix.v1.OpenLinkResponse.refusal:type_name -> assessmatrix.v1.Refusal
 	1,  // 2: assessmatrix.v1.OpenLinkResponse.invitation:type_name -> assessmatrix.v1.InvitationSummary
 	0,  // 3: assessmatrix.v1.RequestCodeResponse.refusal:type_name -> assessmatrix.v1.Refusal
 	0,  // 4: assessmatrix.v1.VerifyCodeResponse.refusal:type_name -> assessmatrix.v1.Refusal
 	0,  // 5: assessmatrix.v1.RequestNewLinkResponse.refusal:type_name -> assessmatrix.v1.Refusal
-	27, // 6: assessmatrix.v1.ItemAnswer.file:type_name -> assessmatrix.v1.Media
-	27, // 7: assessmatrix.v1.AttemptEvent.file:type_name -> assessmatrix.v1.Media
-	25, // 8: assessmatrix.v1.Attempt.answers:type_name -> assessmatrix.v1.Attempt.AnswersEntry
+	29, // 6: assessmatrix.v1.ItemAnswer.file:type_name -> assessmatrix.v1.Media
+	29, // 7: assessmatrix.v1.AttemptEvent.file:type_name -> assessmatrix.v1.Media
+	27, // 8: assessmatrix.v1.Attempt.answers:type_name -> assessmatrix.v1.Attempt.AnswersEntry
 	12, // 9: assessmatrix.v1.Attempt.score:type_name -> assessmatrix.v1.Score
 	11, // 10: assessmatrix.v1.Attempt.events:type_name -> assessmatrix.v1.AttemptEvent
 	14, // 11: assessmatrix.v1.Attempt.reviews:type_name -> assessmatrix.v1.ItemReview
 	1,  // 12: assessmatrix.v1.GetSessionResponse.invitation:type_name -> assessmatrix.v1.InvitationSummary
-	28, // 13: assessmatrix.v1.GetSessionResponse.exam:type_name -> assessmatrix.v1.Exam
+	30, // 13: assessmatrix.v1.GetSessionResponse.exam:type_name -> assessmatrix.v1.Exam
 	13, // 14: assessmatrix.v1.GetSessionResponse.attempt:type_name -> assessmatrix.v1.Attempt
 	13, // 15: assessmatrix.v1.StartAttemptResponse.attempt:type_name -> assessmatrix.v1.Attempt
 	11, // 16: assessmatrix.v1.AppendEventsRequest.events:type_name -> assessmatrix.v1.AttemptEvent
 	13, // 17: assessmatrix.v1.SubmitAttemptResponse.attempt:type_name -> assessmatrix.v1.Attempt
-	10, // 18: assessmatrix.v1.Attempt.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
-	2,  // 19: assessmatrix.v1.CandidateService.OpenLink:input_type -> assessmatrix.v1.OpenLinkRequest
-	4,  // 20: assessmatrix.v1.CandidateService.RequestCode:input_type -> assessmatrix.v1.RequestCodeRequest
-	6,  // 21: assessmatrix.v1.CandidateService.VerifyCode:input_type -> assessmatrix.v1.VerifyCodeRequest
-	8,  // 22: assessmatrix.v1.CandidateService.RequestNewLink:input_type -> assessmatrix.v1.RequestNewLinkRequest
-	15, // 23: assessmatrix.v1.CandidateService.GetSession:input_type -> assessmatrix.v1.GetSessionRequest
-	17, // 24: assessmatrix.v1.CandidateService.StartAttempt:input_type -> assessmatrix.v1.StartAttemptRequest
-	19, // 25: assessmatrix.v1.CandidateService.AppendEvents:input_type -> assessmatrix.v1.AppendEventsRequest
-	21, // 26: assessmatrix.v1.CandidateService.SubmitAttempt:input_type -> assessmatrix.v1.SubmitAttemptRequest
-	23, // 27: assessmatrix.v1.CandidateService.EndSession:input_type -> assessmatrix.v1.EndSessionRequest
-	3,  // 28: assessmatrix.v1.CandidateService.OpenLink:output_type -> assessmatrix.v1.OpenLinkResponse
-	5,  // 29: assessmatrix.v1.CandidateService.RequestCode:output_type -> assessmatrix.v1.RequestCodeResponse
-	7,  // 30: assessmatrix.v1.CandidateService.VerifyCode:output_type -> assessmatrix.v1.VerifyCodeResponse
-	9,  // 31: assessmatrix.v1.CandidateService.RequestNewLink:output_type -> assessmatrix.v1.RequestNewLinkResponse
-	16, // 32: assessmatrix.v1.CandidateService.GetSession:output_type -> assessmatrix.v1.GetSessionResponse
-	18, // 33: assessmatrix.v1.CandidateService.StartAttempt:output_type -> assessmatrix.v1.StartAttemptResponse
-	20, // 34: assessmatrix.v1.CandidateService.AppendEvents:output_type -> assessmatrix.v1.AppendEventsResponse
-	22, // 35: assessmatrix.v1.CandidateService.SubmitAttempt:output_type -> assessmatrix.v1.SubmitAttemptResponse
-	24, // 36: assessmatrix.v1.CandidateService.EndSession:output_type -> assessmatrix.v1.EndSessionResponse
-	28, // [28:37] is the sub-list for method output_type
-	19, // [19:28] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	13, // 18: assessmatrix.v1.GetRecordResponse.attempt:type_name -> assessmatrix.v1.Attempt
+	10, // 19: assessmatrix.v1.Attempt.AnswersEntry.value:type_name -> assessmatrix.v1.ItemAnswer
+	2,  // 20: assessmatrix.v1.CandidateService.OpenLink:input_type -> assessmatrix.v1.OpenLinkRequest
+	4,  // 21: assessmatrix.v1.CandidateService.RequestCode:input_type -> assessmatrix.v1.RequestCodeRequest
+	6,  // 22: assessmatrix.v1.CandidateService.VerifyCode:input_type -> assessmatrix.v1.VerifyCodeRequest
+	8,  // 23: assessmatrix.v1.CandidateService.RequestNewLink:input_type -> assessmatrix.v1.RequestNewLinkRequest
+	15, // 24: assessmatrix.v1.CandidateService.GetSession:input_type -> assessmatrix.v1.GetSessionRequest
+	17, // 25: assessmatrix.v1.CandidateService.StartAttempt:input_type -> assessmatrix.v1.StartAttemptRequest
+	19, // 26: assessmatrix.v1.CandidateService.AppendEvents:input_type -> assessmatrix.v1.AppendEventsRequest
+	21, // 27: assessmatrix.v1.CandidateService.SubmitAttempt:input_type -> assessmatrix.v1.SubmitAttemptRequest
+	23, // 28: assessmatrix.v1.CandidateService.EndSession:input_type -> assessmatrix.v1.EndSessionRequest
+	25, // 29: assessmatrix.v1.CandidateService.GetRecord:input_type -> assessmatrix.v1.GetRecordRequest
+	3,  // 30: assessmatrix.v1.CandidateService.OpenLink:output_type -> assessmatrix.v1.OpenLinkResponse
+	5,  // 31: assessmatrix.v1.CandidateService.RequestCode:output_type -> assessmatrix.v1.RequestCodeResponse
+	7,  // 32: assessmatrix.v1.CandidateService.VerifyCode:output_type -> assessmatrix.v1.VerifyCodeResponse
+	9,  // 33: assessmatrix.v1.CandidateService.RequestNewLink:output_type -> assessmatrix.v1.RequestNewLinkResponse
+	16, // 34: assessmatrix.v1.CandidateService.GetSession:output_type -> assessmatrix.v1.GetSessionResponse
+	18, // 35: assessmatrix.v1.CandidateService.StartAttempt:output_type -> assessmatrix.v1.StartAttemptResponse
+	20, // 36: assessmatrix.v1.CandidateService.AppendEvents:output_type -> assessmatrix.v1.AppendEventsResponse
+	22, // 37: assessmatrix.v1.CandidateService.SubmitAttempt:output_type -> assessmatrix.v1.SubmitAttemptResponse
+	24, // 38: assessmatrix.v1.CandidateService.EndSession:output_type -> assessmatrix.v1.EndSessionResponse
+	26, // 39: assessmatrix.v1.CandidateService.GetRecord:output_type -> assessmatrix.v1.GetRecordResponse
+	30, // [30:40] is the sub-list for method output_type
+	20, // [20:30] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_candidate_proto_init() }
@@ -1962,7 +2086,7 @@ func file_assessmatrix_v1_candidate_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_candidate_proto_rawDesc), len(file_assessmatrix_v1_candidate_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -22,7 +22,8 @@ service ResultService {
   rpc ListResponses(ListResponsesRequest) returns (ListResponsesResponse);
   // The full, hash-chained event log of one attempt, with a check of the chain.
   rpc GetAttemptLog(GetAttemptLogRequest) returns (GetAttemptLogResponse);
-  // Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+  // Essays waiting for a person, blind: the reviewer sees "Answer 7 to
+  // question 3", not a name, an attempt or a hand-in time.
   rpc ListReviews(ListReviewsRequest) returns (ListReviewsResponse);
   // A person's score for one essay. Written to the attempt's log; the
   // attempt's score and its assignment's are recomputed from it.
@@ -81,8 +82,11 @@ message ListReviewsRequest {
 }
 
 message ReviewTask {
-  string attempt_id = 1;
-  // "Response 7": the order of hand-in, so marking is blind to who wrote it.
+  // Not set: the attempt would lead back to the candidate. See task.
+  string attempt_id = 1 [deprecated = true];
+  // "Answer 7": numbered per question in an order derived from a server
+  // secret, not hand-in order, so answers to different questions by the
+  // same candidate cannot be linked, nor any answer matched to a hand-in.
   string label = 2;
   string item_id = 3;
   // The question's position as the candidate saw it.
@@ -93,9 +97,17 @@ message ReviewTask {
   // Most the essay can earn.
   int32 points = 8;
   bool reviewed = 9;
+  // The score and note, when the caller gave them. Another reviewer's are
+  // not shown, so a second look is independent of the first.
   int32 given = 10;
   string note = 11;
-  int64 submitted_at = 12;
+  // Not set, for the same reason as attempt_id.
+  int64 submitted_at = 12 [deprecated = true];
+  // Opaque, sealed under the server secret: what ScoreAnswer takes to score
+  // this answer.
+  string task = 13;
+  // Scored by a reviewer other than the caller.
+  bool scored_by_other = 14;
 }
 
 message ListReviewsResponse {
@@ -103,11 +115,13 @@ message ListReviewsResponse {
 }
 
 message ScoreAnswerRequest {
+  // Either task, from the review queue, or attempt_id and item_id.
   string attempt_id = 1;
   string item_id = 2;
   int32 points = 3;
   // Shown to the candidate with the score.
   string note = 4;
+  string task = 5;
 }
 
 message ScoreAnswerResponse {

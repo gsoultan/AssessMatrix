@@ -277,6 +277,7 @@ export function attemptIn(a: ca.Attempt, serverNow: number): Attempt {
     submittedAt: opt(a.submittedAt),
     score: scoreIn(a.score),
     flagReasons: a.flagReasons.length ? [...a.flagReasons] : undefined,
+    withdrawn: a.withdrawn.length ? [...a.withdrawn] : undefined,
     reviews: a.reviews.length
       ? a.reviews.map((r) => ({ itemId: r.itemId, points: r.points, maxPoints: r.maxPoints, note: r.note }))
       : undefined,

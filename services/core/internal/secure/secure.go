@@ -18,7 +18,7 @@ import (
 // Keys are derived from one server secret, one per purpose, so a hash made
 // for one thing can never be replayed as another.
 type Keys struct {
-	link, code, session, chain, seal, vault, setup []byte
+	link, code, session, chain, seal, vault, setup, review []byte
 }
 
 // MinSecretBytes is the least secret the core will start with.
@@ -34,7 +34,7 @@ func NewKeys(secret []byte) (*Keys, error) {
 		return m.Sum(nil)
 	}
 	return &Keys{link: derive("link"), code: derive("code"), session: derive("session"), chain: derive("attempt-chain"), seal: derive("attempt-seal"),
-		vault: derive("vault"), setup: derive("setup")}, nil
+		vault: derive("vault"), setup: derive("setup"), review: derive("review-order")}, nil
 }
 
 func mac(key []byte, parts ...[]byte) []byte {
@@ -71,6 +71,13 @@ func (k *Keys) AttemptSeal(attemptID string, lastSeq int64, lastHash []byte, pur
 	binary.BigEndian.PutUint64(n[:8], uint64(lastSeq))
 	binary.BigEndian.PutUint64(n[8:], uint64(purgedAt))
 	return mac(k.seal, []byte(attemptID), n[:], lastHash)
+}
+
+// ReviewOrder places an answer in an essay's review queue. Derived from the
+// server key, it follows neither hand-in order nor any id a reviewer can see,
+// and it differs per question, so one candidate's answers do not line up.
+func (k *Keys) ReviewOrder(itemID, attemptID string) []byte {
+	return mac(k.review, []byte(itemID), []byte(attemptID))
 }
 
 // setupAlphabet leaves out 0/O and 1/I/L, so a code read off a log is typed right.

@@ -466,9 +466,14 @@ func (x *ListReviewsRequest) GetIncludeDone() bool {
 }
 
 type ReviewTask struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	AttemptId string                 `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	// "Response 7": the order of hand-in, so marking is blind to who wrote it.
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Not set: the attempt would lead back to the candidate. See task.
+	//
+	// Deprecated: Marked as deprecated in assessmatrix/v1/result.proto.
+	AttemptId string `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	// "Answer 7": numbered per question in an order derived from a server
+	// secret, not hand-in order, so answers to different questions by the
+	// same candidate cannot be linked, nor any answer matched to a hand-in.
 	Label  string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
 	ItemId string `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
 	// The question's position as the candidate saw it.
@@ -477,11 +482,21 @@ type ReviewTask struct {
 	Text   string `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
 	File   *Media `protobuf:"bytes,7,opt,name=file,proto3" json:"file,omitempty"`
 	// Most the essay can earn.
-	Points        int32  `protobuf:"varint,8,opt,name=points,proto3" json:"points,omitempty"`
-	Reviewed      bool   `protobuf:"varint,9,opt,name=reviewed,proto3" json:"reviewed,omitempty"`
-	Given         int32  `protobuf:"varint,10,opt,name=given,proto3" json:"given,omitempty"`
-	Note          string `protobuf:"bytes,11,opt,name=note,proto3" json:"note,omitempty"`
-	SubmittedAt   int64  `protobuf:"varint,12,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	Points   int32 `protobuf:"varint,8,opt,name=points,proto3" json:"points,omitempty"`
+	Reviewed bool  `protobuf:"varint,9,opt,name=reviewed,proto3" json:"reviewed,omitempty"`
+	// The score and note, when the caller gave them. Another reviewer's are
+	// not shown, so a second look is independent of the first.
+	Given int32  `protobuf:"varint,10,opt,name=given,proto3" json:"given,omitempty"`
+	Note  string `protobuf:"bytes,11,opt,name=note,proto3" json:"note,omitempty"`
+	// Not set, for the same reason as attempt_id.
+	//
+	// Deprecated: Marked as deprecated in assessmatrix/v1/result.proto.
+	SubmittedAt int64 `protobuf:"varint,12,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	// Opaque, sealed under the server secret: what ScoreAnswer takes to score
+	// this answer.
+	Task string `protobuf:"bytes,13,opt,name=task,proto3" json:"task,omitempty"`
+	// Scored by a reviewer other than the caller.
+	ScoredByOther bool `protobuf:"varint,14,opt,name=scored_by_other,json=scoredByOther,proto3" json:"scored_by_other,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -516,6 +531,7 @@ func (*ReviewTask) Descriptor() ([]byte, []int) {
 	return file_assessmatrix_v1_result_proto_rawDescGZIP(), []int{7}
 }
 
+// Deprecated: Marked as deprecated in assessmatrix/v1/result.proto.
 func (x *ReviewTask) GetAttemptId() string {
 	if x != nil {
 		return x.AttemptId
@@ -593,11 +609,26 @@ func (x *ReviewTask) GetNote() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in assessmatrix/v1/result.proto.
 func (x *ReviewTask) GetSubmittedAt() int64 {
 	if x != nil {
 		return x.SubmittedAt
 	}
 	return 0
+}
+
+func (x *ReviewTask) GetTask() string {
+	if x != nil {
+		return x.Task
+	}
+	return ""
+}
+
+func (x *ReviewTask) GetScoredByOther() bool {
+	if x != nil {
+		return x.ScoredByOther
+	}
+	return false
 }
 
 type ListReviewsResponse struct {
@@ -645,12 +676,14 @@ func (x *ListReviewsResponse) GetTasks() []*ReviewTask {
 }
 
 type ScoreAnswerRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	AttemptId string                 `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
-	ItemId    string                 `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	Points    int32                  `protobuf:"varint,3,opt,name=points,proto3" json:"points,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Either task, from the review queue, or attempt_id and item_id.
+	AttemptId string `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	ItemId    string `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	Points    int32  `protobuf:"varint,3,opt,name=points,proto3" json:"points,omitempty"`
 	// Shown to the candidate with the score.
 	Note          string `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	Task          string `protobuf:"bytes,5,opt,name=task,proto3" json:"task,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -709,6 +742,13 @@ func (x *ScoreAnswerRequest) GetPoints() int32 {
 func (x *ScoreAnswerRequest) GetNote() string {
 	if x != nil {
 		return x.Note
+	}
+	return ""
+}
+
+func (x *ScoreAnswerRequest) GetTask() string {
+	if x != nil {
+		return x.Task
 	}
 	return ""
 }
@@ -1140,11 +1180,11 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\aitem_id\x18\x05 \x01(\tR\x06itemId\"P\n" +
 	"\x12ListReviewsRequest\x12\x17\n" +
 	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12!\n" +
-	"\finclude_done\x18\x02 \x01(\bR\vincludeDone\"\xc7\x02\n" +
+	"\finclude_done\x18\x02 \x01(\bR\vincludeDone\"\x8b\x03\n" +
 	"\n" +
-	"ReviewTask\x12\x1d\n" +
+	"ReviewTask\x12!\n" +
 	"\n" +
-	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x14\n" +
+	"attempt_id\x18\x01 \x01(\tB\x02\x18\x01R\tattemptId\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x17\n" +
 	"\aitem_id\x18\x03 \x01(\tR\x06itemId\x12\x16\n" +
 	"\x06number\x18\x04 \x01(\x05R\x06number\x12\x12\n" +
@@ -1155,16 +1195,19 @@ const file_assessmatrix_v1_result_proto_rawDesc = "" +
 	"\breviewed\x18\t \x01(\bR\breviewed\x12\x14\n" +
 	"\x05given\x18\n" +
 	" \x01(\x05R\x05given\x12\x12\n" +
-	"\x04note\x18\v \x01(\tR\x04note\x12!\n" +
-	"\fsubmitted_at\x18\f \x01(\x03R\vsubmittedAt\"H\n" +
+	"\x04note\x18\v \x01(\tR\x04note\x12%\n" +
+	"\fsubmitted_at\x18\f \x01(\x03B\x02\x18\x01R\vsubmittedAt\x12\x12\n" +
+	"\x04task\x18\r \x01(\tR\x04task\x12&\n" +
+	"\x0fscored_by_other\x18\x0e \x01(\bR\rscoredByOther\"H\n" +
 	"\x13ListReviewsResponse\x121\n" +
-	"\x05tasks\x18\x01 \x03(\v2\x1b.assessmatrix.v1.ReviewTaskR\x05tasks\"x\n" +
+	"\x05tasks\x18\x01 \x03(\v2\x1b.assessmatrix.v1.ReviewTaskR\x05tasks\"\x8c\x01\n" +
 	"\x12ScoreAnswerRequest\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x17\n" +
 	"\aitem_id\x18\x02 \x01(\tR\x06itemId\x12\x16\n" +
 	"\x06points\x18\x03 \x01(\x05R\x06points\x12\x12\n" +
-	"\x04note\x18\x04 \x01(\tR\x04note\"j\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\x12\x12\n" +
+	"\x04task\x18\x05 \x01(\tR\x04task\"j\n" +
 	"\x13ScoreAnswerResponse\x12,\n" +
 	"\x05score\x18\x01 \x01(\v2\x16.assessmatrix.v1.ScoreR\x05score\x12%\n" +
 	"\x0ecredential_url\x18\x02 \x01(\tR\rcredentialUrl\"T\n" +

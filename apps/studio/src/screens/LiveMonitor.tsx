@@ -279,7 +279,7 @@ function AttemptRecord({ sitting }: { sitting: Sitting }) {
 const dot = (e: AttemptEvent) =>
   e.kind.startsWith('vision.') || e.kind === 'answer.pasted' || e.kind === 'session.second_tab'
     ? 'var(--color-serious)'
-    : e.kind.startsWith('focus.') || e.kind === 'fullscreen.exited'
+    : e.kind.startsWith('focus.') || e.kind === 'fullscreen.exited' || e.kind.endsWith('.withdrawn')
       ? 'var(--color-warn)'
       : e.kind.startsWith('attempt.') || e.kind.startsWith('consent.')
         ? 'var(--color-good)'
@@ -325,6 +325,8 @@ function say(e: AttemptEvent): string {
     case 'response.typed':
       return `Typed an answer to ${e.itemId}`
     default:
+      if (e.kind.startsWith('consent.') && e.kind.endsWith('.withdrawn'))
+        return `Withdrew consent: ${e.kind.slice('consent.'.length, -'.withdrawn'.length)}`
       if (e.kind.startsWith('consent.')) return `Agreed to: ${e.kind.slice('consent.'.length)}`
       return e.detail ? `${e.kind} · ${e.detail}` : e.kind
   }
