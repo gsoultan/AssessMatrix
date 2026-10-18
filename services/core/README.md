@@ -8,7 +8,7 @@ invitations, candidate sessions, attempts and results. It implements the
 
 | Guarantee | Where it is enforced | Proven by |
 | :--- | :--- | :--- |
-| Tenant A cannot read or write tenant B's rows | Row-level security on every table, keyed on a transaction-local setting taken from the authenticated principal; the server refuses to start as a role that could bypass it | `TestTenantIsolationAcrossEveryEndpoint`, which fails if any RPC lacks a case, and `TestNoTenantSeesNothing` |
+| Tenant A cannot read or write tenant B's rows | Row-level security on every table, keyed on a transaction-local setting taken from the authenticated principal; the server refuses to start as a role that could bypass it. Every foreign key between tenant tables includes `tenant_id`, so a row cannot name another tenant's row even if a handler forgets to check | `TestTenantIsolationAcrossEveryEndpoint`, which calls every RPC (public ones too) from another tenant, as its administrator and as someone who works in both, and fails if any RPC lacks a case; `TestEveryTableIsTenantScoped`, `TestForeignKeysStayInsideATenant` and `TestSecurityDefinerFunctionsAreReviewed`, which read the schema, so a new table, key or RLS-bypassing function fails the build until it is scoped or reviewed; `TestNoTenantSeesNothing` |
 | Every RPC has an access rule | `api.Policy()`; the interceptor refuses unknown procedures | `TestEveryProcedureHasAPolicy` |
 | An attempt is tamper-evident | Append-only `attempt_events` (trigger and grants) holding a keyed HMAC hash chain | `TestTamperedAttemptIsDetected` |
 | Candidates never receive answer keys | `domain.ForCandidate` on everything served to them | `TestAuthorInviteSitScore` |

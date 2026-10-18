@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
-	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 )
 
 // procedures lists every RPC in the schema, from the generated descriptors,
@@ -51,10 +51,20 @@ func TestEveryProcedureHasAPolicy(t *testing.T) {
 }
 
 // The MVP gate from docs/04: tenant A cannot read or write tenant B's rows
-// through any endpoint. Each staff and candidate procedure is called by
-// tenant B with tenant A's ids. The test fails if a procedure in the schema
-// has no case here, so a new endpoint cannot ship untested.
+// through any endpoint. Each procedure is called from tenant B with tenant A's
+// ids. The test fails if a procedure in the schema has no case here, so a new
+// endpoint cannot ship untested.
+//
+// It runs twice: as the administrator of another tenant, and as someone who
+// works in both (an administrator of B, a member of A) while signed in to B.
+// A session belongs to one tenant, so the second must reach no more of A
+// than the first, whatever else their address is allowed.
 func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
+	t.Run("another tenant's administrator", func(t *testing.T) { checkIsolation(t, false) })
+	t.Run("member of both, signed in to the other", func(t *testing.T) { checkIsolation(t, true) })
+}
+
+func checkIsolation(t *testing.T, memberOfA bool) {
 	h := newHarness(t)
 	ctx := context.Background()
 
@@ -67,8 +77,22 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 		Events: []*v1.AttemptEvent{{Kind: "response.changed", ItemId: "q1", Values: []string{"b"}}}})))
 	get(candA.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: attA.GetId()})))
 
-	b := h.tenant("Beta")
+	var b *client
+	if memberOfA {
+		email := "both-" + secure.Token()[:8] + "@example.test"
+		h.newTenant("Beta", email) // first, so signing in lands here
+		get(a.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: email, TenantId: tenantA, Role: v1.Role_ROLE_MEMBER})))
+		b = h.signIn(email)
+	} else {
+		b = h.tenant("Beta")
+	}
+	me := get(b.auth.WhoAmI(ctx, connect.NewRequest(&v1.WhoAmIRequest{}))).Msg.GetStaff()
+	if me.GetTenantName() != "Beta" {
+		t.Fatalf("the intruder is signed in to %q, not Beta", me.GetTenantName())
+	}
+	tenantB := me.GetTenantId()
 	fb := h.publishedFixture(b)
+	tokenB := h.lastLink(fb.email)
 	candB := h.redeem(fb)
 
 	// A second, unsubmitted exam in A that B will try to change.
@@ -81,6 +105,15 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 		Url: "https://hooks.alpha.example/am", Events: []string{EventAttemptSubmitted}}))).Msg.GetEndpoint()
 	pingA := get(a.hooks.PingWebhook(ctx, connect.NewRequest(&v1.PingWebhookRequest{Id: hookA.GetId()}))).Msg.GetDelivery()
 
+	// Nothing B does may mail A's people.
+	quiet := func(name string, f func()) {
+		t.Helper()
+		before, beforeCand := h.mailCount(a.email), h.mailCount(fa.email)
+		f()
+		if h.mailCount(a.email) != before || h.mailCount(fa.email) != beforeCand {
+			t.Errorf("%s: B's call mailed someone in A", name)
+		}
+	}
 	denied := func(name string, err error) {
 		t.Helper()
 		if c := connect.CodeOf(err); c != connect.CodeNotFound {
@@ -220,14 +253,29 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 		// Tenancy: B is an administrator, but of B only.
 		"/assessmatrix.v1.TenantService/ListMyTenants": func() {
 			for _, tn := range get(b.tenants.ListMyTenants(ctx, connect.NewRequest(&v1.ListMyTenantsRequest{}))).Msg.GetTenants() {
-				if tn.GetId() == tenantA {
+				switch {
+				case tn.GetId() != tenantA:
+				case !memberOfA:
 					t.Error("ListMyTenants: B is told it belongs to A")
+				case tn.GetRole() != v1.Role_ROLE_MEMBER || tn.GetCurrent():
+					t.Errorf("ListMyTenants: a member of A is told they are %v there (current %t)", tn.GetRole(), tn.GetCurrent())
 				}
 			}
 		},
 		"/assessmatrix.v1.TenantService/SwitchTenant": func() {
-			_, err := b.tenants.SwitchTenant(ctx, connect.NewRequest(&v1.SwitchTenantRequest{TenantId: tenantA}))
-			denied("SwitchTenant", err)
+			r, err := b.tenants.SwitchTenant(ctx, connect.NewRequest(&v1.SwitchTenantRequest{TenantId: tenantA}))
+			if !memberOfA {
+				denied("SwitchTenant", err)
+				return
+			}
+			// A member may switch, and is a member there, not B's administrator.
+			if err != nil || r.Msg.GetStaff().GetRole() != v1.Role_ROLE_MEMBER || r.Msg.GetStaff().GetTenantId() != tenantA {
+				t.Fatalf("SwitchTenant: a member of A switched to %v (err %v)", r, err)
+			}
+			if _, err := b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Through A"})); code(err) != connect.CodePermissionDenied {
+				t.Errorf("SwitchTenant: B's administrator rights came along into A (err %v)", err)
+			}
+			get(b.tenants.SwitchTenant(ctx, connect.NewRequest(&v1.SwitchTenantRequest{TenantId: tenantB})))
 		},
 		"/assessmatrix.v1.TenantService/CreateTenant": func() {
 			made := get(b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Beta Two"}))).Msg.GetTenant()
@@ -254,7 +302,18 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 		},
 		"/assessmatrix.v1.TenantService/SetAccess": func() {
 			_, err := b.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: "mole@example.test", TenantId: tenantA, Role: v1.Role_ROLE_ADMIN}))
-			denied("SetAccess", err)
+			if memberOfA {
+				if code(err) != connect.CodePermissionDenied {
+					t.Errorf("SetAccess: a member of A changed who works there (err %v)", err)
+				}
+			} else {
+				denied("SetAccess", err)
+			}
+			for _, st := range get(a.tenants.ListAccess(ctx, connect.NewRequest(&v1.ListAccessRequest{}))).Msg.GetStaff() {
+				if st.GetEmail() == "mole@example.test" {
+					t.Error("SetAccess: B put someone into A")
+				}
+			}
 		},
 		"/assessmatrix.v1.TenantService/ListExamCopies": func() {
 			_, err := b.tenants.ListExamCopies(ctx, connect.NewRequest(&v1.ListExamCopiesRequest{ExamId: fa.exam.GetId()}))
@@ -338,16 +397,84 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			_, err := candB.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: attA.GetId()}))
 			denied("SubmitAttempt", err)
 		},
+
+		// Public procedures take their own credential: an address and its
+		// code, a link and its code, the setup code. Each of B's resolves to B
+		// and nothing of A's, and spending it changes nothing in A.
+		"/assessmatrix.v1.AuthService/RequestStaffCode": func() {
+			quiet("RequestStaffCode", func() {
+				get(h.browser().auth.RequestStaffCode(ctx, connect.NewRequest(&v1.RequestStaffCodeRequest{Email: b.email})))
+			})
+		},
+		"/assessmatrix.v1.AuthService/VerifyStaffCode": func() {
+			c := h.browser()
+			get(c.auth.RequestStaffCode(ctx, connect.NewRequest(&v1.RequestStaffCodeRequest{Email: b.email})))
+			mine := h.lastCode(b.email)
+			if r := get(c.auth.VerifyStaffCode(ctx, connect.NewRequest(&v1.VerifyStaffCodeRequest{Email: a.email, Code: mine}))); r.Msg.GetOk() {
+				t.Error("VerifyStaffCode: B's code signed in as A's administrator")
+			}
+			r := get(c.auth.VerifyStaffCode(ctx, connect.NewRequest(&v1.VerifyStaffCodeRequest{Email: b.email, Code: mine})))
+			if !r.Msg.GetOk() || r.Msg.GetStaff().GetTenantId() == tenantA {
+				t.Errorf("VerifyStaffCode: B's own code signed in to %q", r.Msg.GetStaff().GetTenantName())
+			}
+		},
+		"/assessmatrix.v1.AuthService/SignOut": func() {
+			c := h.signIn(b.email)
+			get(c.auth.SignOut(ctx, connect.NewRequest(&v1.SignOutRequest{})))
+			if _, err := a.auth.WhoAmI(ctx, connect.NewRequest(&v1.WhoAmIRequest{})); err != nil {
+				t.Errorf("SignOut: B signed A's administrator out (err %v)", err)
+			}
+		},
+		"/assessmatrix.v1.CandidateService/OpenLink": func() {
+			for _, token := range []string{tokenB, secure.Token()} {
+				r := get(candB.candidate.OpenLink(ctx, connect.NewRequest(&v1.OpenLinkRequest{Token: token})))
+				if iss := r.Msg.GetInvitation().GetIssuer(); iss != "" && iss != "Beta" {
+					t.Errorf("OpenLink: B's link opened %q's invitation", iss)
+				}
+			}
+		},
+		"/assessmatrix.v1.CandidateService/RequestCode": func() {
+			quiet("RequestCode", func() {
+				get(candB.candidate.RequestCode(ctx, connect.NewRequest(&v1.RequestCodeRequest{Token: tokenB})))
+			})
+		},
+		"/assessmatrix.v1.CandidateService/VerifyCode": func() {
+			// A's candidate's code, typed against B's link.
+			r := get(candB.candidate.VerifyCode(ctx, connect.NewRequest(&v1.VerifyCodeRequest{Token: tokenB, Code: h.lastCode(fa.email)})))
+			if r.Msg.GetOk() {
+				t.Error("VerifyCode: A's code opened B's link")
+			}
+			if s := get(candB.candidate.GetSession(ctx, connect.NewRequest(&v1.GetSessionRequest{}))); s.Msg.GetAssignmentId() != fb.assign.GetId() {
+				t.Error("VerifyCode: B's candidate now holds another invitation")
+			}
+		},
+		"/assessmatrix.v1.CandidateService/RequestNewLink": func() {
+			quiet("RequestNewLink", func() {
+				get(candB.candidate.RequestNewLink(ctx, connect.NewRequest(&v1.RequestNewLinkRequest{Token: tokenB})))
+			})
+		},
+		"/assessmatrix.v1.CandidateService/EndSession": func() {
+			get(h.browser().candidate.EndSession(ctx, connect.NewRequest(&v1.EndSessionRequest{})))
+			if s := get(candA.candidate.GetSession(ctx, connect.NewRequest(&v1.GetSessionRequest{}))); s.Msg.GetAssignmentId() != fa.assign.GetId() {
+				t.Error("EndSession: A's candidate lost their session")
+			}
+		},
+		"/assessmatrix.v1.SetupService/GetSetupStatus": func() {
+			r := get(h.browser().setup.GetSetupStatus(ctx, connect.NewRequest(&v1.GetSetupStatusRequest{})))
+			if r.Msg.GetNeeded() || r.Msg.GetSchemaVersion() != "" || r.Msg.GetRegion() != "" {
+				t.Errorf("GetSetupStatus: tells anyone %v once organisations exist", r.Msg)
+			}
+		},
+		"/assessmatrix.v1.SetupService/CompleteSetup": func() {
+			_, err := h.browser().setup.CompleteSetup(ctx, connect.NewRequest(&v1.CompleteSetupRequest{SetupCode: h.srv.Keys.SetupCode(),
+				OrganizationName: "Takeover", AdminEmail: b.email}))
+			if code(err) != connect.CodeFailedPrecondition {
+				t.Errorf("CompleteSetup: ran again once organisations exist (err %v)", err)
+			}
+		},
 	}
 
-	// Public procedures take their own credential and are covered elsewhere:
-	// a link token resolves to exactly one tenant (invite_test.go), a staff
-	// email to exactly one account. Sign-out and end-session only clear a cookie.
-	policy := Policy()
 	for _, proc := range procedures(t) {
-		if policy[proc] == auth.Public {
-			continue
-		}
 		run, ok := cases[proc]
 		if !ok {
 			t.Errorf("%s has no tenant-isolation case; add one before shipping it", proc)
@@ -376,8 +503,7 @@ func TestNoTenantSeesNothing(t *testing.T) {
 	h := newHarness(t)
 	h.publishedFixture(h.tenant("Visible"))
 	ctx := context.Background()
-	for _, table := range []string{"tenants", "staff", "exams", "people", "assignments", "attempts", "attempt_events", "outbox", "audit_log",
-		"webhook_endpoints", "webhook_events", "webhook_deliveries"} {
+	for _, table := range tenantTables(t, h) {
 		var n int
 		err := h.srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
 			return tx.QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()).Scan(&n)
@@ -395,5 +521,183 @@ func TestNoTenantSeesNothing(t *testing.T) {
 	})
 	if err != nil || other != 0 {
 		t.Errorf("a tenant with no data sees %d exams (err %v)", other, err)
+	}
+}
+
+// Tables that hold no tenant's data, and why. Everything else in the schema
+// must be scoped by row-level security, so a new table without it fails here.
+var unscopedTables = map[string]string{
+	"schema_migrations": "migration bookkeeping; the application role has no grant on it",
+	// River's own tables. Job arguments carry ids only (mail.SendArgs,
+	// webhook.DeliverArgs, RetentionArgs); each worker looks the row up with
+	// a SECURITY DEFINER function and then works inside that row's tenant.
+	"river_client":       "job queue",
+	"river_client_queue": "job queue",
+	"river_job":          "job queue",
+	"river_leader":       "job queue",
+	"river_migration":    "job queue",
+	"river_notification": "job queue",
+	"river_queue":        "job queue",
+}
+
+// tenantTables is every table in the schema that holds tenant rows.
+func tenantTables(t *testing.T, h *harness) []string {
+	t.Helper()
+	rows, err := h.owner.Query(context.Background(), `SELECT c.relname FROM pg_class c
+		WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p') ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, n := range names {
+		if _, ok := unscopedTables[n]; !ok {
+			out = append(out, n)
+		}
+	}
+	if len(out) == 0 {
+		t.Fatal("no tenant tables found")
+	}
+	return out
+}
+
+// Every tenant table is under row-level security with exactly one policy,
+// the tenant one, for every command. A second permissive policy would widen
+// it; a missing WITH CHECK would let a row be written into another tenant.
+func TestEveryTableIsTenantScoped(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	for _, table := range tenantTables(t, h) {
+		key := "tenant_id"
+		if table == "tenants" {
+			key = "id"
+		}
+		want := "(" + key + " = am_tenant())"
+		var (
+			rls     bool
+			notNull *bool
+			pols    []string
+		)
+		err := h.owner.QueryRow(ctx, `SELECT c.relrowsecurity,
+				(SELECT a.attnotnull FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = $2 AND NOT a.attisdropped),
+				coalesce((SELECT array_agg(concat_ws(' ', p.polcmd, p.polpermissive, p.polroles = '{0}',
+					pg_get_expr(p.polqual, p.polrelid), pg_get_expr(p.polwithcheck, p.polrelid))) FROM pg_policy p WHERE p.polrelid = c.oid), '{}')
+			FROM pg_class c WHERE c.oid = to_regclass('public.' || quote_ident($1))`, table, key).Scan(&rls, &notNull, &pols)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !rls {
+			t.Errorf("%s: row-level security is off; enable it with a tenant policy, or list the table in unscopedTables with a reason", table)
+		}
+		if notNull == nil || !*notNull {
+			t.Errorf("%s: has no NOT NULL %s column to scope it by", table, key)
+		}
+		if exact := "* t t " + want + " " + want; len(pols) != 1 || pols[0] != exact {
+			t.Errorf("%s: policies are %q, want exactly one: %q", table, pols, exact)
+		}
+	}
+}
+
+// A row may point only at a row in its own tenant. Foreign keys are checked
+// without row-level security, so a key on the id alone would let tenant B
+// write a row naming tenant A's exam, which A's deletes would then cascade
+// into or be blocked by. Every key between tenant tables includes tenant_id.
+func TestForeignKeysStayInsideATenant(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	scoped := map[string]bool{}
+	for _, table := range tenantTables(t, h) {
+		scoped[table] = true
+	}
+	rows, err := h.owner.Query(ctx, `SELECT c.conrelid::regclass::text, c.confrelid::regclass::text, pg_get_constraintdef(c.oid),
+			EXISTS (SELECT 1 FROM unnest(c.conkey, c.confkey) AS k(a, b)
+				JOIN pg_attribute x ON x.attrelid = c.conrelid AND x.attnum = k.a
+				JOIN pg_attribute y ON y.attrelid = c.confrelid AND y.attnum = k.b
+				WHERE x.attname = 'tenant_id' AND y.attname = 'tenant_id')
+		FROM pg_constraint c WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace ORDER BY 1, 3`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var from, to, def string
+		var keyed bool
+		if err := rows.Scan(&from, &to, &def, &keyed); err != nil {
+			t.Fatal(err)
+		}
+		if !scoped[from] || !scoped[to] || to == "tenants" {
+			continue
+		}
+		if !keyed {
+			t.Errorf("%s: %s can point into another tenant; key it on (tenant_id, ...)", from, def)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	// And the database says so, whatever a handler forgets to check: in
+	// tenant B, an assignment naming tenant A's exam is refused.
+	a := h.tenant("KeysA")
+	fa := h.publishedFixture(a)
+	b := h.tenant("KeysB")
+	tenantB := h.lastTenant
+	fb := h.publishedFixture(b)
+	err = h.srv.DB.InTenant(ctx, db.TenantID(tenantB), func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO assignments (tenant_id, exam_id, exam_version, person_id, sitting)
+			VALUES (am_tenant(), $1, 1, $2, 99)`, fa.exam.GetId(), fb.person.GetId())
+		return err
+	})
+	if !isForeignKeyViolation(err) {
+		t.Errorf("tenant B wrote an assignment naming tenant A's exam (err %v)", err)
+	}
+}
+
+// SECURITY DEFINER functions run without row-level security, so each one is
+// a hole in it by design. Each is listed here with what keeps it narrow; a new
+// one fails this test until someone has looked at it.
+var definerFunctions = map[string]string{
+	"am_assignment_by_session":   "candidate cookie hash to its one assignment",
+	"am_assignment_by_token":     "invitation link hash to its one assignment",
+	"am_outbox_sweep":            "deletes sent mail past its keep; returns a count",
+	"am_outbox_tenant":           "mail worker: outbox id (from its own job) to that row's tenant",
+	"am_public_credential":       "public verification of one issued credential by id",
+	"am_public_issuer":           "public keys and name of a credential's issuer",
+	"am_purge_attempt":           "refuses unless the attempt is in the caller's tenant",
+	"am_retention_due":           "retention worker: ids due for purging, across tenants",
+	"am_schema_version":          "newest migration name",
+	"am_setup_first_tenant":      "refuses once any tenant exists",
+	"am_setup_needed":            "whether any tenant exists",
+	"am_staff_by_email":          "sign-in: an address to one of its own memberships",
+	"am_staff_session":           "staff cookie hash to its one session",
+	"am_staff_tenants":           "called only with the signed-in staff member's own address",
+	"am_take_analysis":           "psychometrics worker: next queued exam id",
+	"am_webhook_delivery_tenant": "webhook worker: delivery id (from its own job) to that row's tenant",
+	"am_webhook_sweep":           "deletes webhook events past their keep; returns a count",
+}
+
+func TestSecurityDefinerFunctionsAreReviewed(t *testing.T) {
+	h := newHarness(t)
+	rows, err := h.owner.Query(context.Background(), `SELECT p.proname FROM pg_proc p
+		WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range names {
+		if _, ok := definerFunctions[n]; !ok {
+			t.Errorf("%s is SECURITY DEFINER and bypasses row-level security; review it and list it in definerFunctions", n)
+		}
+	}
+	for n := range definerFunctions {
+		if !slices.Contains(names, n) {
+			t.Errorf("definerFunctions lists %s, which is not SECURITY DEFINER in the schema", n)
+		}
 	}
 }
