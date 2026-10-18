@@ -27,7 +27,8 @@ type Tenant struct {
 	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	// Where this tenant's personal data and images are kept.
 	Region string `protobuf:"bytes,3,opt,name=region,proto3" json:"region,omitempty"`
-	// The caller's role there.
+	// The caller's role there. Unspecified for a tenant a super administrator
+	// manages without working in it.
 	Role Role `protobuf:"varint,4,opt,name=role,proto3,enum=assessmatrix.v1.Role" json:"role,omitempty"`
 	// The tenant this session is signed in to.
 	Current       bool `protobuf:"varint,5,opt,name=current,proto3" json:"current,omitempty"`
@@ -272,7 +273,11 @@ type CreateTenantRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Empty means the region of the tenant the caller is signed in to.
-	Region        string `protobuf:"bytes,2,opt,name=region,proto3" json:"region,omitempty"`
+	Region string `protobuf:"bytes,2,opt,name=region,proto3" json:"region,omitempty"`
+	// Its first administrator. Empty means the caller.
+	AdminEmail string `protobuf:"bytes,3,opt,name=admin_email,json=adminEmail,proto3" json:"admin_email,omitempty"`
+	// Used when the administrator is new to the installation.
+	AdminName     string `protobuf:"bytes,4,opt,name=admin_name,json=adminName,proto3" json:"admin_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -317,6 +322,20 @@ func (x *CreateTenantRequest) GetName() string {
 func (x *CreateTenantRequest) GetRegion() string {
 	if x != nil {
 		return x.Region
+	}
+	return ""
+}
+
+func (x *CreateTenantRequest) GetAdminEmail() string {
+	if x != nil {
+		return x.AdminEmail
+	}
+	return ""
+}
+
+func (x *CreateTenantRequest) GetAdminName() string {
+	if x != nil {
+		return x.AdminName
 	}
 	return ""
 }
@@ -459,6 +478,7 @@ type StaffAccess struct {
 	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	// Only tenants the caller administers.
 	Grants        []*AccessGrant `protobuf:"bytes,3,rep,name=grants,proto3" json:"grants,omitempty"`
+	SuperAdmin    bool           `protobuf:"varint,4,opt,name=super_admin,json=superAdmin,proto3" json:"super_admin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -514,9 +534,17 @@ func (x *StaffAccess) GetGrants() []*AccessGrant {
 	return nil
 }
 
+func (x *StaffAccess) GetSuperAdmin() bool {
+	if x != nil {
+		return x.SuperAdmin
+	}
+	return false
+}
+
 type ListAccessResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The tenants the caller administers: the columns of the access table.
+	// The tenants the caller administers (every tenant, for a super
+	// administrator): the columns of the access table.
 	Tenants       []*Tenant      `protobuf:"bytes,1,rep,name=tenants,proto3" json:"tenants,omitempty"`
 	Staff         []*StaffAccess `protobuf:"bytes,2,rep,name=staff,proto3" json:"staff,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1041,20 +1069,26 @@ const file_assessmatrix_v1_tenant_proto_rawDesc = "" +
 	"\x13SwitchTenantRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\"D\n" +
 	"\x14SwitchTenantResponse\x12,\n" +
-	"\x05staff\x18\x01 \x01(\v2\x16.assessmatrix.v1.StaffR\x05staff\"A\n" +
+	"\x05staff\x18\x01 \x01(\v2\x16.assessmatrix.v1.StaffR\x05staff\"\x81\x01\n" +
 	"\x13CreateTenantRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
-	"\x06region\x18\x02 \x01(\tR\x06region\"G\n" +
+	"\x06region\x18\x02 \x01(\tR\x06region\x12\x1f\n" +
+	"\vadmin_email\x18\x03 \x01(\tR\n" +
+	"adminEmail\x12\x1d\n" +
+	"\n" +
+	"admin_name\x18\x04 \x01(\tR\tadminName\"G\n" +
 	"\x14CreateTenantResponse\x12/\n" +
 	"\x06tenant\x18\x01 \x01(\v2\x17.assessmatrix.v1.TenantR\x06tenant\"\x13\n" +
 	"\x11ListAccessRequest\"U\n" +
 	"\vAccessGrant\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12)\n" +
-	"\x04role\x18\x02 \x01(\x0e2\x15.assessmatrix.v1.RoleR\x04role\"m\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x15.assessmatrix.v1.RoleR\x04role\"\x8e\x01\n" +
 	"\vStaffAccess\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x124\n" +
-	"\x06grants\x18\x03 \x03(\v2\x1c.assessmatrix.v1.AccessGrantR\x06grants\"{\n" +
+	"\x06grants\x18\x03 \x03(\v2\x1c.assessmatrix.v1.AccessGrantR\x06grants\x12\x1f\n" +
+	"\vsuper_admin\x18\x04 \x01(\bR\n" +
+	"superAdmin\"{\n" +
 	"\x12ListAccessResponse\x121\n" +
 	"\atenants\x18\x01 \x03(\v2\x17.assessmatrix.v1.TenantR\atenants\x122\n" +
 	"\x05staff\x18\x02 \x03(\v2\x1c.assessmatrix.v1.StaffAccessR\x05staff\"\x84\x01\n" +

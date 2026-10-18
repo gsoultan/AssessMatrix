@@ -9,8 +9,8 @@ package assessmatrix.v1;
 // What a staff member may do in one tenant.
 enum Role {
   ROLE_UNSPECIFIED = 0;
-  // Everything a member can do, plus who has access, new tenants and sharing
-  // instruments with other tenants.
+  // Everything a member can do, plus adding users to this tenant as members
+  // and sharing instruments with other tenants they administer.
   ROLE_ADMIN = 1;
   // Build, invite, score: the everyday work.
   ROLE_MEMBER = 2;
@@ -24,6 +24,9 @@ message Staff {
   string tenant_name = 5;
   // Their role in this tenant.
   Role role = 6;
+  // Runs the whole installation: creates tenants and decides who administers
+  // each, whatever their role in this tenant.
+  bool super_admin = 7;
 }
 
 service AuthService {

@@ -137,8 +137,9 @@ func (s *authService) VerifyStaffCode(ctx context.Context, req *connect.Request[
 func staffProto(ctx context.Context, tx pgx.Tx, id string) (*v1.Staff, error) {
 	var st v1.Staff
 	var role string
-	err := tx.QueryRow(ctx, `SELECT s.id, s.email, s.name, t.id, t.name, s.role FROM staff s JOIN tenants t ON t.id = s.tenant_id
-		WHERE s.id = $1`, id).Scan(&st.Id, &st.Email, &st.Name, &st.TenantId, &st.TenantName, &role)
+	err := tx.QueryRow(ctx, `SELECT s.id, s.email, s.name, t.id, t.name, s.role, am_super_admin(s.email)
+		FROM staff s JOIN tenants t ON t.id = s.tenant_id
+		WHERE s.id = $1`, id).Scan(&st.Id, &st.Email, &st.Name, &st.TenantId, &st.TenantName, &role, &st.SuperAdmin)
 	st.Role = roleProto(role)
 	return &st, err
 }

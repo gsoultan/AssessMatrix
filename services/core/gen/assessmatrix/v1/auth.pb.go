@@ -26,8 +26,8 @@ type Role int32
 
 const (
 	Role_ROLE_UNSPECIFIED Role = 0
-	// Everything a member can do, plus who has access, new tenants and sharing
-	// instruments with other tenants.
+	// Everything a member can do, plus adding users to this tenant as members
+	// and sharing instruments with other tenants they administer.
 	Role_ROLE_ADMIN Role = 1
 	// Build, invite, score: the everyday work.
 	Role_ROLE_MEMBER Role = 2
@@ -82,7 +82,10 @@ type Staff struct {
 	TenantId   string                 `protobuf:"bytes,4,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	TenantName string                 `protobuf:"bytes,5,opt,name=tenant_name,json=tenantName,proto3" json:"tenant_name,omitempty"`
 	// Their role in this tenant.
-	Role          Role `protobuf:"varint,6,opt,name=role,proto3,enum=assessmatrix.v1.Role" json:"role,omitempty"`
+	Role Role `protobuf:"varint,6,opt,name=role,proto3,enum=assessmatrix.v1.Role" json:"role,omitempty"`
+	// Runs the whole installation: creates tenants and decides who administers
+	// each, whatever their role in this tenant.
+	SuperAdmin    bool `protobuf:"varint,7,opt,name=super_admin,json=superAdmin,proto3" json:"super_admin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -157,6 +160,13 @@ func (x *Staff) GetRole() Role {
 		return x.Role
 	}
 	return Role_ROLE_UNSPECIFIED
+}
+
+func (x *Staff) GetSuperAdmin() bool {
+	if x != nil {
+		return x.SuperAdmin
+	}
+	return false
 }
 
 type RequestStaffCodeRequest struct {
@@ -499,7 +509,7 @@ var File_assessmatrix_v1_auth_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x1aassessmatrix/v1/auth.proto\x12\x0fassessmatrix.v1\"\xaa\x01\n" +
+	"\x1aassessmatrix/v1/auth.proto\x12\x0fassessmatrix.v1\"\xcb\x01\n" +
 	"\x05Staff\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
@@ -507,7 +517,9 @@ const file_assessmatrix_v1_auth_proto_rawDesc = "" +
 	"\ttenant_id\x18\x04 \x01(\tR\btenantId\x12\x1f\n" +
 	"\vtenant_name\x18\x05 \x01(\tR\n" +
 	"tenantName\x12)\n" +
-	"\x04role\x18\x06 \x01(\x0e2\x15.assessmatrix.v1.RoleR\x04role\"/\n" +
+	"\x04role\x18\x06 \x01(\x0e2\x15.assessmatrix.v1.RoleR\x04role\x12\x1f\n" +
+	"\vsuper_admin\x18\a \x01(\bR\n" +
+	"superAdmin\"/\n" +
 	"\x17RequestStaffCodeRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\"\x1a\n" +
 	"\x18RequestStaffCodeResponse\"B\n" +
