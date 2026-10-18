@@ -188,6 +188,8 @@ export type Attempt = {
   secondsLeft: number
   submittedAt?: number
   score?: { raw: number; max: number; pct: number; passed: boolean }
+  /** After hand-in (core only): why each integrity flag on the attempt was raised, in Indonesian. */
+  flagReasons?: string[]
   events: AttemptEvent[]
   queued: number
   /** Pinned at start. A mid-attempt edit must not change what is being sat. */

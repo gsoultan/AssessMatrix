@@ -1187,6 +1187,25 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           </>
         )}
 
+        {attempt.flagReasons && attempt.flagReasons.length > 0 && (
+          <section className="hair mt-6 rounded-xl bg-surface p-4" aria-labelledby="flags-title">
+            <h2 id="flags-title" className="text-[13px] font-medium text-ink">
+              Catatan untuk ditinjau penyelenggara
+            </h2>
+            <p className="mt-1 text-[12px] leading-snug text-ink-muted">
+              Ini bukan tuduhan. Penyelenggara akan melihatnya sebelum hasil Anda dipakai. Jika ada yang tidak sesuai
+              dengan yang Anda lakukan, sampaikan kepada penyelenggara dengan menyebut catatan ini.
+            </p>
+            <ul className="mt-3 flex flex-col gap-2">
+              {attempt.flagReasons.map((r, i) => (
+                <li key={i} className="rounded-lg p-3 text-[12.5px] leading-snug text-ink-2" style={{ background: 'var(--color-wash-warn)' }}>
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* transparency: show the participant exactly what was recorded */}
         <div className="hair mt-6 rounded-xl bg-surface">
           <button

@@ -23,7 +23,7 @@ const (
 	KindFullscreenExited = "fullscreen.exited"     // tier 2
 	KindFaceMissing      = "vision.face_missing"   // tier 2; values[0]: ms with no face
 	KindFacesMultiple    = "vision.faces_multiple" // tier 2; values[0]: ms; values[1]: most faces seen
-	KindVisionStopped    = "vision.stopped"        // tier 2; detail: why
+	KindVisionStopped    = "vision.stopped"        // tier 2; detail: one of the CameraStopped codes
 
 	// Consent rows, written by the server at start from what the candidate
 	// agreed to. One kind per purpose: consent.<purpose>.
@@ -69,6 +69,23 @@ func init() {
 		ServerOnly[KindConsentPrefix+p] = true
 	}
 }
+
+// Why the camera stopped, as the runner reports it. The reason a candidate
+// reads is the server's sentence for the code, never the client's own words,
+// so it is always in their language and a modified client cannot write into it.
+var CameraStopped = map[string][2]string{
+	"permission_refused": {"camera permission was refused", "izin kamera ditolak"},
+	"no_camera":          {"no camera could be opened", "kamera tidak dapat dibuka"},
+	"camera_ended":       {"the camera was turned off or disconnected", "kamera dimatikan atau terputus"},
+	"check_failed":       {"the face check failed on this device", "pemeriksaan wajah gagal di perangkat ini"},
+	"check_unavailable":  {"the face check could not load on this device", "pemeriksaan wajah tidak dapat dimuat di perangkat ini"},
+}
+
+var cameraStoppedUnknown = [2]string{"the browser gave no recognised reason", "peramban tidak memberikan alasan yang dikenali"}
+
+// Two reports of the same stretch: the runner reports a long stretch in
+// pieces, each starting where the last one ended (give or take this).
+const stretchJoin = 2 * time.Second
 
 // Flag severities, from "worth knowing" to "do not certify without a look".
 const (
@@ -133,6 +150,13 @@ func ms(ev *v1.AttemptEvent, i int) time.Duration {
 	return time.Duration(n) * time.Millisecond
 }
 
+func abs(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
 func num(ev *v1.AttemptEvent, i int) int64 {
 	if i >= len(ev.GetValues()) {
 		return 0
@@ -171,29 +195,36 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 	var out []Flag
 	if !intact {
 		out = append(out, Flag{Type: FlagRecordAltered, Severity: SeveritySerious,
-			Reason:   fmt.Sprintf("The stored record no longer matches its seal from event %d onward: it was changed after it was written. Nothing from that point can be relied on.", brokenAt),
-			ReasonID: fmt.Sprintf("Catatan yang tersimpan tidak lagi cocok dengan segelnya mulai peristiwa ke-%d: catatan itu diubah setelah ditulis. Isi sejak titik itu tidak dapat diandalkan.", brokenAt)})
+			Reason:   fmt.Sprintf("The stored record no longer matches its seal from event %d onward: it was changed, or events were removed, after it was written. Nothing from that point can be relied on.", brokenAt),
+			ReasonID: fmt.Sprintf("Catatan yang tersimpan tidak lagi cocok dengan segelnya mulai peristiwa ke-%d: catatan itu diubah, atau ada peristiwa yang dihapus, setelah ditulis. Isi sejak titik itu tidak dapat diandalkan.", brokenAt)})
 	}
 
 	var (
-		awayN                   int
-		away, awayLongest       time.Duration
-		pasted                  = map[string]int64{}
-		viewed                  = map[string]time.Duration{}
-		devices                 = map[string]bool{}
-		secondTab, fullscreen   int
-		missing, missingLongest time.Duration
-		multiple                time.Duration
-		mostFaces               int64
-		stopped                 []string
-		answered                = map[string]bool{}
-		order                   []string
+		awayN, awayOpen, noReturn int
+		away, awayLongest         time.Duration
+		pasted                    = map[string]int64{}
+		viewed                    = map[string]time.Duration{}
+		devices                   = map[string]bool{}
+		secondTab, fullscreen     int
+		missing, missingLongest   time.Duration
+		stretch                   time.Duration // the face-missing stretch being reported
+		stretchEnd                int64         // when its last piece was reported
+		multiple                  time.Duration
+		mostFaces                 int64
+		stopped                   []string
+		answered                  = map[string]bool{}
+		order                     []string
 	)
 	for _, ev := range events {
 		switch ev.GetKind() {
 		case KindFocusLost:
 			awayN++
+			if awayOpen > 0 {
+				noReturn++ // left again with no return in between
+			}
+			awayOpen = 1
 		case KindFocusReturned:
+			awayOpen = 0
 			d := ms(ev, 0)
 			away += d
 			if d > awayLongest {
@@ -217,8 +248,15 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 		case KindFaceMissing:
 			d := ms(ev, 0)
 			missing += d
-			if d > missingLongest {
-				missingLongest = d
+			at := ev.GetClientTime()
+			if stretchEnd != 0 && at != 0 && abs(at-d.Milliseconds()-stretchEnd) <= stretchJoin.Milliseconds() {
+				stretch += d
+			} else {
+				stretch = d
+			}
+			stretchEnd = at
+			if stretch > missingLongest {
+				missingLongest = stretch
 			}
 		case KindFacesMultiple:
 			multiple += ms(ev, 0)
@@ -226,7 +264,7 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 				mostFaces = n
 			}
 		case KindVisionStopped:
-			stopped = append(stopped, ev.GetDetail())
+			stopped = append(stopped, strings.TrimSpace(ev.GetDetail()))
 		case KindResponseChanged, KindResponseTyped:
 			if ev.GetItemId() != "" {
 				answered[ev.GetItemId()] = true
@@ -249,20 +287,23 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 	}
 	if len(stopped) > 0 {
 		en, id := times(len(stopped))
-		why := strings.TrimSpace(stopped[len(stopped)-1])
-		if why == "" {
-			why = "no reason given by the browser"
+		why, ok := CameraStopped[stopped[len(stopped)-1]]
+		if !ok {
+			why = cameraStoppedUnknown
 		}
 		out = append(out, Flag{Type: FlagCameraStopped, Severity: SeverityReview,
-			Reason:   fmt.Sprintf("The camera stopped during the exam %s (last: %s). Face presence was not checked while it was off.", en, why),
-			ReasonID: fmt.Sprintf("Kamera berhenti selama ujian %s (terakhir: %s). Kehadiran wajah tidak diperiksa selama kamera mati.", id, why)})
+			Reason:   fmt.Sprintf("The camera stopped during the exam %s (last: %s). Face presence was not checked while it was off.", en, why[0]),
+			ReasonID: fmt.Sprintf("Kamera berhenti selama ujian %s (terakhir: %s). Kehadiran wajah tidak diperiksa selama kamera mati.", id, why[1])})
 	}
 	for _, item := range order {
 		if n := pasted[item]; n >= PasteChars {
-			q := numberOf(item)
+			where, whereID := "a question not in this version of the exam", "soal yang tidak ada di versi ujian ini"
+			if q := numberOf(item); q > 0 {
+				where, whereID = fmt.Sprintf("question %d", q), fmt.Sprintf("soal nomor %d", q)
+			}
 			out = append(out, Flag{Type: FlagPaste, Severity: SeverityReview, ItemID: item,
-				Reason:   fmt.Sprintf("%d characters were pasted into the answer to question %d rather than typed.", n, q),
-				ReasonID: fmt.Sprintf("%d karakter ditempelkan ke jawaban soal nomor %d, bukan diketik.", n, q)})
+				Reason:   fmt.Sprintf("%d characters were pasted into the answer to %s rather than typed.", n, where),
+				ReasonID: fmt.Sprintf("%d karakter ditempelkan ke jawaban %s, bukan diketik.", n, whereID)})
 		}
 	}
 	if len(devices) > 1 {
@@ -274,9 +315,15 @@ func Flags(events []*v1.AttemptEvent, numberOf func(itemID string) int, intact b
 		en, id := times(awayN)
 		ten, tid := span(away)
 		len_, lid := span(awayLongest)
-		out = append(out, Flag{Type: FlagFocusAway, Severity: SeverityReview,
-			Reason:   fmt.Sprintf("Left the exam %s, for %s in total; the longest was %s.", en, ten, len_),
-			ReasonID: fmt.Sprintf("Meninggalkan halaman ujian %s, total %s; yang terlama %s.", id, tid, lid)})
+		reason := fmt.Sprintf("Left the exam %s, for %s in total; the longest was %s.", en, ten, len_)
+		reasonID := fmt.Sprintf("Meninggalkan halaman ujian %s, total %s; yang terlama %s.", id, tid, lid)
+		// A tab killed while away never reports coming back: say so, rather
+		// than letting a missing return read as "0 s away".
+		if noReturn += awayOpen; noReturn > 0 {
+			reason += fmt.Sprintf(" For %d of these no return to the exam was recorded, so the time away is not counted.", noReturn)
+			reasonID += fmt.Sprintf(" Untuk %d di antaranya tidak tercatat kembali ke halaman ujian, jadi lamanya tidak dihitung.", noReturn)
+		}
+		out = append(out, Flag{Type: FlagFocusAway, Severity: SeverityReview, Reason: reason, ReasonID: reasonID})
 	}
 	if fullscreen > 0 {
 		en, id := times(fullscreen)

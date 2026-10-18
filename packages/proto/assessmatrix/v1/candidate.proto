@@ -169,6 +169,9 @@ message Attempt {
   // When the record (answers and signals) was deleted at the end of its
   // retention period; 0 while it is held.
   int64 purged_at = 13;
+  // Served to the candidate once they hand in: the reason for each integrity
+  // flag on their attempt, in Indonesian, so they can see and contest it.
+  repeated string flag_reasons = 14;
 }
 
 message GetSessionRequest {}

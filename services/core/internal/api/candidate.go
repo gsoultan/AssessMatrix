@@ -379,11 +379,7 @@ func (s *candidateService) GetSession(ctx context.Context, _ *connect.Request[v1
 		if err != nil {
 			return err
 		}
-		events, _, _, err := s.loadEvents(ctx, tx, att)
-		if err != nil {
-			return err
-		}
-		out.Attempt, err = s.attemptProto(att, events, false)
+		out.Attempt, err = s.candidateAttempt(ctx, tx, att, e)
 		return err
 	})
 	if err != nil {
@@ -626,7 +622,7 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		if err != nil {
 			return err
 		}
-		events, _, _, err := s.loadEvents(ctx, tx, att)
+		events, intact, _, err := s.loadEvents(ctx, tx, att)
 		if err != nil {
 			return err
 		}
@@ -638,7 +634,7 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return err
 			}
-			out.Attempt, err = s.attemptProto(att, events, false)
+			out.Attempt, err = s.candidateAttempt(ctx, tx, att, nil)
 			return err
 		}
 		e, err := examAt(ctx, tx, att.ExamID, att.ExamVersion)
@@ -691,7 +687,7 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 			if err := storeScore(ctx, tx, att, e, answers, reviews, score); err != nil {
 				return err
 			}
-			cred, err := s.settleCredential(ctx, tx, att, e, score)
+			cred, err := s.settleCredential(ctx, tx, att, e, score, intact)
 			if err != nil {
 				return err
 			}
@@ -700,16 +696,35 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 			}
 		}
 		att.SubmittedAt = &now
-		events, _, _, err = s.loadEvents(ctx, tx, att)
-		if err != nil {
-			return err
-		}
 		out.Ok = true
-		out.Attempt, err = s.attemptProto(att, events, false)
+		out.Attempt, err = s.candidateAttempt(ctx, tx, att, e)
 		return err
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "SubmitAttempt", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// candidateAttempt is the attempt as its candidate sees it: once handed in,
+// with the reason for every flag on it, so nothing is held against them that
+// they cannot read. e is the attempt's version, or nil to load it.
+func (s *candidateService) candidateAttempt(ctx context.Context, tx pgx.Tx, att *attemptRow, e *v1.Exam) (*v1.Attempt, error) {
+	events, intact, brokenAt, err := s.loadEvents(ctx, tx, att)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.attemptProto(att, events, false)
+	if err != nil || att.SubmittedAt == nil {
+		return out, err
+	}
+	if e == nil || e.GetVersion() != att.ExamVersion {
+		if e, err = examAt(ctx, tx, att.ExamID, att.ExamVersion); err != nil {
+			return nil, err
+		}
+	}
+	for _, f := range domain.Flags(events, questionNumbers(e), intact, brokenAt) {
+		out.FlagReasons = append(out.FlagReasons, f.ReasonID)
+	}
+	return out, nil
 }

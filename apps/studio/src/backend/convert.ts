@@ -276,6 +276,7 @@ export function attemptIn(a: ca.Attempt, serverNow: number): Attempt {
     secondsLeft: deadlineAt ? Math.max(0, Math.ceil((deadlineAt - serverNow) / 1000)) : 0,
     submittedAt: opt(a.submittedAt),
     score: scoreIn(a.score),
+    flagReasons: a.flagReasons.length ? [...a.flagReasons] : undefined,
     events: a.events.map((e) => ({ seq: n(e.seq), t: n(e.serverTime), kind: e.kind, detail: e.detail || undefined })),
     queued: 0,
   }

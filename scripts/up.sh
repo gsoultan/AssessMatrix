@@ -78,7 +78,7 @@ ok "Postgres ready"
 # --- 2–3. migrate and seed ---------------------------------------------------
 info "building the core…"
 (cd "$CORE_DIR" && go build -o "$DEV/core" ./cmd/core) || die "the core does not build"
-AM_MIGRATE_DATABASE_URL="$OWNER_URL" "$DEV/core" migrate >"$DEV/migrate.log" 2>&1 || {
+AM_MIGRATE_DATABASE_URL="$OWNER_URL" AM_SECRET="$AM_SECRET" "$DEV/core" migrate >"$DEV/migrate.log" 2>&1 || {
   cat "$DEV/migrate.log"
   die "migrations failed. If you changed the passwords in .env after the first run, reset the database: make down && docker compose down -v"
 }
@@ -130,7 +130,7 @@ core_loop() {
       echo "change detected — rebuilding"
       if (cd "$CORE_DIR" && go build -o "$DEV/core.next" ./cmd/core) && mv "$DEV/core.next" "$DEV/core"; then
         kill "$serve" 2>/dev/null; wait "$serve" 2>/dev/null
-        AM_MIGRATE_DATABASE_URL="$OWNER_URL" "$DEV/core" migrate || echo "migrations failed — fix them and save again"
+        AM_MIGRATE_DATABASE_URL="$OWNER_URL" AM_SECRET="$AM_SECRET" "$DEV/core" migrate || echo "migrations failed — fix them and save again"
       else
         echo "build failed — still serving the previous build; fix it and save again"
       fi

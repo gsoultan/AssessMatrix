@@ -285,6 +285,15 @@ const dot = (e: AttemptEvent) =>
         ? 'var(--color-good)'
         : 'var(--color-ink-muted)'
 
+/** The runner's codes for why the camera stopped (services/core domain.CameraStopped). */
+const CAMERA_STOPPED: Record<string, string> = {
+  permission_refused: 'camera permission was refused',
+  no_camera: 'no camera could be opened',
+  camera_ended: 'the camera was turned off or disconnected',
+  check_failed: 'the face check failed on this device',
+  check_unavailable: 'the face check could not load on this device',
+}
+
 const secs = (v?: string) => `${Math.round(Number(v ?? 0) / 1000)} s`
 
 /** An event in a sentence. Numbers come from values; nothing here interprets them beyond units. */
@@ -310,7 +319,7 @@ function say(e: AttemptEvent): string {
     case 'vision.faces_multiple':
       return `${v[1] ?? 'Several'} faces in view for ${secs(v[0])}`
     case 'vision.stopped':
-      return `Camera check stopped: ${e.detail}`
+      return `Camera check stopped: ${CAMERA_STOPPED[e.detail ?? ''] ?? 'no recognised reason'}`
     case 'response.changed':
       return `Answered ${e.itemId}`
     case 'response.typed':

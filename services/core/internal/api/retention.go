@@ -48,7 +48,11 @@ func (s *Server) purgeAttempt(ctx context.Context, tx pgx.Tx, a *attemptRow, why
 	if err := tx.QueryRow(ctx, `SELECT am_purge_attempt($1)`, a.ID).Scan(&events); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE attempts SET purged_at = $2, purged_why = $3 WHERE id = $1`, a.ID, s.now(), why); err != nil {
+	// Milliseconds, the seal's resolution, so the stored time re-seals exactly.
+	now := s.now().Truncate(time.Millisecond)
+	a.PurgedAt = &now
+	a.Seal = s.seal(a)
+	if _, err := tx.Exec(ctx, `UPDATE attempts SET purged_at = $2, purged_why = $3, seal = $4 WHERE id = $1`, a.ID, now, why, a.Seal); err != nil {
 		return 0, err
 	}
 	metrics.RecordsPurged.WithLabelValues(why).Inc()

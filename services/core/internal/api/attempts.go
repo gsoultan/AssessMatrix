@@ -33,14 +33,16 @@ type attemptRow struct {
 	LastHash                           []byte
 	// Set once the record's events were deleted (retention). The score stays.
 	PurgedAt *time.Time
+	// Keyed over the chain's head and the purge time (secure.AttemptSeal).
+	Seal []byte
 }
 
-const attemptColumns = `id, assignment_id, exam_id, person_id, exam_version, started_at, deadline_at, submitted_at, score, last_seq, last_hash, purged_at`
+const attemptColumns = `id, assignment_id, exam_id, person_id, exam_version, started_at, deadline_at, submitted_at, score, last_seq, last_hash, purged_at, seal`
 
 func scanAttempt(row pgx.Row) (*attemptRow, error) {
 	var a attemptRow
 	err := row.Scan(&a.ID, &a.AssignmentID, &a.ExamID, &a.PersonID, &a.ExamVersion, &a.StartedAt, &a.DeadlineAt,
-		&a.SubmittedAt, &a.Score, &a.LastSeq, &a.LastHash, &a.PurgedAt)
+		&a.SubmittedAt, &a.Score, &a.LastSeq, &a.LastHash, &a.PurgedAt, &a.Seal)
 	return &a, err
 }
 
@@ -100,17 +102,30 @@ func (s *Server) appendEvents(ctx context.Context, tx pgx.Tx, a *attemptRow, evs
 		}
 		a.LastHash = hash
 	}
-	_, err := tx.Exec(ctx, `UPDATE attempts SET last_seq = $2, last_hash = $3 WHERE id = $1`, a.ID, a.LastSeq, a.LastHash)
+	a.Seal = s.seal(a)
+	_, err := tx.Exec(ctx, `UPDATE attempts SET last_seq = $2, last_hash = $3, seal = $4 WHERE id = $1`, a.ID, a.LastSeq, a.LastHash, a.Seal)
 	return err
+}
+
+// seal is what the attempt row's seal should be for its current head.
+func (s *Server) seal(a *attemptRow) []byte {
+	var purged int64
+	if a.PurgedAt != nil {
+		purged = a.PurgedAt.UnixMilli()
+	}
+	return s.Keys.AttemptSeal(a.ID, a.LastSeq, a.LastHash, purged)
 }
 
 // genesis is the chain's starting hash, bound to the attempt id so two
 // attempts' chains can never be spliced together.
 func (s *Server) genesis(attemptID string) []byte { return s.Keys.ChainHash(nil, []byte(attemptID)) }
 
-// loadEvents reads the log and checks the chain as it goes.
+// loadEvents reads the log and checks it: every event against the one before
+// it (the chain), and the attempt row against the chain's head (the seal).
+// brokenAt is the first event that cannot be relied on.
 func (s *Server) loadEvents(ctx context.Context, tx pgx.Tx, a *attemptRow) (events []*v1.AttemptEvent, intact bool, brokenAt int64, err error) {
-	if a.PurgedAt != nil {
+	sealed := secure.Equal(a.Seal, s.seal(a))
+	if a.PurgedAt != nil && sealed {
 		// Deleted on purpose, with an audit record; not a broken chain.
 		return nil, true, 0, nil
 	}
@@ -130,7 +145,12 @@ func (s *Server) loadEvents(ctx context.Context, tx pgx.Tx, a *attemptRow) (even
 		}
 		var ev v1.AttemptEvent
 		if err := proto.Unmarshal(body, &ev); err != nil {
-			return nil, false, 0, err
+			// Bytes no server wrote: a break, not a reason to refuse to read the rest.
+			if intact {
+				intact, brokenAt = false, seq
+			}
+			prev, expect = hash, seq+1
+			continue
 		}
 		ok := seq == expect && ev.GetSeq() == seq && secure.Equal(hash, s.Keys.ChainHash(prev, body))
 		if !ok && intact {
@@ -142,8 +162,10 @@ func (s *Server) loadEvents(ctx context.Context, tx pgx.Tx, a *attemptRow) (even
 	if err := rows.Err(); err != nil {
 		return nil, false, 0, err
 	}
-	// A truncated log is a break too: the attempt row records how far it went.
-	if intact && expect-1 != a.LastSeq {
+	// The chain checks, but does the row agree with where it ends? Events cut
+	// off the end, or a purge marked by hand, break here: the seal covers the
+	// count, the last hash and the purge time, and only the server can make one.
+	if intact && (!sealed || expect-1 != a.LastSeq || !secure.Equal(prev, a.LastHash)) {
 		intact, brokenAt = false, expect
 	}
 	return events, intact, brokenAt, nil

@@ -130,7 +130,7 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		}}); err != nil {
 			return err
 		}
-		events, _, _, err := s.loadEvents(ctx, tx, att)
+		events, intact, _, err := s.loadEvents(ctx, tx, att)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		if err := s.emit(ctx, tx, EventAttemptScored, att.PersonID, attemptData(att, out.Score)); err != nil {
 			return err
 		}
-		cred, err := s.settleCredential(ctx, tx, att, e, out.Score)
+		cred, err := s.settleCredential(ctx, tx, att, e, out.Score, intact)
 		if err != nil {
 			return err
 		}

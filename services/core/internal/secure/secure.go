@@ -18,7 +18,7 @@ import (
 // Keys are derived from one server secret, one per purpose, so a hash made
 // for one thing can never be replayed as another.
 type Keys struct {
-	link, code, session, chain, vault, setup []byte
+	link, code, session, chain, seal, vault, setup []byte
 }
 
 // MinSecretBytes is the least secret the core will start with.
@@ -33,7 +33,7 @@ func NewKeys(secret []byte) (*Keys, error) {
 		m.Write([]byte("assessmatrix/v1/" + purpose))
 		return m.Sum(nil)
 	}
-	return &Keys{link: derive("link"), code: derive("code"), session: derive("session"), chain: derive("attempt-chain"),
+	return &Keys{link: derive("link"), code: derive("code"), session: derive("session"), chain: derive("attempt-chain"), seal: derive("attempt-seal"),
 		vault: derive("vault"), setup: derive("setup")}, nil
 }
 
@@ -60,6 +60,18 @@ func (k *Keys) SessionHash(token string) []byte { return mac(k.session, []byte(t
 
 // ChainHash links an attempt event to the one before it.
 func (k *Keys) ChainHash(prev, body []byte) []byte { return mac(k.chain, prev, body) }
+
+// AttemptSeal binds an attempt row to the head of its chain: how many events
+// it holds, the last one's hash, and when (if ever) its record was purged.
+// The chain alone cannot show that events were cut off the end, or that a
+// record was marked purged by hand; the seal can, because forging it needs
+// the server key. purgedAt is Unix milliseconds, 0 while the record is held.
+func (k *Keys) AttemptSeal(attemptID string, lastSeq int64, lastHash []byte, purgedAt int64) []byte {
+	var n [16]byte
+	binary.BigEndian.PutUint64(n[:8], uint64(lastSeq))
+	binary.BigEndian.PutUint64(n[8:], uint64(purgedAt))
+	return mac(k.seal, []byte(attemptID), n[:], lastHash)
+}
 
 // setupAlphabet leaves out 0/O and 1/I/L, so a code read off a log is typed right.
 const setupAlphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"

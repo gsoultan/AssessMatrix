@@ -57,12 +57,12 @@ party learns who is sitting an exam. They are fetched only by a tier 2 attempt.
 | Collection beyond consent by a modified client | Low | Medium | Server drops unconsented signals (tested: `TestNoSignalWithoutItsConsent`) |
 | Over-retention | Medium | Medium | Attempt records, signals included, are deleted at most one year after the exam by an hourly job, with an audit record (`internal/api/retention.go`, tested: `TestRetentionDeletesTheRecordAndKeepsTheScore`). A tenant may shorten the period, never lengthen it past the year the consent text promises (database check) |
 | Pressure to consent | Medium | Medium | The organiser, not us, decides the tier; the consent text says the alternative is to contact the organiser. Organisers must offer a non-camera route on request (to put in the customer terms) |
-| Candidate cannot see what was recorded | Medium | Medium | The attempt record shows every event and flag reason to staff; a candidate-facing view of their own record is still to build (access right, art. 7) |
+| Candidate cannot see what was recorded | Medium | Medium | The attempt record shows every event and flag reason to staff. After hand-in the candidate sees the reason for every flag on their attempt, in Indonesian, on the result page and whenever they reopen their link (tested: `TestAlteredRecordEarnsNoCredential`). A self-service view of the full record is still to build (access right, art. 7) |
 
 ## 5. Rights
 
 - **Information and consent:** per purpose, before the start, in Indonesian.
-- **Access:** staff can show the full record today; a self-service view for candidates is open.
+- **Access:** staff can show the full record today; candidates see every flag's reason after hand-in; a self-service view of the full record is open.
 - **Objection and withdrawal:** declining before the start is built. Withdrawing mid-attempt is
   not built: today the candidate leaves the attempt and contacts the organiser. To build: a
   "stop the camera" control that ends camera processing, records the withdrawal, and flags the

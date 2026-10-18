@@ -104,7 +104,8 @@ export function watchCamera(emit: (s: Signal) => void, state: (s: VisionState) =
     multipleAt = 0
     most = 0
   }
-  const quit = (why: string) => {
+  /** `why` is a code the server turns into the sentence the candidate reads (domain.CameraStopped). */
+  const quit = (why: 'permission_refused' | 'no_camera' | 'camera_ended' | 'check_failed' | 'check_unavailable') => {
     if (stopped) return
     const now = Date.now()
     endMissing(now)
@@ -139,7 +140,7 @@ export function watchCamera(emit: (s: Signal) => void, state: (s: VisionState) =
   }
   const seen = (e: MessageEvent<Out>) => {
     if (stopped) return
-    if (e.data.type === 'failed') return quit('the face check failed on this device')
+    if (e.data.type === 'failed') return quit('check_failed')
     if (e.data.type !== 'faces') return
     busy = false
     const { faces, at: now } = e.data
@@ -166,16 +167,16 @@ export function watchCamera(emit: (s: Signal) => void, state: (s: VisionState) =
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 320, height: 240 } })
     } catch (e) {
-      return quit((e as DOMException)?.name === 'NotAllowedError' ? 'camera permission was refused' : 'no camera could be opened')
+      return quit((e as DOMException)?.name === 'NotAllowedError' ? 'permission_refused' : 'no_camera')
     }
     if (stopped) return halt()
-    for (const t of stream.getVideoTracks()) t.addEventListener('ended', () => quit('the camera was turned off or disconnected'))
+    for (const t of stream.getVideoTracks()) t.addEventListener('ended', () => quit('camera_ended'))
     video.srcObject = stream
     try {
       await video.play()
       detector = await preload()
     } catch {
-      return quit('the face check could not load on this device')
+      return quit('check_unavailable')
     }
     if (stopped) return halt()
     detector.addEventListener('message', seen)
