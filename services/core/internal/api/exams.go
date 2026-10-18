@@ -20,7 +20,7 @@ import (
 type examService struct{ *Server }
 
 const examColumns = `id, kind, status, version, published_version, title, issuer, tier, pass_pct,
-	shuffle, timed, anonymous, sections, updated_at`
+	shuffle, timed, anonymous, sections, updated_at, source_exam_id, source_version, source_tenant_name`
 
 func scanExam(row pgx.Row) (*v1.Exam, error) {
 	var (
@@ -31,10 +31,16 @@ func scanExam(row pgx.Row) (*v1.Exam, error) {
 		passPct  int16
 		sections []byte
 		updated  time.Time
+		srcID    *string
+		srcVer   *int32
+		srcName  *string
 	)
 	if err := row.Scan(&e.Id, &kind, &status, &e.Version, &e.PublishedVersion, &e.Title, &e.Issuer,
-		&tier, &passPct, &e.Shuffle, &e.Timed, &e.Anonymous, &sections, &updated); err != nil {
+		&tier, &passPct, &e.Shuffle, &e.Timed, &e.Anonymous, &sections, &updated, &srcID, &srcVer, &srcName); err != nil {
 		return nil, err
+	}
+	if srcID != nil && srcVer != nil && srcName != nil {
+		e.SharedFrom = &v1.SharedFrom{ExamId: *srcID, Version: *srcVer, TenantName: *srcName}
 	}
 	e.Kind, e.Status, e.Tier, e.PassPct = v1.Kind(kind), v1.Status(status), int32(tier), int32(passPct)
 	e.UpdatedAt = updated.UnixMilli()
@@ -50,7 +56,15 @@ func encodeSections(e *v1.Exam) ([]byte, error) {
 	return protojson.Marshal(&v1.Exam{Sections: e.GetSections()})
 }
 
-func encodeSnapshot(e *v1.Exam) ([]byte, error) { return protojson.Marshal(e) }
+// encodeSnapshot freezes what candidates are given. Where a shared copy came
+// from is the organiser's business, not the candidate's, so it stays out.
+func encodeSnapshot(e *v1.Exam) ([]byte, error) {
+	if e.GetSharedFrom() != nil {
+		e = proto.Clone(e).(*v1.Exam)
+		e.SharedFrom = nil
+	}
+	return protojson.Marshal(e)
+}
 
 func decodeSnapshot(b []byte) (*v1.Exam, error) {
 	var e v1.Exam

@@ -30,7 +30,9 @@ psql -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
 
 export AM_MIGRATE_DATABASE_URL=postgres://am_owner:owner@localhost/assessmatrix
 go run ./cmd/core migrate
-# Either create the first organisation here, or skip this and use /setup (below).
+# Either create the first organisation and its administrator here, or skip
+# this and use /setup (below). More tenants, and who works in which, are
+# managed from the studio (Access, and the tenant menu).
 go run ./cmd/core tenant "Your Org" you@example.id
 
 AM_DATABASE_URL=postgres://am_app:app@localhost/assessmatrix \

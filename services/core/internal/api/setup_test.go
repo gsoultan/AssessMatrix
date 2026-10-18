@@ -91,14 +91,16 @@ func freshInstall(t *testing.T) (*Server, string, *pgx.Conn) {
 }
 
 type setupBrowser struct {
-	setup assessmatrixv1connect.SetupServiceClient
-	auth  assessmatrixv1connect.AuthServiceClient
+	setup   assessmatrixv1connect.SetupServiceClient
+	auth    assessmatrixv1connect.AuthServiceClient
+	tenants assessmatrixv1connect.TenantServiceClient
 }
 
 func newSetupBrowser(base string) setupBrowser {
 	jar, _ := cookiejar.New(nil)
 	hc := &http.Client{Jar: jar}
-	return setupBrowser{assessmatrixv1connect.NewSetupServiceClient(hc, base), assessmatrixv1connect.NewAuthServiceClient(hc, base)}
+	return setupBrowser{assessmatrixv1connect.NewSetupServiceClient(hc, base), assessmatrixv1connect.NewAuthServiceClient(hc, base),
+		assessmatrixv1connect.NewTenantServiceClient(hc, base)}
 }
 
 // The /setup gate: an empty install asks for setup; a wrong code changes
@@ -175,6 +177,14 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 	me := get(browsers[won].auth.WhoAmI(ctx, connect.NewRequest(&v1.WhoAmIRequest{}))).Msg.GetStaff()
 	if me.GetId() != staff[won].GetId() {
 		t.Fatalf("WhoAmI after setup: %v", me)
+	}
+	// Otherwise nobody could ever give anyone else access to the organisation.
+	if me.GetRole() != v1.Role_ROLE_ADMIN {
+		t.Fatalf("the first staff member is %v, want an administrator", me.GetRole())
+	}
+	// Only admins may manage access; proves the role is honoured, not just shown.
+	if _, err := browsers[won].tenants.ListAccess(ctx, connect.NewRequest(&v1.ListAccessRequest{})); err != nil {
+		t.Fatalf("the first administrator listing access: %v", err)
 	}
 
 	if after := get(b.setup.GetSetupStatus(ctx, connect.NewRequest(&v1.GetSetupStatusRequest{}))).Msg; after.GetNeeded() {

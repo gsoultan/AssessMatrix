@@ -136,9 +136,21 @@ func (s *authService) VerifyStaffCode(ctx context.Context, req *connect.Request[
 
 func staffProto(ctx context.Context, tx pgx.Tx, id string) (*v1.Staff, error) {
 	var st v1.Staff
-	err := tx.QueryRow(ctx, `SELECT s.id, s.email, s.name, t.id, t.name FROM staff s JOIN tenants t ON t.id = s.tenant_id
-		WHERE s.id = $1`, id).Scan(&st.Id, &st.Email, &st.Name, &st.TenantId, &st.TenantName)
+	var role string
+	err := tx.QueryRow(ctx, `SELECT s.id, s.email, s.name, t.id, t.name, s.role FROM staff s JOIN tenants t ON t.id = s.tenant_id
+		WHERE s.id = $1`, id).Scan(&st.Id, &st.Email, &st.Name, &st.TenantId, &st.TenantName, &role)
+	st.Role = roleProto(role)
 	return &st, err
+}
+
+func roleProto(r string) v1.Role {
+	switch r {
+	case auth.RoleAdmin:
+		return v1.Role_ROLE_ADMIN
+	case auth.RoleMember:
+		return v1.Role_ROLE_MEMBER
+	}
+	return v1.Role_ROLE_UNSPECIFIED
 }
 
 func (s *authService) WhoAmI(ctx context.Context, _ *connect.Request[v1.WhoAmIRequest]) (*connect.Response[v1.WhoAmIResponse], error) {

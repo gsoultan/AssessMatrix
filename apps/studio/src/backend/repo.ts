@@ -248,6 +248,7 @@ export function explain(err: unknown): string {
         return 'Someone else changed this since you opened it. Reload to see their version before saving.'
       case Code.InvalidArgument:
       case Code.FailedPrecondition:
+      case Code.PermissionDenied:
         return err.rawMessage
       case Code.Unavailable:
         return 'Cannot reach the server. Check your connection and try again.'
