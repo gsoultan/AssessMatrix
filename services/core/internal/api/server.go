@@ -7,6 +7,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,8 +16,9 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/riverqueue/river"
+
+	"github.com/gsoultan/storm/runtime"
 
 	"github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1/assessmatrixv1connect"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
@@ -25,6 +27,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/auditlog"
 	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
@@ -176,7 +179,7 @@ func (s *Server) limits() {
 }
 
 // tx runs fn scoped to the caller's tenant.
-func (s *Server) tx(ctx context.Context, fn func(pgx.Tx) error) error {
+func (s *Server) tx(ctx context.Context, fn func(*db.Tx) error) error {
 	p := auth.From(ctx)
 	if p == nil || p.Tenant == "" {
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("no principal"))
@@ -185,7 +188,7 @@ func (s *Server) tx(ctx context.Context, fn func(pgx.Tx) error) error {
 }
 
 // audit records a staff write in the same transaction as the write.
-func audit(ctx context.Context, tx pgx.Tx, action, target string, detail map[string]any) error {
+func audit(ctx context.Context, tx *db.Tx, action, target string, detail map[string]any) error {
 	p := auth.From(ctx)
 	actor := "system"
 	if p != nil && p.StaffID != "" {
@@ -194,9 +197,17 @@ func audit(ctx context.Context, tx pgx.Tx, action, target string, detail map[str
 	if detail == nil {
 		detail = map[string]any{}
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO audit_log (tenant_id, actor, action, target, detail)
-		VALUES (am_tenant(), $1, $2, $3, $4)`, actor, action, target, detail)
+	body, err := json.Marshal(detail)
 	if err != nil {
+		return fmt.Errorf("audit %s: %w", action, err)
+	}
+	n := auditlog.Create()
+	n.SetTenantID(tx.Tenant())
+	n.SetActor(actor)
+	n.SetAction(action)
+	n.SetTarget(target)
+	n.SetDetail(body)
+	if _, err := n.Insert(ctx, tx); err != nil {
 		return fmt.Errorf("audit %s: %w", action, err)
 	}
 	return nil
@@ -227,15 +238,9 @@ func (s *Server) internal(ctx context.Context, op string, err error) error {
 	return connect.NewError(connect.CodeInternal, errors.New("internal error"))
 }
 
-func isUniqueViolation(err error) bool {
-	var pg *pgconn.PgError
-	return errors.As(err, &pg) && pg.Code == "23505"
-}
+func isUniqueViolation(err error) bool { return errors.Is(err, runtime.ErrUniqueViolation) }
 
-func isForeignKeyViolation(err error) bool {
-	var pg *pgconn.PgError
-	return errors.As(err, &pg) && (pg.Code == "23503")
-}
+func isForeignKeyViolation(err error) bool { return errors.Is(err, runtime.ErrForeignKeyViolation) }
 
 // uuid checks an id is shaped like one before it reaches a query, so a bad id
 // is NotFound rather than a cast error.

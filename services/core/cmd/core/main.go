@@ -29,6 +29,9 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
+	"github.com/gsoultan/storm"
+	"github.com/gsoultan/storm/runtime"
+
 	"github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1/assessmatrixv1connect"
 	"github.com/gsoultan/assessmatrix/services/core/internal/api"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
@@ -37,6 +40,9 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
 	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/staff"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/superadmin"
 	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
@@ -99,12 +105,11 @@ func createTenant(ctx context.Context, log *slog.Logger, args []string) error {
 		return err
 	}
 	defer conn.Close(ctx)
-	var tenant, staff string
-	err = conn.QueryRow(ctx, `SELECT tenant_id, staff_id FROM am_create_tenant($1, '', $2, '')`, args[0], args[1]).Scan(&tenant, &staff)
+	made, _, err := queries.CreateTenant.One(ctx, db.Conn(conn), args[0], args[1])
 	if err != nil {
 		return err
 	}
-	log.Info("tenant created", "tenant", tenant, "staff", staff)
+	log.Info("tenant created", "tenant", storm.UUID(made.TenantID).String(), "staff", storm.UUID(made.StaffID).String())
 	return nil
 }
 
@@ -124,20 +129,32 @@ func addSuperAdmin(ctx context.Context, log *slog.Logger, args []string) error {
 		return err
 	}
 	defer conn.Close(ctx)
-	tag, err := conn.Exec(ctx, `INSERT INTO super_admins (email)
-		SELECT lower($1::text) WHERE EXISTS (SELECT 1 FROM staff WHERE lower(email) = lower($1) AND disabled_at IS NULL)
-		ON CONFLICT DO NOTHING`, args[0])
+	ex := db.Conn(conn)
+	email := strings.ToLower(args[0])
+	// The owner reads every tenant's staff: row-level security binds the
+	// application role, not the schema's owner.
+	active, err := staff.New().Where(staff.Email.EqLower(email), staff.DisabledAt.IsNull()).Exists(ctx, ex)
 	if err != nil {
 		return err
 	}
-	var known bool
-	if err := conn.QueryRow(ctx, `SELECT am_super_admin($1)`, args[0]).Scan(&known); err != nil {
+	added := false
+	if active {
+		n := superadmin.Create()
+		n.SetEmail(email)
+		_, err := n.DoNothing().Insert(ctx, ex)
+		if err != nil && !errors.Is(err, runtime.ErrConflict) {
+			return err
+		}
+		added = err == nil
+	}
+	known, _, err := queries.SuperAdmin.One(ctx, ex, email)
+	if err != nil {
 		return err
 	}
-	if !known {
+	if !known.Yes {
 		return fmt.Errorf("%s has no access to any tenant; give them access first, or use `core tenant`", args[0])
 	}
-	log.Info("super administrator", "email", strings.ToLower(args[0]), "added", tag.RowsAffected() == 1)
+	log.Info("super administrator", "email", email, "added", added)
 	return nil
 }
 
@@ -313,9 +330,8 @@ func serve(ctx context.Context, log *slog.Logger) error {
 // checkSchema stops a server whose database is older than its code, with
 // the command that fixes it, instead of failing on the first request.
 func checkSchema(ctx context.Context, d *db.DB) error {
-	var have string
-	err := d.Pool.QueryRow(ctx, `SELECT am_schema_version()`).Scan(&have)
-	want := db.LatestMigration()
+	v, _, err := queries.SchemaVersion.One(ctx, d.Executor())
+	have, want := v.Version, db.LatestMigration()
 	if err != nil {
 		return fmt.Errorf("the database schema is not set up for this build (%v): run `core migrate`, "+
 			"or set AM_MIGRATE_DATABASE_URL so serve applies it", err)
@@ -330,8 +346,7 @@ func checkSchema(ctx context.Context, d *db.DB) error {
 // announceSetup prints where and with what code to finish first-run setup,
 // while there is no organisation yet. The code is useless once setup is done.
 func announceSetup(ctx context.Context, log *slog.Logger, d *db.DB, keys *secure.Keys, publicURL string) {
-	var needed bool
-	if err := d.Pool.QueryRow(ctx, `SELECT am_setup_needed()`).Scan(&needed); err != nil || !needed {
+	if needed, _, err := queries.SetupNeeded.One(ctx, d.Executor()); err != nil || !needed.Yes {
 		return
 	}
 	log.Warn("first-run setup is open: finish it at the URL with this code", "url", publicURL+"/setup",

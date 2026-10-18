@@ -26,11 +26,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
+
+	"github.com/gsoultan/storm"
 
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/webhookdelivery"
 )
 
 // Delivery states, as stored.
@@ -243,25 +246,36 @@ type row struct {
 // transaction is held open across the request: a slow receiver costs a
 // worker slot, never a database connection.
 func Deliver(ctx context.Context, d *db.DB, keys *secure.Keys, client *http.Client, id string, last bool) error {
-	var tenant string
-	err := d.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT am_webhook_delivery_tenant($1)::text`, id).Scan(&tenant)
+	key, err := storm.ParseUUID(id)
+	if err != nil {
+		return river.JobCancel(fmt.Errorf("webhook delivery %q: %w", id, err))
+	}
+	var owner queries.TenantOf
+	err = d.Unscoped(ctx, func(tx *db.Tx) (err error) {
+		owner, _, err = queries.WebhookDeliveryTenant.One(ctx, tx, key)
+		return err
 	})
-	if err != nil || tenant == "" {
+	t, found := owner.TenantID.Get()
+	if err != nil || !found {
 		// Deleted with its endpoint, or swept: nothing left to send.
 		return river.JobCancel(fmt.Errorf("webhook delivery %s not found: %w", id, err))
 	}
-	var r row
-	err = d.InTenant(ctx, db.TenantID(tenant), func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT e.id, e.url, e.active, e.secret, v.id, v.type, v.body, d.state
-			FROM webhook_deliveries d JOIN webhook_endpoints e ON e.id = d.endpoint_id JOIN webhook_events v ON v.id = d.event_id
-			WHERE d.id = $1`, id).Scan(&r.endpointID, &r.url, &r.active, &r.sealed, &r.eventID, &r.eventType, &r.body, &r.state)
+	tenant := storm.UUID(t).String()
+	var rows []webhookdelivery.ForSendRow
+	err = d.InTenant(ctx, db.TenantID(tenant), func(tx *db.Tx) (err error) {
+		rows, err = webhookdelivery.New().IDEq(key).Limit(1).AllForSend(ctx, tx)
+		return err
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return river.JobCancel(fmt.Errorf("webhook delivery %s not found", id))
-	}
 	if err != nil {
 		return err
+	}
+	if len(rows) == 0 {
+		return river.JobCancel(fmt.Errorf("webhook delivery %s not found", id))
+	}
+	f := rows[0]
+	r := row{
+		endpointID: storm.UUID(f.EndpointID).String(), url: f.URL, active: f.Active, sealed: f.Secret,
+		eventID: storm.UUID(f.EventID).String(), eventType: f.EventType, body: f.Body, state: f.State,
 	}
 	if r.state != StatePending {
 		return nil // delivered already, or given up on and not asked again
@@ -338,17 +352,29 @@ func record(ctx context.Context, d *db.DB, tenant, id string, state int16, statu
 	if len(why) > 300 {
 		why = why[:300]
 	}
-	inc := 0
-	if tried {
-		inc = 1
-	}
-	return d.InTenant(ctx, db.TenantID(tenant), func(tx pgx.Tx) error {
-		// Only a pending row moves: a concurrent redelivery that already
-		// succeeded is not turned back into a failure.
-		_, err := tx.Exec(ctx, `UPDATE webhook_deliveries SET state = $2::smallint, last_status = $3, last_error = $4,
-			tries = tries + $5::int, last_try_at = CASE WHEN $5::int > 0 THEN now() ELSE last_try_at END,
-			delivered_at = CASE WHEN $2::smallint = 2 THEN now() ELSE delivered_at END
-			WHERE id = $1 AND state = 1`, id, state, status, why, inc)
+	key, err := storm.ParseUUID(id)
+	if err != nil {
 		return err
+	}
+	return d.InTenant(ctx, db.TenantID(tenant), func(tx *db.Tx) error {
+		// Only a pending row moves: a concurrent redelivery that already
+		// succeeded is not turned back into a failure. The row lock makes
+		// the check and the write one step.
+		cur, ok, err := webhookdelivery.New().IDEq(key).ForUpdate().One(ctx, tx)
+		if err != nil || !ok || cur.State != StatePending {
+			return err
+		}
+		m := webhookdelivery.Mutate(cur)
+		m.SetState(state)
+		m.SetLastStatus(int32(status))
+		m.SetLastError(why)
+		if tried {
+			m.IncTries()
+			m.SetLastTryAtNow()
+		}
+		if state == StateDelivered {
+			m.SetDeliveredAtNow()
+		}
+		return m.Update(ctx, tx)
 	})
 }

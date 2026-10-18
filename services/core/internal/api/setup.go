@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/staffsession"
 )
 
 // setupService is first-run setup: the super administrator, and the default
@@ -35,8 +36,10 @@ func (s *setupService) region() string {
 
 func (s *setupService) GetSetupStatus(ctx context.Context, _ *connect.Request[v1.GetSetupStatusRequest]) (*connect.Response[v1.GetSetupStatusResponse], error) {
 	out := &v1.GetSetupStatusResponse{SchemaLatest: db.LatestMigration(), Region: s.region()}
-	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT am_setup_needed(), am_schema_version()`).Scan(&out.Needed, &out.SchemaVersion)
+	err := s.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		st, _, err := queries.SetupStatus.One(ctx, tx)
+		out.Needed, out.SchemaVersion = st.Needed, st.Version
+		return err
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "GetSetupStatus", err)
@@ -91,19 +94,23 @@ func (s *setupService) CompleteSetup(ctx context.Context, req *connect.Request[v
 	var st *v1.Staff
 	// One transaction: the tenant, the super administrator, the audit row and
 	// their first session commit together or not at all.
-	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, `SELECT tenant_id, staff_id FROM am_setup_first_tenant($1, $2, $3, $4)`,
-			org, region, email, name).Scan(&tenant, &staffID); err != nil {
+	err := s.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		made, _, err := queries.SetupFirstTenant.One(ctx, tx, org, region, email, name)
+		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenant); err != nil {
+		tenant, staffID = idText(made.TenantID), idText(made.StaffID)
+		if err := tx.Scope(ctx, made.TenantID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO staff_sessions (tenant_id, staff_id, token_hash, expires_at)
-			VALUES (am_tenant(), $1, $2, $3)`, staffID, s.Keys.SessionHash(session), now.Add(auth.StaffSessionTTL)); err != nil {
+		n := staffsession.Create()
+		n.SetTenantID(made.TenantID)
+		n.SetStaffID(made.StaffID)
+		n.SetTokenHash(s.Keys.SessionHash(session))
+		n.SetExpiresAt(now.Add(auth.StaffSessionTTL))
+		if _, err := n.Insert(ctx, tx); err != nil {
 			return err
 		}
-		var err error
 		st, err = staffProto(ctx, tx, staffID)
 		return err
 	})

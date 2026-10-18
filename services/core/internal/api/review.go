@@ -9,12 +9,15 @@ import (
 	"unicode/utf8"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/analysisrequest"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/itemstat"
 )
 
 // MaxReviewNote bounds what a reviewer writes back to a candidate.
@@ -22,18 +25,19 @@ const MaxReviewNote = 2000
 
 func (s *resultService) ListReviews(ctx context.Context, req *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error) {
 	out := &v1.ListReviewsResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		if _, err := getExam(ctx, tx, req.Msg.GetExamId(), false); err != nil {
 			return err
 		}
-		rows, err := tx.Query(ctx, `SELECT `+attemptColumns+` FROM attempts
-			WHERE exam_id = $1 AND submitted_at IS NOT NULL AND purged_at IS NULL ORDER BY submitted_at, id LIMIT 50000`, req.Msg.GetExamId())
+		rows, err := attempt.New().
+			Where(attempt.ExamID.Eq(key(req.Msg.GetExamId())), attempt.SubmittedAt.IsNotNull(), attempt.PurgedAt.IsNull()).
+			Order(attempt.SubmittedAt.Asc(), attempt.ID.Asc()).Limit(50000).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		atts, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*attemptRow, error) { return scanAttempt(r) })
-		if err != nil {
-			return err
+		atts := make([]*attemptRow, len(rows))
+		for i, r := range rows {
+			atts[i] = attemptOf(r)
 		}
 		versions := map[int32]*v1.Exam{}
 		for i, a := range atts {
@@ -93,7 +97,7 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		return nil, invalidArg(fmt.Errorf("the note is longer than %d characters", MaxReviewNote))
 	}
 	out := &v1.ScoreAnswerResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		att, err := attemptBy(ctx, tx, "id", m.GetAttemptId(), true)
 		if err != nil {
 			return err
@@ -160,34 +164,30 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 
 func (s *resultService) GetItemAnalysis(ctx context.Context, req *connect.Request[v1.GetItemAnalysisRequest]) (*connect.Response[v1.GetItemAnalysisResponse], error) {
 	out := &v1.GetItemAnalysisResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		e, err := getExam(ctx, tx, req.Msg.GetExamId(), false)
 		if err != nil {
 			return err
 		}
-		var body []byte
-		q := `SELECT stats FROM item_stats WHERE exam_id = $1 ORDER BY exam_version DESC LIMIT 1`
-		args := []any{e.GetId()}
-		if v := req.Msg.GetExamVersion(); v > 0 {
-			q = `SELECT stats FROM item_stats WHERE exam_id = $1 AND exam_version = $2`
-			args = append(args, v)
-		}
-		err = tx.QueryRow(ctx, q, args...).Scan(&body)
-		if errors.Is(err, pgx.ErrNoRows) {
-			out.Pending = true
-			out.ExamVersion = req.Msg.GetExamVersion()
-			return nil
-		}
+		v := req.Msg.GetExamVersion()
+		st, ok, err := itemstat.New().Where(itemstat.ExamID.Eq(key(e.GetId()))).
+			WhereIf(v > 0, itemstat.ExamVersion.Eq(v)).
+			Order(itemstat.ExamVersion.Desc()).One(ctx, tx)
 		if err != nil {
 			return err
 		}
-		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(body, out); err != nil {
+		if !ok {
+			out.Pending = true
+			out.ExamVersion = v
+			return nil
+		}
+		if err := (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(st.Stats, out); err != nil {
 			return err
 		}
 		// Stale while newer hand-ins wait in the queue.
-		var queued bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM analysis_queue WHERE exam_id = $1 AND exam_version = $2)`,
-			e.GetId(), out.GetExamVersion()).Scan(&queued); err != nil {
+		queued, err := analysisrequest.New().
+			Where(analysisrequest.ExamID.Eq(st.ExamID), analysisrequest.ExamVersion.Eq(out.GetExamVersion())).Exists(ctx, tx)
+		if err != nil {
 			return err
 		}
 		out.Pending = queued

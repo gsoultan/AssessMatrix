@@ -11,7 +11,6 @@ import (
 	"unicode"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
@@ -19,6 +18,14 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
 	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attemptbatch"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attemptevent"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/credential"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/exam"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/person"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
 )
 
 type candidateService struct{ *Server }
@@ -62,18 +69,16 @@ func (s *candidateService) resolve(ctx context.Context, token string) (*link, er
 	if !secure.ValidToken(token) {
 		return nil, nil
 	}
-	var l link
-	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT tenant_id, assignment_id, current FROM am_assignment_by_token($1)`,
-			s.Keys.LinkHash(token)).Scan(&l.tenant, &l.id, &l.current)
+	var r queries.TokenAssignment
+	var ok bool
+	err := s.DB.Unscoped(ctx, func(tx *db.Tx) (err error) {
+		r, ok, err = queries.AssignmentByToken.One(ctx, tx, s.Keys.LinkHash(token))
+		return err
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
+	if err != nil || !ok {
 		return nil, err
 	}
-	return &l, nil
+	return &link{tenant: db.TenantID(idText(r.TenantID)), id: idText(r.AssignmentID), current: r.Current}, nil
 }
 
 // checked is an assignment that passed (or failed) the link checks.
@@ -85,17 +90,23 @@ type checked struct {
 }
 
 // check is invite.ts check(): the order of the refusals is the contract.
-func (s *candidateService) check(ctx context.Context, tx pgx.Tx, l *link) (*checked, error) {
+func (s *candidateService) check(ctx context.Context, tx *db.Tx, l *link) (*checked, error) {
 	a, err := getAssignment(ctx, tx, l.id, true)
 	if err != nil {
 		return nil, err
 	}
 	c := &checked{a: a}
-	var examStatus int16
-	if err := tx.QueryRow(ctx, `SELECT p.email, e.status FROM people p, exams e WHERE p.id = $1 AND e.id = $2`,
-		a.PersonID, a.ExamID).Scan(&c.email, &examStatus); err != nil {
+	if c.email, err = personEmail(ctx, tx, a.PersonID); err != nil {
 		return nil, err
 	}
+	e, ok, err := exam.New().IDEq(key(a.ExamID)).One(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, notFound("instrument")
+	}
+	examStatus := e.Status
 	now := s.now()
 	switch {
 	case a.RevokedAt != nil:
@@ -148,7 +159,7 @@ func (s *candidateService) OpenLink(ctx context.Context, req *connect.Request[v1
 	if l == nil {
 		return connect.NewResponse(out), nil
 	}
-	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
+	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
 			return err
@@ -179,7 +190,7 @@ func (s *candidateService) RequestCode(ctx context.Context, req *connect.Request
 	if l == nil {
 		return connect.NewResponse(out), nil
 	}
-	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
+	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
 			return err
@@ -198,9 +209,13 @@ func (s *candidateService) RequestCode(ctx context.Context, req *connect.Request
 			return nil
 		}
 		code := secure.Code()
-		if _, err := tx.Exec(ctx, `UPDATE assignments SET otp_hash = $2, otp_expires_at = $3, otp_tries = 0,
-			otp_sent_at = $4, otp_sends = otp_sends + 1 WHERE id = $1`,
-			a.ID, s.Keys.CodeHash(a.ID, code), now.Add(OTPTTL), now); err != nil {
+		m := assignment.MutateKey(key(a.ID))
+		m.SetOtpHash(s.Keys.CodeHash(a.ID, code))
+		m.SetOtpExpiresAt(now.Add(OTPTTL))
+		m.SetOtpTries(0)
+		m.SetOtpSentAt(now)
+		m.IncOtpSends()
+		if err := m.Update(ctx, tx); err != nil {
 			return err
 		}
 		if err := logInvite(ctx, tx, a.ID, "code.sent", "to "+secure.MaskEmail(c.email)); err != nil {
@@ -242,7 +257,7 @@ func (s *candidateService) VerifyCode(ctx context.Context, req *connect.Request[
 		return connect.NewResponse(out), nil
 	}
 	var session string
-	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
+	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
 			return err
@@ -260,7 +275,9 @@ func (s *candidateService) VerifyCode(ctx context.Context, req *connect.Request[
 		if len(code) != 6 || !secure.Equal(a.OTPHash, s.Keys.CodeHash(a.ID, code)) {
 			// A wrong guess costs a try whether or not it was close.
 			a.OTPTries++
-			if _, err := tx.Exec(ctx, `UPDATE assignments SET otp_tries = $2 WHERE id = $1`, a.ID, a.OTPTries); err != nil {
+			m := assignment.MutateKey(key(a.ID))
+			m.SetOtpTries(a.OTPTries)
+			if err := m.Update(ctx, tx); err != nil {
 				return err
 			}
 			if err := logInvite(ctx, tx, a.ID, "code.wrong", ""); err != nil {
@@ -275,8 +292,12 @@ func (s *candidateService) VerifyCode(ctx context.Context, req *connect.Request[
 		}
 		// Spend the link and start the session in one write.
 		session = secure.Token()
-		if _, err := tx.Exec(ctx, `UPDATE assignments SET redeemed_at = $2, otp_hash = NULL, otp_expires_at = NULL,
-			session_hash = $3 WHERE id = $1`, a.ID, now, s.Keys.SessionHash(session)); err != nil {
+		m := assignment.MutateKey(key(a.ID))
+		m.SetRedeemedAt(now)
+		m.SetOtpHash(nil)
+		m.SetOtpExpiresAtNull()
+		m.SetSessionHash(s.Keys.SessionHash(session))
+		if err := m.Update(ctx, tx); err != nil {
 			return err
 		}
 		out.Ok, out.Refusal = true, v1.Refusal_REFUSAL_UNSPECIFIED
@@ -304,7 +325,7 @@ func (s *candidateService) RequestNewLink(ctx context.Context, req *connect.Requ
 	if l == nil {
 		return connect.NewResponse(out), nil
 	}
-	err = s.DB.InTenant(ctx, l.tenant, func(tx pgx.Tx) error {
+	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
 			return err
@@ -347,7 +368,7 @@ func (s *candidateService) EndSession(ctx context.Context, req *connect.Request[
 }
 
 // session loads the caller's assignment and the version it is pinned to.
-func (s *candidateService) session(ctx context.Context, tx pgx.Tx, lock bool) (*assignmentRow, *v1.Exam, error) {
+func (s *candidateService) session(ctx context.Context, tx *db.Tx, lock bool) (*assignmentRow, *v1.Exam, error) {
 	p := auth.From(ctx)
 	a, err := getAssignment(ctx, tx, p.AssignmentID, lock)
 	if err != nil {
@@ -362,13 +383,13 @@ func (s *candidateService) session(ctx context.Context, tx pgx.Tx, lock bool) (*
 
 func (s *candidateService) GetSession(ctx context.Context, _ *connect.Request[v1.GetSessionRequest]) (*connect.Response[v1.GetSessionResponse], error) {
 	out := &v1.GetSessionResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		a, e, err := s.session(ctx, tx, false)
 		if err != nil {
 			return err
 		}
-		var email string
-		if err := tx.QueryRow(ctx, `SELECT email FROM people WHERE id = $1`, a.PersonID).Scan(&email); err != nil {
+		email, err := personEmail(ctx, tx, a.PersonID)
+		if err != nil {
 			return err
 		}
 		out.AssignmentId, out.Invitation, out.Exam = a.ID, summary(e, a, email), domain.ForCandidate(e)
@@ -400,7 +421,7 @@ func isNotFound(err error) bool {
 
 func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Request[v1.StartAttemptRequest]) (*connect.Response[v1.StartAttemptResponse], error) {
 	var out *v1.Attempt
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		a, e, err := s.session(ctx, tx, true)
 		if err != nil {
 			return err
@@ -442,12 +463,24 @@ func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Reques
 			d := now.Add(time.Duration(mins) * time.Minute)
 			deadline = &d
 		}
-		var id string
-		if err := tx.QueryRow(ctx, `INSERT INTO attempts (tenant_id, assignment_id, exam_id, exam_version, person_id,
-			started_at, deadline_at, last_hash) VALUES (am_tenant(), $1, $2, $3, $4, $5, $6, '\x00') RETURNING id`,
-			a.ID, a.ExamID, a.ExamVersion, a.PersonID, now, deadline).Scan(&id); err != nil {
+		n := attempt.Create()
+		n.SetTenantID(tx.Tenant())
+		n.SetAssignmentID(key(a.ID))
+		n.SetExamID(key(a.ExamID))
+		n.SetExamVersion(a.ExamVersion)
+		n.SetPersonID(key(a.PersonID))
+		n.SetStartedAt(now)
+		if deadline != nil {
+			n.SetDeadlineAt(*deadline)
+		}
+		// The chain's head before its first event; appendEvents starts
+		// from the genesis hash, not from this.
+		n.SetLastHash([]byte{0})
+		row, err := n.Insert(ctx, tx)
+		if err != nil {
 			return err
 		}
+		id := idText(row.ID)
 		att := &attemptRow{ID: id, AssignmentID: a.ID, ExamID: a.ExamID, PersonID: a.PersonID, ExamVersion: a.ExamVersion,
 			StartedAt: now, DeadlineAt: deadline, LastHash: s.genesis(id)}
 		if err := s.appendEvents(ctx, tx, att, []*v1.AttemptEvent{
@@ -465,8 +498,12 @@ func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Reques
 		if err := s.appendEvents(ctx, tx, att, consents); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE assignments SET status = $2, started_at = coalesce(started_at, $3) WHERE id = $1`,
-			a.ID, int16(v1.AssignStatus_ASSIGN_STATUS_STARTED), now); err != nil {
+		m := assignment.MutateKey(key(a.ID))
+		m.SetStatus(int16(v1.AssignStatus_ASSIGN_STATUS_STARTED))
+		if a.StartedAt == nil { // the row is locked, so this is still true
+			m.SetStartedAt(now)
+		}
+		if err := m.Update(ctx, tx); err != nil {
 			return err
 		}
 		if err := s.emit(ctx, tx, EventAttemptStarted, att.PersonID, attemptData(att, nil)); err != nil {
@@ -482,7 +519,7 @@ func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Reques
 }
 
 // ownAttempt locks the caller's attempt, refusing any other.
-func (s *candidateService) ownAttempt(ctx context.Context, tx pgx.Tx, id string) (*attemptRow, error) {
+func (s *candidateService) ownAttempt(ctx context.Context, tx *db.Tx, id string) (*attemptRow, error) {
 	att, err := attemptBy(ctx, tx, "id", id, true)
 	if err != nil {
 		return nil, err
@@ -537,20 +574,20 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 	}
 	out := &v1.AppendEventsResponse{}
 	stored := 0
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		att, err := s.ownAttempt(ctx, tx, m.GetAttemptId())
 		if err != nil {
 			return err
 		}
 		out.DeadlineAt = msPtr(att.DeadlineAt)
-		var seen int64
-		err = tx.QueryRow(ctx, `SELECT last_seq FROM attempt_batches WHERE attempt_id = $1 AND batch_id = $2`, att.ID, m.GetBatchId()).Scan(&seen)
-		if err == nil {
-			out.LastSeq = seen // a retry of a batch we already hold
-			return nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
+		seen, held, err := attemptbatch.New().
+			Where(attemptbatch.AttemptID.Eq(key(att.ID)), attemptbatch.BatchID.Eq(m.GetBatchId())).One(ctx, tx)
+		if err != nil {
 			return err
+		}
+		if held {
+			out.LastSeq = seen.LastSeq // a retry of a batch we already hold
+			return nil
 		}
 		if att.SubmittedAt != nil {
 			return failedPrecondition("this attempt has been submitted")
@@ -579,8 +616,12 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 		}
 		stored = len(evs)
 		out.LastSeq = att.LastSeq
-		_, err = tx.Exec(ctx, `INSERT INTO attempt_batches (tenant_id, attempt_id, batch_id, last_seq) VALUES (am_tenant(), $1, $2, $3)`,
-			att.ID, m.GetBatchId(), att.LastSeq)
+		b := attemptbatch.Create()
+		b.SetTenantID(tx.Tenant())
+		b.SetAttemptID(key(att.ID))
+		b.SetBatchID(m.GetBatchId())
+		b.SetLastSeq(att.LastSeq)
+		_, err = b.Insert(ctx, tx)
 		return err
 	})
 	if err != nil {
@@ -597,18 +638,22 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 // collect) is dropped, never stored. It is dropped rather than refused because
 // the batch also carries answers, and a refused batch would block them in the
 // candidate's queue for good. Only a batch with signals costs the lookup.
-func (s *candidateService) consented(ctx context.Context, tx pgx.Tx, attemptID string, evs []*v1.AttemptEvent) (func(*v1.AttemptEvent) bool, error) {
+func (s *candidateService) consented(ctx context.Context, tx *db.Tx, attemptID string, evs []*v1.AttemptEvent) (func(*v1.AttemptEvent) bool, error) {
 	all := func(*v1.AttemptEvent) bool { return true }
 	if !slices.ContainsFunc(evs, func(ev *v1.AttemptEvent) bool { return domain.PurposeOf(ev.GetKind()) != "" }) {
 		return all, nil
 	}
-	rows, err := tx.Query(ctx, `SELECT DISTINCT kind FROM attempt_events WHERE attempt_id = $1 AND kind LIKE 'consent.%'`, attemptID)
+	rows, err := attemptevent.New().
+		Where(attemptevent.AttemptID.Eq(key(attemptID)), attemptevent.Kind.Like(domain.KindConsentPrefix+"%")).
+		Limit(MaxEventsPerTry).All(ctx, tx, nil)
 	if err != nil {
 		return nil, err
 	}
-	kinds, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return nil, err
+	var kinds []string
+	for _, r := range rows {
+		if !slices.Contains(kinds, r.Kind) {
+			kinds = append(kinds, r.Kind)
+		}
 	}
 	return func(ev *v1.AttemptEvent) bool {
 		p := domain.PurposeOf(ev.GetKind())
@@ -621,7 +666,7 @@ const ExpirySkew = 5 * time.Second
 
 func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Request[v1.SubmitAttemptRequest]) (*connect.Response[v1.SubmitAttemptResponse], error) {
 	out := &v1.SubmitAttemptResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		att, err := s.ownAttempt(ctx, tx, req.Msg.GetAttemptId())
 		if err != nil {
 			return err
@@ -632,11 +677,13 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		}
 		if att.SubmittedAt != nil { // idempotent: a retried submit sees the result
 			out.Ok = true
-			var cred string
-			if err := tx.QueryRow(ctx, `SELECT id FROM credentials WHERE attempt_id = $1 AND revoked_at IS NULL`, att.ID).Scan(&cred); err == nil {
-				out.CredentialUrl = s.CredentialURL(cred)
-			} else if !errors.Is(err, pgx.ErrNoRows) {
+			cred, ok, err := credential.New().
+				Where(credential.AttemptID.Eq(key(att.ID)), credential.RevokedAt.IsNull()).One(ctx, tx)
+			if err != nil {
 				return err
+			}
+			if ok {
+				out.CredentialUrl = s.CredentialURL(idText(cred.ID))
 			}
 			out.Attempt, err = s.attemptProto(att, events, false)
 			return err
@@ -671,11 +718,15 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		if err := s.appendEvents(ctx, tx, att, []*v1.AttemptEvent{{Kind: kind, ClientTime: now.UnixMilli(), Detail: detail}}); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE attempts SET submitted_at = $2 WHERE id = $1`, att.ID, now); err != nil {
+		ma := attempt.MutateKey(key(att.ID))
+		ma.SetSubmittedAt(now)
+		if err := ma.Update(ctx, tx); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE assignments SET status = $2, submitted_at = $3 WHERE id = $1`,
-			att.AssignmentID, int16(v1.AssignStatus_ASSIGN_STATUS_SUBMITTED), now); err != nil {
+		mg := assignment.MutateKey(key(att.AssignmentID))
+		mg.SetStatus(int16(v1.AssignStatus_ASSIGN_STATUS_SUBMITTED))
+		mg.SetSubmittedAt(now)
+		if err := mg.Update(ctx, tx); err != nil {
 			return err
 		}
 		// Before the credential, so a receiver hears of the result first.
@@ -712,4 +763,16 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		return nil, s.internal(ctx, "SubmitAttempt", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// personEmail is the address a person's mail goes to.
+func personEmail(ctx context.Context, tx *db.Tx, id string) (string, error) {
+	p, ok, err := person.New().IDEq(key(id)).One(ctx, tx)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", notFound("person")
+	}
+	return p.Email, nil
 }

@@ -4,39 +4,31 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
 )
 
 type resultService struct{ *Server }
 
 func (s *resultService) ListResponses(ctx context.Context, req *connect.Request[v1.ListResponsesRequest]) (*connect.Response[v1.ListResponsesResponse], error) {
 	var out []*v1.Response
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		e, err := getExam(ctx, tx, req.Msg.GetExamId(), false)
 		if err != nil {
 			return err
 		}
-		rows, err := tx.Query(ctx, `SELECT `+attemptColumns+` FROM attempts
-			WHERE exam_id = $1 AND submitted_at IS NOT NULL ORDER BY submitted_at LIMIT 50000`, e.GetId())
+		rows, err := attempt.New().Where(attempt.ExamID.Eq(key(e.GetId())), attempt.SubmittedAt.IsNotNull()).
+			Order(attempt.SubmittedAt.Asc(), attempt.ID.Asc()).Limit(50000).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		var atts []*attemptRow
-		for rows.Next() {
-			a, err := scanAttempt(rows)
-			if err != nil {
-				rows.Close()
-				return err
-			}
-			atts = append(atts, a)
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
+		atts := make([]*attemptRow, len(rows))
+		for i, r := range rows {
+			atts[i] = attemptOf(r)
 		}
 		for _, a := range atts {
 			events, _, _, err := s.loadEvents(ctx, tx, a)
@@ -71,7 +63,7 @@ func (s *resultService) ListResponses(ctx context.Context, req *connect.Request[
 
 func (s *resultService) GetAttemptLog(ctx context.Context, req *connect.Request[v1.GetAttemptLogRequest]) (*connect.Response[v1.GetAttemptLogResponse], error) {
 	out := &v1.GetAttemptLogResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		a, err := attemptBy(ctx, tx, "id", req.Msg.GetAttemptId(), false)
 		if err != nil {
 			return err

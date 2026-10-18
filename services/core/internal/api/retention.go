@@ -7,8 +7,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gsoultan/storm/runtime"
+
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/credential"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/itemscore"
+	mediarow "github.com/gsoultan/assessmatrix/services/core/internal/store/media"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/outbox"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/person"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/webhookevent"
+
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
@@ -36,19 +47,33 @@ const purgeBatch = 200
 
 // purgeAttempt deletes one attempt's record inside the tenant's transaction.
 // The caller holds the attempt row lock. Returns the images deleted.
-func (s *Server) purgeAttempt(ctx context.Context, tx pgx.Tx, a *attemptRow, why string) (images int, err error) {
+func (s *Server) purgeAttempt(ctx context.Context, tx *db.Tx, a *attemptRow, why string) (images int, err error) {
 	images, err = s.deleteUploads(ctx, tx, "assignment:"+a.AssignmentID)
 	if err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM item_scores WHERE attempt_id = $1`, a.ID); err != nil {
+	scores, err := itemscore.New().Where(itemscore.AttemptID.Eq(key(a.ID))).Limit(maxItemScores).All(ctx, tx, nil)
+	if err != nil {
 		return 0, err
 	}
-	var events int64
-	if err := tx.QueryRow(ctx, `SELECT am_purge_attempt($1)`, a.ID).Scan(&events); err != nil {
+	ops := make([]runtime.BatchOp, len(scores))
+	for i, r := range scores {
+		ops[i] = itemscore.DeleteOp(r.AttemptID, r.ItemID)
+	}
+	if err := runBatch(ctx, tx, ops); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE attempts SET purged_at = $2, purged_why = $3 WHERE id = $1`, a.ID, s.now(), why); err != nil {
+	// The event log is append-only to this role; the owner's function
+	// is the one way to delete it.
+	purged, _, err := queries.PurgeAttempt.One(ctx, tx, key(a.ID))
+	if err != nil {
+		return 0, err
+	}
+	events := purged.N
+	m := attempt.MutateKey(key(a.ID))
+	m.SetPurgedAt(s.now())
+	m.SetPurgedWhy(why)
+	if err := m.Update(ctx, tx); err != nil {
 		return 0, err
 	}
 	metrics.RecordsPurged.WithLabelValues(why).Inc()
@@ -57,31 +82,41 @@ func (s *Server) purgeAttempt(ctx context.Context, tx pgx.Tx, a *attemptRow, why
 
 // deleteUploads removes the images one uploader put there: the bytes first,
 // so a failure leaves rows to retry from, never bytes no row points at.
-func (s *Server) deleteUploads(ctx context.Context, tx pgx.Tx, by string) (int, error) {
-	rows, err := tx.Query(ctx, `SELECT tenant_id::text, id::text FROM media WHERE uploaded_by = $1`, by)
+func (s *Server) deleteUploads(ctx context.Context, tx *db.Tx, by string) (int, error) {
+	objs, err := mediarow.New().Where(mediarow.UploadedBy.Eq(by)).Limit(maxUploadsPerSitting).All(ctx, tx, nil)
 	if err != nil {
 		return 0, err
 	}
-	type obj struct{ Tenant, ID string }
-	objs, err := pgx.CollectRows(rows, pgx.RowToStructByPos[obj])
-	if err != nil {
-		return 0, err
-	}
-	for _, o := range objs {
-		key, err := media.Key(o.Tenant, o.ID)
+	ops := make([]runtime.BatchOp, len(objs))
+	for i, o := range objs {
+		id := idText(o.ID)
+		k, err := media.Key(idText(o.TenantID), id)
 		if err != nil {
 			return 0, err
 		}
 		if s.Media.Store != nil {
-			if err := s.Media.Delete(ctx, key); err != nil {
-				return 0, fmt.Errorf("delete image %s: %w", o.ID, err)
+			if err := s.Media.Delete(ctx, k); err != nil {
+				return 0, fmt.Errorf("delete image %s: %w", id, err)
 			}
 		}
+		ops[i] = mediarow.DeleteOp(o.ID)
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM media WHERE uploaded_by = $1`, by); err != nil {
-		return 0, err
+	return len(objs), runBatch(ctx, tx, ops)
+}
+
+// maxUploadsPerSitting bounds the images one sitting can leave behind, well
+// above what a candidate uploads.
+const maxUploadsPerSitting = 10_000
+
+// eraseBatch is how many rows erasure reads and deletes at a time.
+const eraseBatch = 1000
+
+// runBatch sends a set of keyed writes in one round trip.
+func runBatch(ctx context.Context, tx *db.Tx, ops []runtime.BatchOp) error {
+	if len(ops) == 0 {
+		return nil
 	}
-	return len(objs), nil
+	return tx.Batch(ctx, ops, nil)
 }
 
 // PurgeDue applies retention to every tenant: records past their period are
@@ -90,18 +125,14 @@ func (s *Server) deleteUploads(ctx context.Context, tx pgx.Tx, by string) (int, 
 func (s *Server) PurgeDue(ctx context.Context) (purged int, err error) {
 	now := s.now()
 	for {
-		rows, err := s.DB.Pool.Query(ctx, `SELECT tenant_id::text, attempt_id::text FROM am_retention_due($1, $2)`, now, purgeBatch)
-		if err != nil {
-			return purged, err
-		}
-		type due struct{ Tenant, Attempt string }
-		batch, err := pgx.CollectRows(rows, pgx.RowToStructByPos[due])
+		batch, err := queries.RetentionDue.Query(ctx, s.DB.Executor(), now, purgeBatch)
 		if err != nil {
 			return purged, err
 		}
 		for _, d := range batch {
-			err := s.DB.InTenant(ctx, db.TenantID(d.Tenant), func(tx pgx.Tx) error {
-				a, err := attemptBy(ctx, tx, "id", d.Attempt, true)
+			attemptID := idText(d.AttemptID)
+			err := s.DB.InTenant(ctx, db.TenantID(idText(d.TenantID)), func(tx *db.Tx) error {
+				a, err := attemptBy(ctx, tx, "id", attemptID, true)
 				if err != nil || a.PurgedAt != nil {
 					return err // gone or done by another run meanwhile
 				}
@@ -109,7 +140,7 @@ func (s *Server) PurgeDue(ctx context.Context) (purged int, err error) {
 				return err
 			})
 			if err != nil {
-				return purged, fmt.Errorf("purge %s: %w", d.Attempt, err)
+				return purged, fmt.Errorf("purge %s: %w", attemptID, err)
 			}
 			purged++
 		}
@@ -117,10 +148,10 @@ func (s *Server) PurgeDue(ctx context.Context) (purged int, err error) {
 			break
 		}
 	}
-	if _, err := s.DB.Pool.Exec(ctx, `SELECT am_outbox_sweep($1)`, now.Add(-OutboxKeep)); err != nil {
+	if _, _, err := queries.OutboxSweep.One(ctx, s.DB.Executor(), now.Add(-OutboxKeep)); err != nil {
 		return purged, err
 	}
-	if _, err := s.DB.Pool.Exec(ctx, `SELECT am_webhook_sweep($1)`, now.Add(-WebhookKeep)); err != nil {
+	if _, _, err := queries.WebhookSweep.One(ctx, s.DB.Executor(), now.Add(-WebhookKeep)); err != nil {
 		return purged, err
 	}
 	return purged, nil
@@ -154,23 +185,20 @@ func (s *personService) ErasePerson(ctx context.Context, req *connect.Request[v1
 		return nil, invalidArg(errors.New("say why, in up to 200 characters, without personal data"))
 	}
 	out := &v1.ErasePersonResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		var email string
-		if err := tx.QueryRow(ctx, `SELECT email FROM people WHERE id = $1 FOR UPDATE`, id).Scan(&email); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return notFound("person")
-			}
-			return err
-		}
-		rows, err := tx.Query(ctx, `SELECT `+attemptColumns+` FROM attempts WHERE person_id = $1 FOR UPDATE`, id)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		who, ok, err := person.New().IDEq(key(id)).ForUpdate().One(ctx, tx)
 		if err != nil {
 			return err
 		}
-		atts, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (*attemptRow, error) { return scanAttempt(r) })
+		if !ok {
+			return notFound("person")
+		}
+		rows, err := attempt.New().Where(attempt.PersonID.Eq(who.ID)).ForUpdate().Limit(maxExamRows).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		for _, a := range atts {
+		for _, r := range rows {
+			a := attemptOf(r)
 			if a.PurgedAt == nil {
 				n, err := s.purgeAttempt(ctx, tx, a, "erasure")
 				if err != nil {
@@ -178,42 +206,56 @@ func (s *personService) ErasePerson(ctx context.Context, req *connect.Request[v1
 				}
 				out.Images += int32(n)
 			}
-			tag, err := tx.Exec(ctx, `DELETE FROM credentials WHERE attempt_id = $1`, a.ID)
+			creds, err := credential.New().Where(credential.AttemptID.Eq(r.ID)).Limit(eraseBatch).All(ctx, tx, nil)
 			if err != nil {
 				return err
 			}
-			out.Credentials += int32(tag.RowsAffected())
-			if _, err := tx.Exec(ctx, `DELETE FROM attempts WHERE id = $1`, a.ID); err != nil {
+			ops := make([]runtime.BatchOp, 0, len(creds)+1)
+			for _, c := range creds {
+				ops = append(ops, credential.DeleteOp(c.ID))
+			}
+			out.Credentials += int32(len(creds))
+			if err := runBatch(ctx, tx, append(ops, attempt.DeleteOp(r.ID))); err != nil {
 				return err
 			}
 			out.Attempts++
 		}
 		// Images from an invitation that never became an attempt.
-		arows, err := tx.Query(ctx, `SELECT id::text FROM assignments WHERE person_id = $1`, id)
-		if err != nil {
-			return err
-		}
-		assignments, err := pgx.CollectRows(arows, pgx.RowTo[string])
+		assignments, err := assignment.New().Where(assignment.PersonID.Eq(who.ID)).Limit(maxExamRows).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
 		for _, a := range assignments {
-			n, err := s.deleteUploads(ctx, tx, "assignment:"+a)
+			n, err := s.deleteUploads(ctx, tx, "assignment:"+idText(a.ID))
 			if err != nil {
 				return err
 			}
 			out.Images += int32(n)
 		}
 		// Mail to them, and the person with their invitations.
-		if _, err := tx.Exec(ctx, `DELETE FROM outbox WHERE lower(to_addr) = lower($1)`, email); err != nil {
+		if err := drain(ctx, tx, func() ([]runtime.BatchOp, error) {
+			mail, err := outbox.New().Where(outbox.ToAddr.EqLower(who.Email)).Unordered().Limit(eraseBatch).All(ctx, tx, nil)
+			ops := make([]runtime.BatchOp, len(mail))
+			for i, m := range mail {
+				ops[i] = outbox.DeleteOp(m.ID)
+			}
+			return ops, err
+		}); err != nil {
 			return err
 		}
 		// Webhook events about them, with their deliveries (ids only, but
 		// the id of an erased person should not outlive them here).
-		if _, err := tx.Exec(ctx, `DELETE FROM webhook_events WHERE person_id = $1`, id); err != nil {
+		if err := drain(ctx, tx, func() ([]runtime.BatchOp, error) {
+			evs, err := webhookevent.New().Where(webhookevent.PersonID.Eq(who.ID)).Unordered().Limit(eraseBatch).All(ctx, tx, nil)
+			ops := make([]runtime.BatchOp, len(evs))
+			for i, e := range evs {
+				ops[i] = webhookevent.DeleteOp(e.ID)
+			}
+			return ops, err
+		}); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM people WHERE id = $1`, id); err != nil {
+		if err := person.Delete(ctx, tx, who.ID); err != nil {
 			return err
 		}
 		return audit(ctx, tx, "person.erased", id, map[string]any{
@@ -223,4 +265,21 @@ func (s *personService) ErasePerson(ctx context.Context, req *connect.Request[v1
 		return nil, s.internal(ctx, "ErasePerson", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// drain applies batches of keyed writes until next finds nothing left to
+// write. Each batch must take its rows out of what next reads.
+func drain(ctx context.Context, tx *db.Tx, next func() ([]runtime.BatchOp, error)) error {
+	for {
+		ops, err := next()
+		if err != nil {
+			return err
+		}
+		if err := runBatch(ctx, tx, ops); err != nil {
+			return err
+		}
+		if len(ops) < eraseBatch {
+			return nil
+		}
+	}
 }

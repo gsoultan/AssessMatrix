@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
@@ -137,8 +136,9 @@ func TestEventsStayAppendOnlyOutsideThePurge(t *testing.T) {
 	tx.Rollback(ctx)
 	// The application role, even under its own tenant, cannot purge another tenant's attempt.
 	h.tenant("Other")
-	err = h.srv.DB.InTenant(ctx, db.TenantID(h.lastTenant), func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `SELECT am_purge_attempt($1)`, id)
+	err = h.srv.DB.InTenant(ctx, db.TenantID(h.lastTenant), func(tx *db.Tx) error {
+		// Called raw on purpose: the database must refuse it, whoever asks.
+		_, err := tx.Pgx().Exec(ctx, `SELECT am_purge_attempt($1)`, id)
 		return err
 	})
 	if err == nil || !strings.Contains(err.Error(), "not found") {

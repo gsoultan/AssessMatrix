@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/webhookdelivery"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/webhookendpoint"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/webhookevent"
 	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
@@ -56,14 +59,16 @@ type envelope struct {
 // caller's transaction, and queues its deliveries. With no subscriber it
 // costs one indexed read and writes nothing. person is the person the event
 // is about ("" if none), kept so erasure can find the event.
-func (s *Server) emit(ctx context.Context, tx pgx.Tx, typ, person string, data map[string]any) error {
-	rows, err := tx.Query(ctx, `SELECT id::text FROM webhook_endpoints WHERE active AND $1 = ANY(events)`, typ)
+func (s *Server) emit(ctx context.Context, tx *db.Tx, typ, person string, data map[string]any) error {
+	rows, err := webhookendpoint.New().
+		Where(webhookendpoint.Active.Eq(true), webhookendpoint.Events.Contains(typ)).
+		Limit(maxWebhooksPerTenant).All(ctx, tx, nil)
 	if err != nil {
 		return err
 	}
-	endpoints, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return err
+	endpoints := make([][16]byte, len(rows))
+	for i, r := range rows {
+		endpoints[i] = r.ID
 	}
 	if len(endpoints) == 0 {
 		return nil
@@ -74,31 +79,37 @@ func (s *Server) emit(ctx context.Context, tx pgx.Tx, typ, person string, data m
 
 // recordEvent writes the event and one delivery per endpoint, returning the
 // delivery ids in endpoint order.
-func (s *Server) recordEvent(ctx context.Context, tx pgx.Tx, typ, person string, data map[string]any, endpoints []string) ([]string, error) {
-	var id string
-	if err := tx.QueryRow(ctx, `SELECT gen_random_uuid()::text`).Scan(&id); err != nil {
-		return nil, err
-	}
+func (s *Server) recordEvent(ctx context.Context, tx *db.Tx, typ, person string, data map[string]any, endpoints [][16]byte) ([]string, error) {
+	id := newID()
 	now := s.now().UTC()
-	body, err := json.Marshal(envelope{ID: id, Type: typ, CreatedAt: now.Format(time.RFC3339Nano), Data: data})
+	body, err := json.Marshal(envelope{ID: idText(id), Type: typ, CreatedAt: now.Format(time.RFC3339Nano), Data: data})
 	if err != nil {
 		return nil, fmt.Errorf("encode %s event: %w", typ, err)
 	}
-	var pid *string
+	ev := webhookevent.Create()
+	ev.SetID(id)
+	ev.SetTenantID(tx.Tenant())
+	ev.SetType(typ)
 	if person != "" {
-		pid = &person
+		ev.SetPersonID(key(person))
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO webhook_events (id, tenant_id, type, person_id, body, created_at)
-		VALUES ($1, am_tenant(), $2, $3, $4, $5)`, id, typ, pid, string(body), now); err != nil {
+	ev.SetBody(string(body))
+	ev.SetCreatedAt(now)
+	if _, err := ev.Insert(ctx, tx); err != nil {
 		return nil, err
 	}
 	out := make([]string, 0, len(endpoints))
 	for _, ep := range endpoints {
-		var did string
-		if err := tx.QueryRow(ctx, `INSERT INTO webhook_deliveries (tenant_id, endpoint_id, event_id, created_at)
-			VALUES (am_tenant(), $1, $2, $3) RETURNING id`, ep, id, now).Scan(&did); err != nil {
+		d := webhookdelivery.Create()
+		d.SetTenantID(tx.Tenant())
+		d.SetEndpointID(ep)
+		d.SetEventID(id)
+		d.SetCreatedAt(now)
+		row, err := d.Insert(ctx, tx)
+		if err != nil {
 			return nil, err
 		}
+		did := idText(row.ID)
 		if err := s.queueDelivery(ctx, tx, did); err != nil {
 			return nil, err
 		}
@@ -107,11 +118,11 @@ func (s *Server) recordEvent(ctx context.Context, tx pgx.Tx, typ, person string,
 	return out, nil
 }
 
-func (s *Server) queueDelivery(ctx context.Context, tx pgx.Tx, id string) error {
+func (s *Server) queueDelivery(ctx context.Context, tx *db.Tx, id string) error {
 	if s.Jobs == nil {
 		return nil
 	}
-	_, err := s.Jobs.InsertTx(ctx, tx, webhook.DeliverArgs{DeliveryID: id}, webhook.InsertOpts())
+	_, err := s.Jobs.InsertTx(ctx, tx.Pgx(), webhook.DeliverArgs{DeliveryID: id}, webhook.InsertOpts())
 	return err
 }
 
@@ -142,32 +153,50 @@ func attemptData(att *attemptRow, score *v1.Score) map[string]any {
 // webhookService is the staff API over endpoints and the delivery log.
 type webhookService struct{ *Server }
 
-const endpointColumns = `e.id::text, e.url, e.description, e.events, e.active, e.created_at, e.secret_hint,
-	(SELECT count(*) FROM webhook_deliveries d WHERE d.endpoint_id = e.id AND d.state = 2)::int,
-	(SELECT count(*) FROM webhook_deliveries d WHERE d.endpoint_id = e.id AND d.state = 3)::int,
-	(SELECT max(d.last_try_at) FROM webhook_deliveries d WHERE d.endpoint_id = e.id)`
-
-func scanEndpoint(r pgx.Row) (*v1.WebhookEndpoint, error) {
-	var ep v1.WebhookEndpoint
-	var created time.Time
-	var last *time.Time
-	if err := r.Scan(&ep.Id, &ep.Url, &ep.Description, &ep.Events, &ep.Active, &created, &ep.SecretHint,
-		&ep.Delivered, &ep.Failing, &last); err != nil {
+// endpointOf is the API's view of an endpoint, with its delivery tallies.
+func endpointOf(ctx context.Context, tx *db.Tx, r webhookendpoint.Row) (*v1.WebhookEndpoint, error) {
+	ep := &v1.WebhookEndpoint{
+		Id: idText(r.ID), Url: r.URL, Description: r.Description, Events: r.Events, Active: r.Active,
+		CreatedAt: ms(r.CreatedAt), SecretHint: r.SecretHint,
+	}
+	of := webhookdelivery.New().Where(webhookdelivery.EndpointID.Eq(r.ID))
+	delivered, err := of.Where(webhookdelivery.State.Eq(webhook.StateDelivered)).Count(ctx, tx)
+	if err != nil {
 		return nil, err
 	}
-	ep.CreatedAt, ep.LastDeliveryAt = ms(created), msPtr(last)
-	return &ep, nil
+	failing, err := of.Where(webhookdelivery.State.Eq(webhook.StateFailed)).Count(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	last, ok, err := of.Where(webhookdelivery.LastTryAt.IsNotNull()).
+		Order(webhookdelivery.LastTryAt.Desc()).One(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	ep.Delivered, ep.Failing = int32(delivered), int32(failing)
+	if ok {
+		ep.LastDeliveryAt = msPtr(optTime(last.LastTryAt))
+	}
+	return ep, nil
 }
 
-func getEndpoint(ctx context.Context, tx pgx.Tx, id string) (*v1.WebhookEndpoint, error) {
+func getEndpoint(ctx context.Context, tx *db.Tx, id string) (*v1.WebhookEndpoint, error) {
+	r, err := endpointRow(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+	return endpointOf(ctx, tx, r)
+}
+
+func endpointRow(ctx context.Context, tx *db.Tx, id string) (webhookendpoint.Row, error) {
 	if !validUUID(id) {
-		return nil, notFound("webhook")
+		return webhookendpoint.Row{}, notFound("webhook")
 	}
-	ep, err := scanEndpoint(tx.QueryRow(ctx, `SELECT `+endpointColumns+` FROM webhook_endpoints e WHERE e.id = $1`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, notFound("webhook")
+	r, ok, err := webhookendpoint.New().IDEq(key(id)).One(ctx, tx)
+	if err == nil && !ok {
+		err = notFound("webhook")
 	}
-	return ep, err
+	return r, err
 }
 
 // checkEndpoint validates what staff typed and normalises the event list.
@@ -198,13 +227,20 @@ func newWebhookSecret() string { return "whsec_" + secure.Token() }
 
 func (s *webhookService) ListWebhooks(ctx context.Context, _ *connect.Request[v1.ListWebhooksRequest]) (*connect.Response[v1.ListWebhooksResponse], error) {
 	out := &v1.ListWebhooksResponse{EventTypes: EventTypes}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT `+endpointColumns+` FROM webhook_endpoints e ORDER BY e.created_at`)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		rows, err := webhookendpoint.New().Order(webhookendpoint.CreatedAt.Asc(), webhookendpoint.ID.Asc()).
+			Limit(maxWebhooksPerTenant).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		out.Endpoints, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (*v1.WebhookEndpoint, error) { return scanEndpoint(r) })
-		return err
+		for _, r := range rows {
+			ep, err := endpointOf(ctx, tx, r)
+			if err != nil {
+				return err
+			}
+			out.Endpoints = append(out.Endpoints, ep)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "ListWebhooks", err)
@@ -218,28 +254,33 @@ func (s *webhookService) CreateWebhook(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	out := &v1.CreateWebhookResponse{Secret: newWebhookSecret()}
-	err = s.tx(ctx, func(tx pgx.Tx) error {
+	err = s.tx(ctx, func(tx *db.Tx) error {
 		// One count per tenant at a time, so two creates cannot both pass it.
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM tenants WHERE id = am_tenant() FOR UPDATE`); err != nil {
+		if err := lockTenant(ctx, tx); err != nil {
 			return err
 		}
-		var n int
-		if err := tx.QueryRow(ctx, `SELECT count(*) FROM webhook_endpoints`).Scan(&n); err != nil {
+		n, err := webhookendpoint.New().Count(ctx, tx)
+		if err != nil {
 			return err
 		}
 		if n >= maxWebhooksPerTenant {
 			return failedPrecondition(fmt.Sprintf("at most %d webhooks; delete one first", maxWebhooksPerTenant))
 		}
-		var id string
-		if err := tx.QueryRow(ctx, `SELECT gen_random_uuid()::text`).Scan(&id); err != nil {
-			return err
-		}
+		uid := newID()
+		id := idText(uid)
 		sealed, err := s.Keys.Seal(webhook.SecretLabel(id), []byte(out.Secret))
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO webhook_endpoints (id, tenant_id, url, description, events, secret, secret_hint)
-			VALUES ($1, am_tenant(), $2, $3, $4, $5, $6)`, id, url, description, events, sealed, out.Secret[:webhookSecretHintChars]); err != nil {
+		ins := webhookendpoint.Create()
+		ins.SetID(uid)
+		ins.SetTenantID(tx.Tenant())
+		ins.SetURL(url)
+		ins.SetDescription(description)
+		ins.SetEvents(events)
+		ins.SetSecret(sealed)
+		ins.SetSecretHint(out.Secret[:webhookSecretHintChars])
+		if _, err := ins.Insert(ctx, tx); err != nil {
 			return err
 		}
 		if out.Endpoint, err = getEndpoint(ctx, tx, id); err != nil {
@@ -260,12 +301,18 @@ func (s *webhookService) UpdateWebhook(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	out := &v1.UpdateWebhookResponse{}
-	err = s.tx(ctx, func(tx pgx.Tx) error {
-		if _, err := getEndpoint(ctx, tx, m.GetId()); err != nil {
+	err = s.tx(ctx, func(tx *db.Tx) error {
+		r, err := endpointRow(ctx, tx, m.GetId())
+		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE webhook_endpoints SET url = $2, description = $3, events = $4, active = $5,
-			updated_at = now() WHERE id = $1`, m.GetId(), url, description, events, m.GetActive()); err != nil {
+		mu := webhookendpoint.Mutate(r)
+		mu.SetURL(url)
+		mu.SetDescription(description)
+		mu.SetEvents(events)
+		mu.SetActive(m.GetActive())
+		mu.SetUpdatedAtNow()
+		if err := mu.Update(ctx, tx); err != nil {
 			return err
 		}
 		if out.Endpoint, err = getEndpoint(ctx, tx, m.GetId()); err != nil {
@@ -281,17 +328,21 @@ func (s *webhookService) UpdateWebhook(ctx context.Context, req *connect.Request
 
 func (s *webhookService) RotateWebhookSecret(ctx context.Context, req *connect.Request[v1.RotateWebhookSecretRequest]) (*connect.Response[v1.RotateWebhookSecretResponse], error) {
 	out := &v1.RotateWebhookSecretResponse{Secret: newWebhookSecret()}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		id := req.Msg.GetId()
-		if _, err := getEndpoint(ctx, tx, id); err != nil {
+		r, err := endpointRow(ctx, tx, id)
+		if err != nil {
 			return err
 		}
 		sealed, err := s.Keys.Seal(webhook.SecretLabel(id), []byte(out.Secret))
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE webhook_endpoints SET secret = $2, secret_hint = $3, updated_at = now() WHERE id = $1`,
-			id, sealed, out.Secret[:webhookSecretHintChars]); err != nil {
+		mu := webhookendpoint.Mutate(r)
+		mu.SetSecret(sealed)
+		mu.SetSecretHint(out.Secret[:webhookSecretHintChars])
+		mu.SetUpdatedAtNow()
+		if err := mu.Update(ctx, tx); err != nil {
 			return err
 		}
 		if out.Endpoint, err = getEndpoint(ctx, tx, id); err != nil {
@@ -306,17 +357,17 @@ func (s *webhookService) RotateWebhookSecret(ctx context.Context, req *connect.R
 }
 
 func (s *webhookService) DeleteWebhook(ctx context.Context, req *connect.Request[v1.DeleteWebhookRequest]) (*connect.Response[v1.DeleteWebhookResponse], error) {
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		ep, err := getEndpoint(ctx, tx, req.Msg.GetId())
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		ep, err := endpointRow(ctx, tx, req.Msg.GetId())
 		if err != nil {
 			return err
 		}
 		// Its deliveries go with it (cascade); a queued job then finds
 		// nothing and stops.
-		if _, err := tx.Exec(ctx, `DELETE FROM webhook_endpoints WHERE id = $1`, ep.GetId()); err != nil {
+		if err := webhookendpoint.Delete(ctx, tx, ep.ID); err != nil {
 			return err
 		}
-		return audit(ctx, tx, "webhook.deleted", ep.GetId(), map[string]any{"host": hostOf(ep.GetUrl())})
+		return audit(ctx, tx, "webhook.deleted", idText(ep.ID), map[string]any{"host": hostOf(ep.URL)})
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "DeleteWebhook", err)
@@ -324,33 +375,60 @@ func (s *webhookService) DeleteWebhook(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&v1.DeleteWebhookResponse{}), nil
 }
 
-const deliveryColumns = `d.id::text, d.endpoint_id::text, v.id::text, v.type, d.state, d.tries, d.last_status, d.last_error,
-	d.created_at, d.last_try_at, d.delivered_at, v.body`
-
-func scanDelivery(r pgx.Row) (*v1.WebhookDelivery, error) {
-	var d v1.WebhookDelivery
-	var state int16
-	var created time.Time
-	var tried, delivered *time.Time
-	if err := r.Scan(&d.Id, &d.EndpointId, &d.EventId, &d.EventType, &state, &d.Tries, &d.LastStatus, &d.LastError,
-		&created, &tried, &delivered, &d.Payload); err != nil {
+// deliveriesOf is the API's view of deliveries, each with its event.
+func deliveriesOf(ctx context.Context, tx *db.Tx, rows []webhookdelivery.Row) ([]*v1.WebhookDelivery, error) {
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	ids := make([][16]byte, 0, len(rows))
+	for _, r := range rows {
+		if !slices.Contains(ids, r.EventID) {
+			ids = append(ids, r.EventID)
+		}
+	}
+	evs, err := webhookevent.New().IDIn(ids...).Limit(int64(len(ids))).All(ctx, tx, nil)
+	if err != nil {
 		return nil, err
 	}
-	d.State = v1.DeliveryState(state)
-	d.CreatedAt, d.LastTryAt, d.DeliveredAt = ms(created), msPtr(tried), msPtr(delivered)
-	return &d, nil
+	byID := make(map[[16]byte]webhookevent.Row, len(evs))
+	for _, e := range evs {
+		byID[e.ID] = e
+	}
+	out := make([]*v1.WebhookDelivery, 0, len(rows))
+	for _, r := range rows {
+		e, ok := byID[r.EventID]
+		if !ok {
+			continue // erased while we read; the delivery goes with it
+		}
+		out = append(out, &v1.WebhookDelivery{
+			Id: idText(r.ID), EndpointId: idText(r.EndpointID), EventId: idText(e.ID), EventType: e.Type,
+			State: v1.DeliveryState(r.State), Tries: r.Tries, LastStatus: r.LastStatus, LastError: r.LastError,
+			CreatedAt: ms(r.CreatedAt), LastTryAt: msPtr(optTime(r.LastTryAt)), DeliveredAt: msPtr(optTime(r.DeliveredAt)),
+			Payload: e.Body,
+		})
+	}
+	return out, nil
 }
 
-func getDelivery(ctx context.Context, tx pgx.Tx, id string) (*v1.WebhookDelivery, error) {
+func getDelivery(ctx context.Context, tx *db.Tx, id string) (*v1.WebhookDelivery, error) {
 	if !validUUID(id) {
 		return nil, notFound("delivery")
 	}
-	d, err := scanDelivery(tx.QueryRow(ctx, `SELECT `+deliveryColumns+`
-		FROM webhook_deliveries d JOIN webhook_events v ON v.id = d.event_id WHERE d.id = $1`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
+	r, ok, err := webhookdelivery.New().IDEq(key(id)).One(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, notFound("delivery")
 	}
-	return d, err
+	out, err := deliveriesOf(ctx, tx, []webhookdelivery.Row{r})
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, notFound("delivery")
+	}
+	return out[0], nil
 }
 
 func (s *webhookService) ListDeliveries(ctx context.Context, req *connect.Request[v1.ListDeliveriesRequest]) (*connect.Response[v1.ListDeliveriesResponse], error) {
@@ -364,20 +442,16 @@ func (s *webhookService) ListDeliveries(ctx context.Context, req *connect.Reques
 		return nil, notFound("webhook")
 	}
 	out := &v1.ListDeliveriesResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		var endpoint *string
-		if m.GetEndpointId() != "" {
-			e := m.GetEndpointId()
-			endpoint = &e
-		}
-		rows, err := tx.Query(ctx, `SELECT `+deliveryColumns+`
-			FROM webhook_deliveries d JOIN webhook_events v ON v.id = d.event_id
-			WHERE ($1::uuid IS NULL OR d.endpoint_id = $1) AND (NOT $2 OR d.state = 3)
-			ORDER BY d.created_at DESC, d.id LIMIT $3`, endpoint, m.GetFailedOnly(), limit)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		rows, err := webhookdelivery.New().
+			WhereIf(m.GetEndpointId() != "", webhookdelivery.EndpointID.Eq(key(m.GetEndpointId()))).
+			WhereIf(m.GetFailedOnly(), webhookdelivery.State.Eq(webhook.StateFailed)).
+			Order(webhookdelivery.CreatedAt.Desc(), webhookdelivery.ID.Asc()).
+			Limit(int64(limit)).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		out.Deliveries, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (*v1.WebhookDelivery, error) { return scanDelivery(r) })
+		out.Deliveries, err = deliveriesOf(ctx, tx, rows)
 		return err
 	})
 	if err != nil {
@@ -388,13 +462,16 @@ func (s *webhookService) ListDeliveries(ctx context.Context, req *connect.Reques
 
 func (s *webhookService) Redeliver(ctx context.Context, req *connect.Request[v1.RedeliverRequest]) (*connect.Response[v1.RedeliverResponse], error) {
 	out := &v1.RedeliverResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		d, err := getDelivery(ctx, tx, req.Msg.GetDeliveryId())
 		if err != nil {
 			return err
 		}
 		// Same row, same event id and body: the receiver de-duplicates on it.
-		if _, err := tx.Exec(ctx, `UPDATE webhook_deliveries SET state = 1, last_error = '' WHERE id = $1`, d.GetId()); err != nil {
+		mu := webhookdelivery.MutateKey(key(d.GetId()))
+		mu.SetState(webhook.StatePending)
+		mu.SetLastError("")
+		if err := mu.Update(ctx, tx); err != nil {
 			return err
 		}
 		if err := s.queueDelivery(ctx, tx, d.GetId()); err != nil {
@@ -413,7 +490,7 @@ func (s *webhookService) Redeliver(ctx context.Context, req *connect.Request[v1.
 
 func (s *webhookService) PingWebhook(ctx context.Context, req *connect.Request[v1.PingWebhookRequest]) (*connect.Response[v1.PingWebhookResponse], error) {
 	out := &v1.PingWebhookResponse{}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		ep, err := getEndpoint(ctx, tx, req.Msg.GetId())
 		if err != nil {
 			return err
@@ -421,7 +498,7 @@ func (s *webhookService) PingWebhook(ctx context.Context, req *connect.Request[v
 		if !ep.GetActive() {
 			return failedPrecondition("this webhook is paused; resume it first")
 		}
-		ids, err := s.recordEvent(ctx, tx, EventWebhookPing, "", map[string]any{"endpoint_id": ep.GetId()}, []string{ep.GetId()})
+		ids, err := s.recordEvent(ctx, tx, EventWebhookPing, "", map[string]any{"endpoint_id": ep.GetId()}, [][16]byte{key(ep.GetId())})
 		if err != nil {
 			return err
 		}

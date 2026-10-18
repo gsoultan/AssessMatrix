@@ -190,7 +190,7 @@ func TestWebhookEventOnlyIfTheChangeCommits(t *testing.T) {
 	staff := h.tenant("HookRollback")
 	h.subscribe(staff, "https://hooks.example.test/am")
 	boom := errors.New("the change failed")
-	err := h.srv.DB.InTenant(ctx, db.TenantID(h.lastTenant), func(tx pgx.Tx) error {
+	err := h.srv.DB.InTenant(ctx, db.TenantID(h.lastTenant), func(tx *db.Tx) error {
 		if err := h.srv.emit(ctx, tx, EventExamPublished, "", map[string]any{"exam_id": "x"}); err != nil {
 			return err
 		}

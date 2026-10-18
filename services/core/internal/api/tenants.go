@@ -9,9 +9,18 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/gsoultan/storm/runtime"
+
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/exam"
+	mediarow "github.com/gsoultan/assessmatrix/services/core/internal/store/media"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/staff"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/staffcode"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/staffsession"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/tenant"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
@@ -75,26 +84,24 @@ func (m *membership) in(ctx context.Context) context.Context {
 func (s *Server) memberships(ctx context.Context) (string, []membership, error) {
 	p := auth.From(ctx)
 	var email string
-	if err := s.tx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT email FROM staff WHERE id = $1`, p.StaffID).Scan(&email)
+	if err := s.tx(ctx, func(tx *db.Tx) error {
+		me, ok, err := staff.New().IDEq(key(p.StaffID)).One(ctx, tx)
+		if err == nil && !ok {
+			err = notFound("staff member")
+		}
+		email = me.Email
+		return err
 	}); err != nil {
 		return "", nil, err
 	}
 	var out []membership
-	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT tenant_id, staff_id, tenant_name, region, role FROM am_staff_tenants($1)`, email)
-		if err != nil {
-			return err
+	err := s.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		rows, err := queries.StaffTenants.Query(ctx, tx, email)
+		for _, r := range rows {
+			out = append(out, membership{tenant: db.TenantID(idText(r.TenantID)), staffID: idText(r.StaffID),
+				name: r.TenantName, region: r.Region, role: r.Role})
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var m membership
-			if err := rows.Scan(&m.tenant, &m.staffID, &m.name, &m.region, &m.role); err != nil {
-				return err
-			}
-			out = append(out, m)
-		}
-		return rows.Err()
+		return err
 	})
 	return email, out, err
 }
@@ -136,23 +143,16 @@ func (s *Server) managed(ctx context.Context, ms []membership) ([]membership, er
 		return out, nil
 	}
 	var out []membership
-	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT tenant_id, tenant_name, region FROM am_all_tenants()`)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var m membership
-			if err := rows.Scan(&m.tenant, &m.name, &m.region); err != nil {
-				return err
-			}
+	err := s.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		rows, err := queries.AllTenants.Query(ctx, tx)
+		for _, r := range rows {
+			m := membership{tenant: db.TenantID(idText(r.TenantID)), name: r.TenantName, region: r.Region}
 			if mine, err := find(ms, string(m.tenant)); err == nil {
 				m = *mine
 			}
 			out = append(out, m)
 		}
-		return rows.Err()
+		return err
 	})
 	return out, err
 }
@@ -198,7 +198,7 @@ func (s *tenantService) SwitchTenant(ctx context.Context, req *connect.Request[v
 	p := auth.From(ctx)
 	out := &v1.SwitchTenantResponse{}
 	if m.tenant == p.Tenant {
-		err := s.tx(ctx, func(tx pgx.Tx) (err error) {
+		err := s.tx(ctx, func(tx *db.Tx) (err error) {
 			out.Staff, err = staffProto(ctx, tx, p.StaffID)
 			return err
 		})
@@ -208,9 +208,13 @@ func (s *tenantService) SwitchTenant(ctx context.Context, req *connect.Request[v
 		return connect.NewResponse(out), nil
 	}
 	session := secure.Token()
-	err = s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO staff_sessions (tenant_id, staff_id, token_hash, expires_at)
-			VALUES (am_tenant(), $1, $2, $3)`, m.staffID, s.Keys.SessionHash(session), s.now().Add(auth.StaffSessionTTL)); err != nil {
+	err = s.DB.InTenant(ctx, m.tenant, func(tx *db.Tx) error {
+		n := staffsession.Create()
+		n.SetTenantID(tx.Tenant())
+		n.SetStaffID(key(m.staffID))
+		n.SetTokenHash(s.Keys.SessionHash(session))
+		n.SetExpiresAt(s.now().Add(auth.StaffSessionTTL))
+		if _, err := n.Insert(ctx, tx); err != nil {
 			return err
 		}
 		out.Staff, err = staffProto(ctx, tx, m.staffID)
@@ -220,10 +224,8 @@ func (s *tenantService) SwitchTenant(ctx context.Context, req *connect.Request[v
 		return nil, s.internal(ctx, "SwitchTenant", err)
 	}
 	if token := auth.CookieValue(req.Header(), auth.StaffCookie); secure.ValidToken(token) {
-		if err := s.tx(ctx, func(tx pgx.Tx) error {
-			_, err := tx.Exec(ctx, `UPDATE staff_sessions SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`,
-				s.Keys.SessionHash(token))
-			return err
+		if err := s.tx(ctx, func(tx *db.Tx) error {
+			return revokeSessions(ctx, tx, staffsession.TokenHash.Eq(s.Keys.SessionHash(token)))
 		}); err != nil {
 			return nil, s.internal(ctx, "SwitchTenant", err)
 		}
@@ -254,9 +256,16 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 	}
 	p := auth.From(ctx)
 	var email, staffName, here string
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT s.email, s.name, t.region FROM staff s JOIN tenants t ON t.id = s.tenant_id
-			WHERE s.id = $1`, p.StaffID).Scan(&email, &staffName, &here)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		rows, err := staff.New().IDEq(key(p.StaffID)).Limit(1).AllWithTenant(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return notFound("staff member")
+		}
+		email, staffName, here = rows[0].Email, rows[0].Name, rows[0].Region
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "CreateTenant", err)
@@ -271,17 +280,25 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 	m := membership{tenant: db.TenantID(uuid.NewString()), name: name, region: region}
 	// Row-level security lets a transaction insert only its own tenant's
 	// rows, the new tenant included: it is scoped to the new id first.
-	err = s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO tenants (id, name, region) VALUES (am_tenant(), $1, $2)`, name, region); err != nil {
+	err = s.DB.InTenant(ctx, m.tenant, func(tx *db.Tx) error {
+		t := tenant.Create()
+		t.SetID(tx.Tenant())
+		t.SetName(name)
+		t.SetRegion(region)
+		if _, err := t.Insert(ctx, tx); err != nil {
 			return err
 		}
-		var adminID string
-		if err := tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email, name, role) VALUES (am_tenant(), $1, $2, 'admin')
-			RETURNING id`, adminEmail, adminName).Scan(&adminID); err != nil {
+		a := staff.Create()
+		a.SetTenantID(tx.Tenant())
+		a.SetEmail(adminEmail)
+		a.SetName(adminName)
+		a.SetRole(auth.RoleAdmin)
+		admin, err := a.Insert(ctx, tx)
+		if err != nil {
 			return err
 		}
 		if mine {
-			m.staffID, m.role = adminID, auth.RoleAdmin
+			m.staffID, m.role = idText(admin.ID), auth.RoleAdmin
 		}
 		if err := audit(m.in(ctx), tx, "tenant.created", string(m.tenant), map[string]any{
 			"name": name, "region": region, "from": string(p.Tenant), "admin": adminEmail,
@@ -294,7 +311,7 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 		return s.accessMail(ctx, tx, adminEmail, name)
 	})
 	if err == nil {
-		err = s.tx(ctx, func(tx pgx.Tx) error {
+		err = s.tx(ctx, func(tx *db.Tx) error {
 			return audit(ctx, tx, "tenant.created", string(m.tenant), map[string]any{"name": name, "region": region, "admin": adminEmail})
 		})
 	}
@@ -305,7 +322,7 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 }
 
 // accessMail tells someone they can now work in a tenant.
-func (s *Server) accessMail(ctx context.Context, tx pgx.Tx, email, tenant string) error {
+func (s *Server) accessMail(ctx context.Context, tx *db.Tx, email, tenant string) error {
 	return s.queueMail(ctx, tx, "staff-access", email, "Anda mendapat akses ke "+tenant+" di AssessMatrix",
 		"Anda sekarang dapat bekerja di "+tenant+" di AssessMatrix.\n\nMasuk dengan alamat email ini di "+
 			strings.TrimRight(s.PublicURL, "/")+"/ ; kode masuk akan dikirim ke email ini.")
@@ -318,22 +335,46 @@ type staffRow struct {
 }
 
 // staffIn lists the active staff of one tenant, by address.
-func staffIn(ctx context.Context, tx pgx.Tx) ([]staffRow, error) {
-	rows, err := tx.Query(ctx, `SELECT lower(email), name, role, am_super_admin(email) FROM staff WHERE disabled_at IS NULL
-		ORDER BY lower(email) LIMIT $1`, maxStaffInTenant)
+func staffIn(ctx context.Context, tx *db.Tx) ([]staffRow, error) {
+	rows, err := staff.New().Where(staff.DisabledAt.IsNull()).Unordered().Limit(maxStaffInTenant).All(ctx, tx, nil)
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	out := make([]staffRow, len(rows))
+	emails := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = staffRow{email: strings.ToLower(r.Email), name: r.Name, role: r.Role}
+		emails[i] = r.Email
+	}
+	supers, err := queries.SuperAdmins.Query(ctx, tx, emails)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []staffRow
-	for rows.Next() {
-		var r staffRow
-		if err := rows.Scan(&r.email, &r.name, &r.role, &r.super); err != nil {
-			return nil, err
+	for _, sa := range supers {
+		for i := range out {
+			if out[i].email == strings.ToLower(sa.Email) {
+				out[i].super = true
+			}
 		}
-		out = append(out, r)
 	}
-	return out, rows.Err()
+	slices.SortFunc(out, func(a, b staffRow) int { return strings.Compare(a.email, b.email) })
+	return out, nil
+}
+
+// revokeSessions ends every live staff session matching where.
+func revokeSessions(ctx context.Context, tx *db.Tx, where staffsession.Pred) error {
+	return drain(ctx, tx, func() ([]runtime.BatchOp, error) {
+		live, err := staffsession.New().Where(where, staffsession.RevokedAt.IsNull()).Unordered().Limit(eraseBatch).All(ctx, tx, nil)
+		ops := make([]runtime.BatchOp, 0, len(live))
+		for _, r := range live {
+			m := staffsession.Mutate(r)
+			m.SetRevokedAtNow()
+			if op, ok := m.UpdateOp(); ok {
+				ops = append(ops, op)
+			}
+		}
+		return ops, err
+	})
 }
 
 // access is ListAccess's table over the tenants the caller manages,
@@ -345,7 +386,7 @@ func (s *Server) access(ctx context.Context, managed []membership, only string) 
 		m := &managed[i]
 		out.Tenants = append(out.Tenants, m.proto(auth.From(ctx).Tenant))
 		var rows []staffRow
-		err := s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) (err error) {
+		err := s.DB.InTenant(ctx, m.tenant, func(tx *db.Tx) (err error) {
 			rows, err = staffIn(ctx, tx)
 			return err
 		})
@@ -430,32 +471,24 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 		return nil, err
 	}
 	var added bool
-	err = s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) error {
+	err = s.DB.InTenant(ctx, m.tenant, func(tx *db.Tx) error {
 		// One change to a tenant's administrators at a time, so two admins
 		// demoting each other cannot both pass the last-admin check.
-		if _, err := tx.Exec(ctx, `SELECT 1 FROM tenants WHERE id = am_tenant() FOR UPDATE`); err != nil {
+		if err := lockTenant(ctx, tx); err != nil {
 			return err
 		}
-		var (
-			id      string
-			was     string
-			active  bool
-			current = true
-		)
-		err := tx.QueryRow(ctx, `SELECT id, role, disabled_at IS NULL FROM staff WHERE lower(email) = $1 FOR UPDATE`, email).
-			Scan(&id, &was, &active)
-		if errors.Is(err, pgx.ErrNoRows) {
-			current = false
-		} else if err != nil {
+		row, current, err := staff.New().Where(staff.Email.EqLower(email)).ForUpdate().One(ctx, tx)
+		if err != nil {
 			return err
 		}
+		id, was, active := idText(row.ID), row.Role, !row.DisabledAt.Valid
 		if current && active && was == auth.RoleAdmin && !super {
 			return errAdminsBySuper
 		}
 		if current && active && was == auth.RoleAdmin && role != auth.RoleAdmin {
-			var others int
-			if err := tx.QueryRow(ctx, `SELECT count(*) FROM staff WHERE role = 'admin' AND disabled_at IS NULL AND id <> $1`, id).
-				Scan(&others); err != nil {
+			others, err := staff.New().
+				Where(staff.Role.Eq(auth.RoleAdmin), staff.DisabledAt.IsNull(), staff.ID.NotEq(row.ID)).Count(ctx, tx)
+			if err != nil {
 				return err
 			}
 			if others == 0 {
@@ -466,22 +499,41 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 			if !current || !active {
 				return nil
 			}
-			if _, err := tx.Exec(ctx, `UPDATE staff SET disabled_at = now() WHERE id = $1`, id); err != nil {
+			off := staff.Mutate(row)
+			off.SetDisabledAtNow()
+			if err := off.Update(ctx, tx); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `UPDATE staff_sessions SET revoked_at = now() WHERE staff_id = $1 AND revoked_at IS NULL`, id); err != nil {
+			if err := revokeSessions(ctx, tx, staffsession.StaffID.Eq(row.ID)); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `DELETE FROM staff_codes WHERE staff_id = $1`, id); err != nil {
+			if err := staffcode.Delete(ctx, tx, row.ID); err != nil && !noRow(err) {
 				return err
 			}
 			return audit(m.in(ctx), tx, "staff.access", id, map[string]any{"email": email, "role": "none", "was": was, "by": by})
 		}
-		if err := tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email, name, role) VALUES (am_tenant(), $1, $2, $3)
-			ON CONFLICT (tenant_id, lower(email)) DO UPDATE SET role = excluded.role, disabled_at = NULL,
-				name = CASE WHEN excluded.name <> '' THEN excluded.name ELSE staff.name END
-			RETURNING id`, email, name, role).Scan(&id); err != nil {
-			return err
+		if current {
+			// The row is locked, so re-granting cannot race a second grant.
+			up := staff.Mutate(row)
+			up.SetRole(role)
+			up.SetDisabledAtNull()
+			if name != "" {
+				up.SetName(name)
+			}
+			if err := up.Update(ctx, tx); err != nil {
+				return err
+			}
+		} else {
+			n := staff.Create()
+			n.SetTenantID(tx.Tenant())
+			n.SetEmail(email)
+			n.SetName(name)
+			n.SetRole(role)
+			made, err := n.Insert(ctx, tx)
+			if err != nil {
+				return err
+			}
+			id = idText(made.ID)
 		}
 		if !current || !active {
 			was, added = "none", true
@@ -500,12 +552,11 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 	// Their grants only: read just the managed tenants they are in, not
 	// every tenant a super administrator could see.
 	var theirs []string
-	err = s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT tenant_id::text FROM am_staff_tenants($1)`, email)
-		if err != nil {
-			return err
+	err = s.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		rows, err := queries.StaffTenants.Query(ctx, tx, email)
+		for _, r := range rows {
+			theirs = append(theirs, idText(r.TenantID))
 		}
-		theirs, err = pgx.CollectRows(rows, pgx.RowTo[string])
 		return err
 	})
 	if err != nil {
@@ -526,21 +577,28 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 /* ── sharing instruments ───────────────────────────────────────────────── */
 
 // copyIn reads the copy of an original held by the tenant tx is scoped to.
-func copyIn(ctx context.Context, tx pgx.Tx, m *membership, sourceID string) (*v1.ExamCopy, error) {
+func copyIn(ctx context.Context, tx *db.Tx, m *membership, sourceID string) (*v1.ExamCopy, error) {
 	c := &v1.ExamCopy{TenantId: string(m.tenant), TenantName: m.name}
-	var status int16
-	err := tx.QueryRow(ctx, `SELECT id, source_version, published_version, status FROM exams WHERE source_exam_id = $1`, sourceID).
-		Scan(&c.ExamId, &c.SourceVersion, &c.PublishedVersion, &status)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return c, nil
+	r, ok, err := sharedCopy(ctx, tx, sourceID, false)
+	if err != nil || !ok {
+		return c, err
 	}
-	c.Status = v1.Status(status)
-	return c, err
+	c.ExamId, c.SourceVersion, c.PublishedVersion, c.Status = idText(r.ID), r.SourceVersion.V, r.PublishedVersion, v1.Status(r.Status)
+	return c, nil
+}
+
+// sharedCopy reads the tenant's copy of an original, if it holds one.
+func sharedCopy(ctx context.Context, tx *db.Tx, sourceID string, lock bool) (exam.Row, bool, error) {
+	q := exam.New().Where(exam.SourceExamID.Eq(key(sourceID)))
+	if lock {
+		q = q.ForUpdate()
+	}
+	return q.One(ctx, tx)
 }
 
 func (s *tenantService) ListExamCopies(ctx context.Context, req *connect.Request[v1.ListExamCopiesRequest]) (*connect.Response[v1.ListExamCopiesResponse], error) {
 	id := req.Msg.GetExamId()
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		_, err := getExam(ctx, tx, id, false)
 		return err
 	})
@@ -557,7 +615,7 @@ func (s *tenantService) ListExamCopies(ctx context.Context, req *connect.Request
 		if m.role != auth.RoleAdmin || m.tenant == auth.From(ctx).Tenant {
 			continue
 		}
-		err := s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) error {
+		err := s.DB.InTenant(ctx, m.tenant, func(tx *db.Tx) error {
 			c, err := copyIn(ctx, tx, m, id)
 			out.Copies = append(out.Copies, c)
 			return err
@@ -610,7 +668,7 @@ func (s *tenantService) ShareExam(ctx context.Context, req *connect.Request[v1.S
 		return nil, invalidArg(fmt.Errorf("share with at most %d tenants at a time", maxShareTargets))
 	}
 	src := &original{tenant: auth.From(ctx).Tenant}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		e, err := getExam(ctx, tx, req.Msg.GetExamId(), false)
 		if err != nil {
 			return err
@@ -626,9 +684,14 @@ func (s *tenantService) ShareExam(ctx context.Context, req *connect.Request[v1.S
 			return err
 		}
 		src.exam.Id = e.GetId()
-		if err := tx.QueryRow(ctx, `SELECT name FROM tenants WHERE id = am_tenant()`).Scan(&src.tenantName); err != nil {
+		here, ok, err := tenant.New().IDEq(tx.Tenant()).One(ctx, tx)
+		if err != nil {
 			return err
 		}
+		if !ok {
+			return notFound("tenant")
+		}
+		src.tenantName = here.Name
 		seen := map[string]bool{}
 		var missing error
 		uploadedImages(src.exam, func(m *v1.Media) {
@@ -637,16 +700,15 @@ func (s *tenantService) ShareExam(ctx context.Context, req *connect.Request[v1.S
 				return
 			}
 			seen[id] = true
-			img := sharedImage{url: m.GetUrl()}
-			err := tx.QueryRow(ctx, `SELECT content_type, bytes, sha256 FROM media WHERE id = $1`, id).Scan(&img.contentType, &img.bytes, &img.sha)
-			if errors.Is(err, pgx.ErrNoRows) {
-				return // already broken here; the copy shows it broken too
-			}
+			row, ok, err := mediarow.New().IDEq(key(id)).One(ctx, tx)
 			if err != nil {
 				missing = err
 				return
 			}
-			src.images = append(src.images, img)
+			if !ok {
+				return // already broken here; the copy shows it broken too
+			}
+			src.images = append(src.images, sharedImage{url: m.GetUrl(), contentType: row.ContentType, bytes: row.Bytes, sha: row.Sha256})
 		})
 		return missing
 	})
@@ -683,7 +745,7 @@ func (s *tenantService) ShareExam(ctx context.Context, req *connect.Request[v1.S
 		shared = append(shared, id)
 	}
 	if len(shared) > 0 {
-		err := s.tx(ctx, func(tx pgx.Tx) error {
+		err := s.tx(ctx, func(tx *db.Tx) error {
 			return audit(ctx, tx, "exam.shared", src.exam.GetId(), map[string]any{"version": src.version, "tenants": shared})
 		})
 		if err != nil {
@@ -705,16 +767,16 @@ func (s *tenantService) shareInto(ctx context.Context, src *original, m *members
 	}
 	ctx = m.in(ctx)
 	var out *v1.ExamCopy
-	err := s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) error {
-		var (
-			copyID string
-			at     int32
-		)
-		err := tx.QueryRow(ctx, `SELECT id, source_version FROM exams WHERE source_exam_id = $1 FOR UPDATE`, src.exam.GetId()).
-			Scan(&copyID, &at)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	err := s.DB.InTenant(ctx, m.tenant, func(tx *db.Tx) error {
+		held, ok, err := sharedCopy(ctx, tx, src.exam.GetId(), true)
+		if err != nil {
 			return err
 		}
+		var copyID string
+		if ok {
+			copyID = idText(held.ID)
+		}
+		at := held.SourceVersion.V
 		next := proto.Clone(src.exam).(*v1.Exam)
 		next.SharedFrom = nil
 		urls := map[string]string{}
@@ -751,8 +813,11 @@ func (s *tenantService) shareInto(ctx context.Context, src *original, m *members
 		if _, err := writeExam(ctx, tx, next); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE exams SET source_exam_id = $2, source_version = $3, source_tenant_name = $4 WHERE id = $1`,
-			cur.GetId(), src.exam.GetId(), src.version, src.tenantName); err != nil {
+		from := exam.MutateKey(key(cur.GetId()))
+		from.SetSourceExamID(key(src.exam.GetId()))
+		from.SetSourceVersion(src.version)
+		from.SetSourceTenantName(src.tenantName)
+		if err := from.Update(ctx, tx); err != nil {
 			return err
 		}
 		published, err := getExam(ctx, tx, cur.GetId(), false)
@@ -775,14 +840,14 @@ func (s *tenantService) shareInto(ctx context.Context, src *original, m *members
 
 // copyImage puts one of the original's images in the tenant tx is scoped to
 // and returns its URL there.
-func (s *tenantService) copyImage(ctx context.Context, tx pgx.Tx, from db.TenantID, img sharedImage) (string, error) {
-	var id string
-	err := tx.QueryRow(ctx, `SELECT id FROM media WHERE sha256 = $1 AND content_type = $2 LIMIT 1`, img.sha, img.contentType).Scan(&id)
-	if err == nil {
-		return MediaPrefix + id, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+func (s *tenantService) copyImage(ctx context.Context, tx *db.Tx, from db.TenantID, img sharedImage) (string, error) {
+	held, ok, err := mediarow.New().
+		Where(mediarow.Sha256.Eq(img.sha), mediarow.ContentType.Eq(img.contentType)).Unordered().One(ctx, tx)
+	if err != nil {
 		return "", err
+	}
+	if ok {
+		return MediaPrefix + idText(held.ID), nil
 	}
 	srcKey, err := media.Key(string(from), strings.TrimPrefix(img.url, MediaPrefix))
 	if err != nil {
@@ -801,16 +866,23 @@ func (s *tenantService) copyImage(ctx context.Context, tx pgx.Tx, from db.Tenant
 		return "", fmt.Errorf("image %s is larger than an upload may be", srcKey)
 	}
 	p := auth.From(ctx)
-	if err := tx.QueryRow(ctx, `INSERT INTO media (tenant_id, content_type, bytes, sha256, uploaded_by)
-		VALUES (am_tenant(), $1, $2, $3, $4) RETURNING id`, img.contentType, len(body), img.sha, "staff:"+p.StaffID).Scan(&id); err != nil {
+	n := mediarow.Create()
+	n.SetTenantID(tx.Tenant())
+	n.SetContentType(img.contentType)
+	n.SetBytes(int32(len(body)))
+	n.SetSha256(img.sha)
+	n.SetUploadedBy("staff:" + p.StaffID)
+	row, err := n.Insert(ctx, tx)
+	if err != nil {
 		return "", err
 	}
-	key, err := media.Key(string(p.Tenant), id)
+	id := idText(row.ID)
+	k, err := media.Key(string(p.Tenant), id)
 	if err != nil {
 		return "", err
 	}
 	// Stored before the row commits, as an upload is.
-	if err := s.Media.Put(ctx, key, img.contentType, body); err != nil {
+	if err := s.Media.Put(ctx, k, img.contentType, body); err != nil {
 		return "", err
 	}
 	return MediaPrefix + id, nil

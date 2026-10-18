@@ -378,8 +378,8 @@ func TestNoTenantSeesNothing(t *testing.T) {
 	for _, table := range []string{"tenants", "staff", "exams", "people", "assignments", "attempts", "attempt_events", "outbox", "audit_log",
 		"webhook_endpoints", "webhook_events", "webhook_deliveries"} {
 		var n int
-		err := h.srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-			return tx.QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()).Scan(&n)
+		err := h.srv.DB.Unscoped(ctx, func(tx *db.Tx) error {
+			return tx.Pgx().QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()).Scan(&n)
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -389,8 +389,8 @@ func TestNoTenantSeesNothing(t *testing.T) {
 		}
 	}
 	var other int
-	err := h.srv.DB.InTenant(ctx, db.TenantID("00000000-0000-0000-0000-000000000000"), func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT count(*) FROM exams`).Scan(&other)
+	err := h.srv.DB.InTenant(ctx, db.TenantID("00000000-0000-0000-0000-000000000000"), func(tx *db.Tx) error {
+		return tx.Pgx().QueryRow(ctx, `SELECT count(*) FROM exams`).Scan(&other)
 	})
 	if err != nil || other != 0 {
 		t.Errorf("a tenant with no data sees %d exams (err %v)", other, err)

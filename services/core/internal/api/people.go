@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
+
+	"github.com/gsoultan/storm/runtime"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/person"
 )
 
 type personService struct{ *Server }
@@ -17,14 +20,19 @@ type personService struct{ *Server }
 // MaxRosterRows matches the roster file cap in docs/08.
 const MaxRosterRows = 5000
 
-func scanPerson(row pgx.Row) (*v1.Person, error) {
-	var p v1.Person
-	var at time.Time
-	if err := row.Scan(&p.Id, &p.Name, &p.Email, &p.Group, &at); err != nil {
-		return nil, err
-	}
-	p.CreatedAt = at.UnixMilli()
-	return &p, nil
+// personOf is the API's view of a roster row.
+func personOf(r person.Row) *v1.Person {
+	return &v1.Person{Id: idText(r.ID), Name: r.Name, Email: r.Email, Group: r.GroupName, CreatedAt: r.CreatedAt.UnixMilli()}
+}
+
+// newPerson stages a roster row from a cleaned draft.
+func newPerson(tx *db.Tx, d *v1.PersonDraft) person.Ins {
+	n := person.Create()
+	n.SetTenantID(tx.Tenant())
+	n.SetName(d.Name)
+	n.SetEmail(d.Email)
+	n.SetGroupName(d.Group)
+	return n
 }
 
 // cleanDraft trims a draft and checks it is a usable address. The schema
@@ -48,20 +56,15 @@ func cleanDraft(d *v1.PersonDraft) (*v1.PersonDraft, error) {
 
 func (s *personService) ListPeople(ctx context.Context, _ *connect.Request[v1.ListPeopleRequest]) (*connect.Response[v1.ListPeopleResponse], error) {
 	var out []*v1.Person
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT id, name, email, grp, created_at FROM people ORDER BY created_at DESC LIMIT 50000`)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		rows, err := person.New().Order(person.CreatedAt.Desc(), person.ID.Asc()).Limit(50000).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			p, err := scanPerson(rows)
-			if err != nil {
-				return err
-			}
-			out = append(out, p)
+		for _, r := range rows {
+			out = append(out, personOf(r))
 		}
-		return rows.Err()
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "ListPeople", err)
@@ -75,15 +78,16 @@ func (s *personService) AddPerson(ctx context.Context, req *connect.Request[v1.A
 		return nil, err
 	}
 	var p *v1.Person
-	err = s.tx(ctx, func(tx pgx.Tx) (err error) {
-		p, err = scanPerson(tx.QueryRow(ctx, `INSERT INTO people (tenant_id, name, email, grp)
-			VALUES (am_tenant(), $1, $2, $3) RETURNING id, name, email, grp, created_at`, d.Name, d.Email, d.Group))
+	err = s.tx(ctx, func(tx *db.Tx) (err error) {
+		n := newPerson(tx, d)
+		r, err := n.Insert(ctx, tx)
 		if isUniqueViolation(err) {
 			return connect.NewError(connect.CodeAlreadyExists, errors.New("someone with that email is already on the roster"))
 		}
 		if err != nil {
 			return err
 		}
+		p = personOf(r)
 		return audit(ctx, tx, "person.added", p.GetId(), nil)
 	})
 	if err != nil {
@@ -93,35 +97,38 @@ func (s *personService) AddPerson(ctx context.Context, req *connect.Request[v1.A
 }
 
 // ensure puts every draft on the roster once and returns ids in input order.
-func ensure(ctx context.Context, tx pgx.Tx, drafts []*v1.PersonDraft) (ids []string, created int32, people []*v1.Person, err error) {
+func ensure(ctx context.Context, tx *db.Tx, drafts []*v1.PersonDraft) (ids []string, created int32, people []*v1.Person, err error) {
 	seen := map[string]bool{}
 	for _, raw := range drafts {
 		d, err := cleanDraft(raw)
 		if err != nil {
 			return nil, 0, nil, err
 		}
-		key := strings.ToLower(d.Email)
-		if seen[key] {
+		lower := strings.ToLower(d.Email)
+		if seen[lower] {
 			continue
 		}
-		seen[key] = true
-		// Insert if new; either way return the row. xmax = 0 marks a fresh insert.
-		var inserted bool
-		var p v1.Person
-		var at time.Time
-		err = tx.QueryRow(ctx, `INSERT INTO people (tenant_id, name, email, grp) VALUES (am_tenant(), $1, $2, $3)
-			ON CONFLICT (tenant_id, lower(email)) DO UPDATE SET email = people.email
-			RETURNING id, name, email, grp, created_at, (xmax = 0)`, d.Name, d.Email, d.Group).
-			Scan(&p.Id, &p.Name, &p.Email, &p.Group, &at, &inserted)
-		if err != nil {
+		seen[lower] = true
+		// Insert if new; someone already on the roster keeps their row.
+		n := newPerson(tx, d)
+		r, err := n.OnConflictTenantIDLowerEmail().DoNothing().Insert(ctx, tx)
+		switch {
+		case err == nil:
+			created++
+		case errors.Is(err, runtime.ErrConflict):
+			var ok bool
+			if r, ok, err = person.New().Where(person.Email.EqLower(d.Email)).One(ctx, tx); err != nil {
+				return nil, 0, nil, err
+			}
+			if !ok { // deleted between the two statements
+				return nil, 0, nil, connect.NewError(connect.CodeAborted, errors.New("the roster changed; try again"))
+			}
+		default:
 			return nil, 0, nil, err
 		}
-		p.CreatedAt = at.UnixMilli()
-		if inserted {
-			created++
-		}
+		p := personOf(r)
 		ids = append(ids, p.Id)
-		people = append(people, &p)
+		people = append(people, p)
 	}
 	return ids, created, people, nil
 }
@@ -131,7 +138,7 @@ func (s *personService) EnsurePeople(ctx context.Context, req *connect.Request[v
 		return nil, invalidArg(errors.New("at most 5,000 people at once"))
 	}
 	var out v1.EnsurePeopleResponse
-	err := s.tx(ctx, func(tx pgx.Tx) (err error) {
+	err := s.tx(ctx, func(tx *db.Tx) (err error) {
 		out.Ids, out.Created, out.People, err = ensure(ctx, tx, req.Msg.GetPeople())
 		if err != nil {
 			return err
@@ -149,21 +156,19 @@ func (s *personService) DeletePerson(ctx context.Context, req *connect.Request[v
 	if !validUUID(id) {
 		return nil, notFound("person")
 	}
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		var sat bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM attempts WHERE person_id = $1)`, id).Scan(&sat); err != nil {
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		sat, err := attempt.New().Where(attempt.PersonID.Eq(key(id))).Exists(ctx, tx)
+		if err != nil {
 			return err
 		}
 		if sat {
 			return failedPrecondition("this person has sat an instrument; their attempts are evidence and cannot be deleted from here")
 		}
 		// Their assignments go with them: no dangling invitations.
-		tag, err := tx.Exec(ctx, `DELETE FROM people WHERE id = $1`, id)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 0 {
+		if err := person.Delete(ctx, tx, key(id)); noRow(err) {
 			return notFound("person")
+		} else if err != nil {
+			return err
 		}
 		return audit(ctx, tx, "person.deleted", id, nil)
 	})

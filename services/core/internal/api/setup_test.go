@@ -216,8 +216,8 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 	}
 
 	// The serving role cannot make organisations by itself, setup or not.
-	err := srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `SELECT am_create_tenant('Rogue', 'id', 'x@example.test', '')`)
+	err := srv.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		_, err := tx.Pgx().Exec(ctx, `SELECT am_create_tenant('Rogue', 'id', 'x@example.test', '')`)
 		return err
 	})
 	var pg *pgconn.PgError
@@ -225,8 +225,8 @@ func TestFirstRunSetupHappensOnce(t *testing.T) {
 		t.Fatalf("the app role calling am_create_tenant: got %v, want permission denied", err)
 	}
 	// Nor make itself a super administrator.
-	err = srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO super_admins (email) VALUES ('x@example.test')`)
+	err = srv.DB.Unscoped(ctx, func(tx *db.Tx) error {
+		_, err := tx.Pgx().Exec(ctx, `INSERT INTO super_admins (email) VALUES ('x@example.test')`)
 		return err
 	})
 	if !errors.As(err, &pg) || pg.Code != "42501" {

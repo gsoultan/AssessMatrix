@@ -1,5 +1,10 @@
 // Package db owns the Postgres connection, the tenant-scoped transaction every
 // query runs in, and the schema migrations.
+//
+// Queries go through storm: the typed packages under internal/store, and the
+// declared statements in internal/store/queries for what those cannot say.
+// Only the migration runner below speaks SQL directly, because a migration is
+// SQL.
 package db
 
 import (
@@ -15,6 +20,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
+
+	"github.com/gsoultan/storm"
+	"github.com/gsoultan/storm/runtime"
+	"github.com/gsoultan/storm/runtime/pgxdrv"
+
+	// The generated scanners and the registry of declared statements.
+	_ "github.com/gsoultan/assessmatrix/services/core/internal/store"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
 )
 
 //go:embed migrations/*.sql
@@ -28,6 +41,41 @@ type TenantID string
 type DB struct {
 	Pool *pgxpool.Pool
 }
+
+// Tx is one transaction. Every storm query and write takes it as its
+// Executor; River, which enqueues jobs in the same transaction, takes Pgx.
+type Tx struct {
+	ex     pgxdrv.Tx
+	tenant storm.UUID
+}
+
+func (t *Tx) Query(ctx context.Context, sql string, args []any) (runtime.Rows, error) {
+	return t.ex.Query(ctx, sql, args)
+}
+
+func (t *Tx) Exec(ctx context.Context, sql string, args []any) (int64, error) {
+	return t.ex.Exec(ctx, sql, args)
+}
+
+func (t *Tx) CopyFrom(ctx context.Context, table string, cols []string, src runtime.CopySource) (int64, error) {
+	return t.ex.CopyFrom(ctx, table, cols, src)
+}
+
+func (t *Tx) Batch(ctx context.Context, ops []runtime.BatchOp, each func(int, runtime.Rows, int64, error) error) error {
+	return t.ex.Batch(ctx, ops, each)
+}
+
+// Pgx is the transaction underneath, for River's InsertTx.
+func (t *Tx) Pgx() pgx.Tx { return t.ex.T }
+
+// Tenant is the tenant the transaction is scoped to: the value every row it
+// inserts carries, and the only one row-level security lets it write. Zero in
+// an unscoped transaction.
+func (t *Tx) Tenant() storm.UUID { return t.tenant }
+
+// Conn adapts a single connection, such as the owner's in `core tenant`, to
+// the same Executor.
+func Conn(c *pgx.Conn) runtime.Executor { return pgxdrv.Conn{C: c} }
 
 func Open(ctx context.Context, url string) (*DB, error) {
 	cfg, err := pgxpool.ParseConfig(url)
@@ -47,45 +95,68 @@ func Open(ctx context.Context, url string) (*DB, error) {
 
 func (d *DB) Close() { d.Pool.Close() }
 
+// Executor runs a statement outside any transaction, for reads that need
+// none (the schema version, whether setup is open).
+func (d *DB) Executor() runtime.Executor { return pgxdrv.Pool{P: d.Pool} }
+
 // ErrPrivilegedRole means the core is connected as a role that RLS would not
 // stop. Starting anyway would make tenant isolation a matter of luck.
 var ErrPrivilegedRole = errors.New("database role can bypass row-level security")
 
 // CheckRole refuses a superuser, a BYPASSRLS role, or the owner of any table.
 func (d *DB) CheckRole(ctx context.Context) error {
-	var super, bypass bool
-	var owns int
-	err := d.Pool.QueryRow(ctx, `
-		SELECT r.rolsuper, r.rolbypassrls,
-		       (SELECT count(*) FROM pg_tables t WHERE t.schemaname = 'public' AND t.tableowner = current_user)
-		FROM pg_roles r WHERE r.rolname = current_user`).Scan(&super, &bypass, &owns)
+	r, _, err := queries.CurrentRole.One(ctx, d.Executor())
 	if err != nil {
 		return fmt.Errorf("inspect database role: %w", err)
 	}
-	if super || bypass || owns > 0 {
-		return fmt.Errorf("%w (superuser=%t bypassrls=%t owns_tables=%d)", ErrPrivilegedRole, super, bypass, owns)
+	if r.Super || r.Bypass || r.OwnsTables > 0 {
+		return fmt.Errorf("%w (superuser=%t bypassrls=%t owns_tables=%d)", ErrPrivilegedRole, r.Super, r.Bypass, r.OwnsTables)
 	}
 	return nil
 }
 
 // InTenant runs fn in a transaction scoped to one tenant. The setting is
 // transaction-local, so it cannot leak to the next user of the connection.
-func (d *DB) InTenant(ctx context.Context, tenant TenantID, fn func(pgx.Tx) error) error {
+func (d *DB) InTenant(ctx context.Context, tenant TenantID, fn func(*Tx) error) error {
 	if tenant == "" {
 		return errors.New("db: InTenant called without a tenant")
 	}
-	return pgx.BeginFunc(ctx, d.Pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, string(tenant)); err != nil {
-			return fmt.Errorf("scope transaction to tenant: %w", err)
+	id, err := storm.ParseUUID(string(tenant))
+	if err != nil {
+		return fmt.Errorf("db: InTenant called with tenant %q: %w", tenant, err)
+	}
+	return pgx.BeginFunc(ctx, d.Pool, func(ptx pgx.Tx) error {
+		tx := &Tx{ex: pgxdrv.Tx{T: ptx}}
+		if err := tx.scope(ctx, id); err != nil {
+			return err
 		}
 		return fn(tx)
 	})
 }
 
+// Scope moves an unscoped transaction into a tenant, for the one case that
+// learns its tenant mid-transaction: first-run setup, which creates it.
+func (t *Tx) Scope(ctx context.Context, tenant [16]byte) error {
+	if t.tenant != (storm.UUID{}) {
+		return errors.New("db: transaction is already scoped to a tenant")
+	}
+	return t.scope(ctx, tenant)
+}
+
+func (t *Tx) scope(ctx context.Context, tenant [16]byte) error {
+	if _, _, err := queries.ScopeToTenant.One(ctx, t, storm.UUID(tenant).String()); err != nil {
+		return fmt.Errorf("scope transaction to tenant: %w", err)
+	}
+	t.tenant = tenant
+	return nil
+}
+
 // Unscoped runs fn with no tenant. Under RLS it sees no tenant rows at all;
 // it exists for the SECURITY DEFINER lookups and River.
-func (d *DB) Unscoped(ctx context.Context, fn func(pgx.Tx) error) error {
-	return pgx.BeginFunc(ctx, d.Pool, fn)
+func (d *DB) Unscoped(ctx context.Context, fn func(*Tx) error) error {
+	return pgx.BeginFunc(ctx, d.Pool, func(ptx pgx.Tx) error {
+		return fn(&Tx{ex: pgxdrv.Tx{T: ptx}})
+	})
 }
 
 // Migrate applies pending migrations as the schema owner, then grants the

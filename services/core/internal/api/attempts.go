@@ -5,13 +5,15 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attemptevent"
 )
 
 // Bounds on what one attempt can store.
@@ -35,28 +37,43 @@ type attemptRow struct {
 	PurgedAt *time.Time
 }
 
-const attemptColumns = `id, assignment_id, exam_id, person_id, exam_version, started_at, deadline_at, submitted_at, score, last_seq, last_hash, purged_at`
-
-func scanAttempt(row pgx.Row) (*attemptRow, error) {
-	var a attemptRow
-	err := row.Scan(&a.ID, &a.AssignmentID, &a.ExamID, &a.PersonID, &a.ExamVersion, &a.StartedAt, &a.DeadlineAt,
-		&a.SubmittedAt, &a.Score, &a.LastSeq, &a.LastHash, &a.PurgedAt)
-	return &a, err
+func attemptOf(r attempt.Row) *attemptRow {
+	a := &attemptRow{
+		ID: idText(r.ID), AssignmentID: idText(r.AssignmentID), ExamID: idText(r.ExamID), PersonID: idText(r.PersonID),
+		ExamVersion: r.ExamVersion, StartedAt: r.StartedAt, DeadlineAt: optTime(r.DeadlineAt),
+		SubmittedAt: optTime(r.SubmittedAt), LastSeq: r.LastSeq, LastHash: r.LastHash, PurgedAt: optTime(r.PurgedAt),
+	}
+	if sc, ok := r.Score.Get(); ok {
+		a.Score = sc
+	}
+	return a
 }
 
-func attemptBy(ctx context.Context, tx pgx.Tx, column, value string, lock bool) (*attemptRow, error) {
+// attemptBy reads one attempt by its id or by its assignment's.
+func attemptBy(ctx context.Context, tx *db.Tx, column, value string, lock bool) (*attemptRow, error) {
 	if !validUUID(value) {
 		return nil, notFound("attempt")
 	}
-	q := `SELECT ` + attemptColumns + ` FROM attempts WHERE ` + column + ` = $1`
-	if lock {
-		q += ` FOR UPDATE`
+	q := attempt.New()
+	switch column {
+	case "id":
+		q = q.IDEq(key(value))
+	case "assignment_id":
+		q = q.AssignmentIDEq(key(value))
+	default:
+		return nil, errors.New("attemptBy: unknown column " + column)
 	}
-	a, err := scanAttempt(tx.QueryRow(ctx, q, value))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if lock {
+		q = q.ForUpdate()
+	}
+	r, ok, err := q.One(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
 		return nil, notFound("attempt")
 	}
-	return a, err
+	return attemptOf(r), nil
 }
 
 // open refuses any change to an attempt whose record was deleted: its
@@ -83,8 +100,9 @@ func eventBody(ev *v1.AttemptEvent) ([]byte, error) {
 
 // appendEvents writes events to the chain. The caller holds the attempt row
 // lock, so seq and prev_hash cannot race.
-func (s *Server) appendEvents(ctx context.Context, tx pgx.Tx, a *attemptRow, evs []*v1.AttemptEvent) error {
+func (s *Server) appendEvents(ctx context.Context, tx *db.Tx, a *attemptRow, evs []*v1.AttemptEvent) error {
 	now := s.now()
+	id := key(a.ID)
 	for _, ev := range evs {
 		a.LastSeq++
 		ev.Seq = a.LastSeq
@@ -94,14 +112,23 @@ func (s *Server) appendEvents(ctx context.Context, tx pgx.Tx, a *attemptRow, evs
 			return err
 		}
 		hash := s.Keys.ChainHash(a.LastHash, body)
-		if _, err := tx.Exec(ctx, `INSERT INTO attempt_events (tenant_id, attempt_id, seq, server_time, kind, body, hash)
-			VALUES (am_tenant(), $1, $2, $3, $4, $5, $6)`, a.ID, ev.Seq, now, ev.GetKind(), body, hash); err != nil {
+		n := attemptevent.Create()
+		n.SetTenantID(tx.Tenant())
+		n.SetAttemptID(id)
+		n.SetSeq(ev.Seq)
+		n.SetServerTime(now)
+		n.SetKind(ev.GetKind())
+		n.SetBody(body)
+		n.SetHash(hash)
+		if _, err := n.Insert(ctx, tx); err != nil {
 			return err
 		}
 		a.LastHash = hash
 	}
-	_, err := tx.Exec(ctx, `UPDATE attempts SET last_seq = $2, last_hash = $3 WHERE id = $1`, a.ID, a.LastSeq, a.LastHash)
-	return err
+	m := attempt.MutateKey(id)
+	m.SetLastSeq(a.LastSeq)
+	m.SetLastHash(a.LastHash)
+	return m.Update(ctx, tx)
 }
 
 // genesis is the chain's starting hash, bound to the attempt id so two
@@ -109,25 +136,23 @@ func (s *Server) appendEvents(ctx context.Context, tx pgx.Tx, a *attemptRow, evs
 func (s *Server) genesis(attemptID string) []byte { return s.Keys.ChainHash(nil, []byte(attemptID)) }
 
 // loadEvents reads the log and checks the chain as it goes.
-func (s *Server) loadEvents(ctx context.Context, tx pgx.Tx, a *attemptRow) (events []*v1.AttemptEvent, intact bool, brokenAt int64, err error) {
+func (s *Server) loadEvents(ctx context.Context, tx *db.Tx, a *attemptRow) (events []*v1.AttemptEvent, intact bool, brokenAt int64, err error) {
 	if a.PurgedAt != nil {
 		// Deleted on purpose, with an audit record; not a broken chain.
 		return nil, true, 0, nil
 	}
-	rows, err := tx.Query(ctx, `SELECT seq, body, hash FROM attempt_events WHERE attempt_id = $1 ORDER BY seq`, a.ID)
+	// One past the cap, so a log longer than any attempt may write still
+	// reads as more than the attempt row records, which is a break.
+	rows, err := attemptevent.New().AttemptIDEq(key(a.ID)).Order(attemptevent.Seq.Asc()).
+		Limit(MaxEventsPerTry+1).All(ctx, tx, nil)
 	if err != nil {
 		return nil, false, 0, err
 	}
-	defer rows.Close()
 	prev := s.genesis(a.ID)
 	intact = true
 	var expect int64 = 1
-	for rows.Next() {
-		var seq int64
-		var body, hash []byte
-		if err := rows.Scan(&seq, &body, &hash); err != nil {
-			return nil, false, 0, err
-		}
+	for _, r := range rows {
+		seq, body, hash := r.Seq, r.Body, r.Hash
 		var ev v1.AttemptEvent
 		if err := proto.Unmarshal(body, &ev); err != nil {
 			return nil, false, 0, err
@@ -138,9 +163,6 @@ func (s *Server) loadEvents(ctx context.Context, tx pgx.Tx, a *attemptRow) (even
 		}
 		prev, expect = hash, seq+1
 		events = append(events, &ev)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, false, 0, err
 	}
 	// A truncated log is a break too: the attempt row records how far it went.
 	if intact && expect-1 != a.LastSeq {

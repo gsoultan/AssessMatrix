@@ -2,15 +2,20 @@ package api
 
 import (
 	"bytes"
+	"cmp"
 	"context"
+	"slices"
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/person"
 )
 
 type proctorService struct{ *Server }
@@ -44,7 +49,7 @@ func (s *proctorService) WatchExam(ctx context.Context, req *connect.Request[v1.
 	if !validUUID(examID) {
 		return notFound("instrument")
 	}
-	if err := s.tx(ctx, func(tx pgx.Tx) error {
+	if err := s.tx(ctx, func(tx *db.Tx) error {
 		_, err := getExam(ctx, tx, examID, false)
 		return err
 	}); err != nil {
@@ -88,45 +93,9 @@ func (s *proctorService) WatchExam(ctx context.Context, req *connect.Request[v1.
 // flags. Only attempts whose log grew since the last call are re-read.
 func (s *proctorService) sittings(ctx context.Context, examID string, cache map[string]*sittingCache, versions map[int32]*v1.Exam) ([]*v1.Sitting, error) {
 	var out []*v1.Sitting
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT a.id, coalesce(nullif(p.name, ''), p.email), a.status, a.exam_version,
-				t.id, t.exam_version, t.started_at, t.submitted_at, coalesce(t.last_seq, 0), coalesce(a.score_pct, 0)
-			FROM assignments a
-			JOIN people p ON p.id = a.person_id
-			LEFT JOIN attempts t ON t.assignment_id = a.id
-			WHERE a.exam_id = $1
-			ORDER BY t.started_at DESC NULLS LAST, p.name, p.email
-			LIMIT $2`, examID, MaxSittings)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		all, err := sittingRows(ctx, tx, examID)
 		if err != nil {
-			return err
-		}
-		type row struct {
-			sit       *v1.Sitting
-			version   int32
-			attemptV  *int32
-			lastSeq   int64
-			started   *time.Time
-			submitted *time.Time
-		}
-		var all []row
-		for rows.Next() {
-			var r row
-			var status int16
-			var attemptID *string
-			var score int16
-			r.sit = &v1.Sitting{}
-			if err := rows.Scan(&r.sit.AssignmentId, &r.sit.PersonName, &status, &r.version,
-				&attemptID, &r.attemptV, &r.started, &r.submitted, &r.lastSeq, &score); err != nil {
-				return err
-			}
-			r.sit.Status = v1.AssignStatus(status)
-			r.sit.ScorePct = int32(score)
-			if attemptID != nil {
-				r.sit.AttemptId = *attemptID
-			}
-			all = append(all, r)
-		}
-		if err := rows.Err(); err != nil {
 			return err
 		}
 
@@ -181,4 +150,80 @@ func (s *proctorService) sittings(ctx context.Context, examID string, cache map[
 		return nil
 	})
 	return out, err
+}
+
+// sittingRow is one assignment of the exam, with its attempt if started.
+type sittingRow struct {
+	sit       *v1.Sitting
+	version   int32
+	attemptV  *int32
+	lastSeq   int64
+	started   *time.Time
+	submitted *time.Time
+	name      string
+	email     string
+}
+
+// maxExamRows bounds each read behind the sittings list; MaxSittings then
+// keeps the most recently started of them.
+const maxExamRows = 50_000
+
+// sittingRows is everyone assigned the exam, latest start first, then by name.
+func sittingRows(ctx context.Context, tx *db.Tx, examID string) ([]sittingRow, error) {
+	eid := key(examID)
+	as, err := assignment.New().Where(assignment.ExamID.Eq(eid)).Limit(maxExamRows).All(ctx, tx, nil)
+	if err != nil || len(as) == 0 {
+		return nil, err
+	}
+	ats, err := attempt.New().Where(attempt.ExamID.Eq(eid)).Limit(maxExamRows).All(ctx, tx, nil)
+	if err != nil {
+		return nil, err
+	}
+	byAssignment := make(map[[16]byte]attempt.Row, len(ats))
+	for _, t := range ats {
+		byAssignment[t.AssignmentID] = t
+	}
+	pids := make([][16]byte, 0, len(as))
+	for _, a := range as {
+		pids = append(pids, a.PersonID)
+	}
+	ps, err := person.New().IDIn(pids...).Limit(int64(len(pids))).All(ctx, tx, nil)
+	if err != nil {
+		return nil, err
+	}
+	people := make(map[[16]byte]person.Row, len(ps))
+	for _, p := range ps {
+		people[p.ID] = p
+	}
+	all := make([]sittingRow, 0, len(as))
+	for _, a := range as {
+		p, ok := people[a.PersonID]
+		if !ok {
+			continue // removed from the roster while we read
+		}
+		r := sittingRow{
+			sit: &v1.Sitting{AssignmentId: idText(a.ID), PersonName: cmp.Or(p.Name, p.Email),
+				Status: v1.AssignStatus(a.Status), ScorePct: int32(a.ScorePct.V)},
+			version: a.ExamVersion, name: p.Name, email: p.Email,
+		}
+		if t, ok := byAssignment[a.ID]; ok {
+			r.sit.AttemptId = idText(t.ID)
+			r.attemptV, r.lastSeq, r.started, r.submitted = &t.ExamVersion, t.LastSeq, &t.StartedAt, optTime(t.SubmittedAt)
+		}
+		all = append(all, r)
+	}
+	slices.SortStableFunc(all, func(x, y sittingRow) int {
+		switch {
+		case x.started != nil && y.started != nil:
+			if c := y.started.Compare(*x.started); c != 0 {
+				return c
+			}
+		case x.started != nil:
+			return -1
+		case y.started != nil:
+			return 1
+		}
+		return cmp.Or(cmp.Compare(x.name, y.name), cmp.Compare(x.email, y.email))
+	})
+	return all[:min(len(all), MaxSittings)], nil
 }

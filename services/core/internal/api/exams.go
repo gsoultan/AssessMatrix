@@ -8,48 +8,45 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/gsoultan/storm/runtime"
+
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/exam"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/examversion"
 )
 
 type examService struct{ *Server }
 
-const examColumns = `id, kind, status, version, published_version, title, issuer, tier, pass_pct,
-	shuffle, timed, anonymous, sections, updated_at, source_exam_id, source_version, source_tenant_name`
+// maxVersions bounds a version history read; nobody publishes more.
+const maxVersions = 10_000
 
-func scanExam(row pgx.Row) (*v1.Exam, error) {
-	var (
-		e        v1.Exam
-		kind     int16
-		status   int16
-		tier     int16
-		passPct  int16
-		sections []byte
-		updated  time.Time
-		srcID    *string
-		srcVer   *int32
-		srcName  *string
-	)
-	if err := row.Scan(&e.Id, &kind, &status, &e.Version, &e.PublishedVersion, &e.Title, &e.Issuer,
-		&tier, &passPct, &e.Shuffle, &e.Timed, &e.Anonymous, &sections, &updated, &srcID, &srcVer, &srcName); err != nil {
-		return nil, err
+// examOf is the API's view of an instrument row.
+func examOf(r exam.Row) (*v1.Exam, error) {
+	e := &v1.Exam{
+		Id: idText(r.ID), Kind: v1.Kind(r.Kind), Status: v1.Status(r.Status), Version: r.Version,
+		PublishedVersion: r.PublishedVersion, Title: r.Title, Issuer: r.Issuer, Tier: int32(r.Tier),
+		PassPct: int32(r.PassPct), Shuffle: r.Shuffle, Timed: r.Timed, Anonymous: r.Anonymous,
+		UpdatedAt: r.UpdatedAt.UnixMilli(),
 	}
-	if srcID != nil && srcVer != nil && srcName != nil {
-		e.SharedFrom = &v1.SharedFrom{ExamId: *srcID, Version: *srcVer, TenantName: *srcName}
+	srcID, okID := r.SourceExamID.Get()
+	srcVer, okVer := r.SourceVersion.Get()
+	srcName, okName := r.SourceTenantName.Get()
+	if okID && okVer && okName {
+		e.SharedFrom = &v1.SharedFrom{ExamId: idText(srcID), Version: srcVer, TenantName: srcName}
 	}
-	e.Kind, e.Status, e.Tier, e.PassPct = v1.Kind(kind), v1.Status(status), int32(tier), int32(passPct)
-	e.UpdatedAt = updated.UnixMilli()
 	var holder v1.Exam
-	if err := protojson.Unmarshal(sections, &holder); err != nil {
+	if err := protojson.Unmarshal(r.Sections, &holder); err != nil {
 		return nil, fmt.Errorf("decode sections of %s: %w", e.Id, err)
 	}
 	e.Sections = holder.Sections
-	return &e, nil
+	return e, nil
 }
 
 func encodeSections(e *v1.Exam) ([]byte, error) {
@@ -74,88 +71,133 @@ func decodeSnapshot(b []byte) (*v1.Exam, error) {
 	return &e, nil
 }
 
-func getExam(ctx context.Context, tx pgx.Tx, id string, lock bool) (*v1.Exam, error) {
+func getExam(ctx context.Context, tx *db.Tx, id string, lock bool) (*v1.Exam, error) {
 	if !validUUID(id) {
 		return nil, notFound("instrument")
 	}
-	q := `SELECT ` + examColumns + ` FROM exams WHERE id = $1`
+	q := exam.New().IDEq(key(id))
 	if lock {
-		q += ` FOR UPDATE`
+		q = q.ForUpdate()
 	}
-	e, err := scanExam(tx.QueryRow(ctx, q, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, notFound("instrument")
-	}
-	return e, err
-}
-
-// examAt returns the version an attempt or invitation is pinned to.
-func examAt(ctx context.Context, tx pgx.Tx, examID string, version int32) (*v1.Exam, error) {
-	var snap []byte
-	err := tx.QueryRow(ctx, `SELECT snapshot FROM exam_versions WHERE exam_id = $1 AND version = $2`, examID, version).Scan(&snap)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, notFound("instrument version")
-	}
+	r, ok, err := q.One(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	return decodeSnapshot(snap)
+	if !ok {
+		return nil, notFound("instrument")
+	}
+	return examOf(r)
 }
 
-func snapshot(ctx context.Context, tx pgx.Tx, e *v1.Exam, note string) error {
+// examAt returns the version an attempt or invitation is pinned to.
+func examAt(ctx context.Context, tx *db.Tx, examID string, version int32) (*v1.Exam, error) {
+	r, ok, err := examversion.New().
+		Where(examversion.ExamID.Eq(key(examID)), examversion.Version.Eq(version)).One(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, notFound("instrument version")
+	}
+	return decodeSnapshot(r.Snapshot)
+}
+
+// snapshot freezes e's current version, replacing an earlier freeze of
+// the same version (an in-place update).
+func snapshot(ctx context.Context, tx *db.Tx, e *v1.Exam, note string) error {
 	b, err := encodeSnapshot(e)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO exam_versions (tenant_id, exam_id, version, note, snapshot)
-		VALUES (am_tenant(), $1, $2, $3, $4)
-		ON CONFLICT (exam_id, version) DO UPDATE SET snapshot = excluded.snapshot, note = excluded.note, published_at = now()`,
-		e.GetId(), e.GetVersion(), note, b)
+	n := examversion.Create()
+	n.SetTenantID(tx.Tenant())
+	n.SetExamID(key(e.GetId()))
+	n.SetVersion(e.GetVersion())
+	n.SetNote(note)
+	n.SetSnapshot(b)
+	n.SetPublishedAt(time.Now())
+	_, err = n.OnConflictExamIDVersion().Insert(ctx, tx)
 	return err
 }
 
-func writeExam(ctx context.Context, tx pgx.Tx, e *v1.Exam) (*v1.Exam, error) {
+// setExam assigns every field an organiser edits.
+func setExam(m interface {
+	SetKind(int16)
+	SetStatus(int16)
+	SetVersion(int32)
+	SetPublishedVersion(int32)
+	SetTitle(string)
+	SetIssuer(string)
+	SetTier(int16)
+	SetPassPct(int16)
+	SetShuffle(bool)
+	SetTimed(bool)
+	SetAnonymous(bool)
+	SetSections(runtime.JSON)
+}, e *v1.Exam) error {
 	sections, err := encodeSections(e)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return scanExam(tx.QueryRow(ctx, `UPDATE exams SET kind = $2, status = $3, version = $4, published_version = $5,
-		title = $6, issuer = $7, tier = $8, pass_pct = $9, shuffle = $10, timed = $11, anonymous = $12,
-		sections = $13, updated_at = clock_timestamp()
-		WHERE id = $1 RETURNING `+examColumns,
-		e.GetId(), int16(e.GetKind()), int16(e.GetStatus()), e.GetVersion(), e.GetPublishedVersion(),
-		e.GetTitle(), e.GetIssuer(), int16(e.GetTier()), int16(e.GetPassPct()), e.GetShuffle(), e.GetTimed(),
-		e.GetAnonymous(), sections))
+	m.SetKind(int16(e.GetKind()))
+	m.SetStatus(int16(e.GetStatus()))
+	m.SetVersion(e.GetVersion())
+	m.SetPublishedVersion(e.GetPublishedVersion())
+	m.SetTitle(e.GetTitle())
+	m.SetIssuer(e.GetIssuer())
+	m.SetTier(int16(e.GetTier()))
+	m.SetPassPct(int16(e.GetPassPct()))
+	m.SetShuffle(e.GetShuffle())
+	m.SetTimed(e.GetTimed())
+	m.SetAnonymous(e.GetAnonymous())
+	m.SetSections(sections)
+	return nil
 }
 
-func insertExam(ctx context.Context, tx pgx.Tx, e *v1.Exam) (*v1.Exam, error) {
-	sections, err := encodeSections(e)
+func writeExam(ctx context.Context, tx *db.Tx, e *v1.Exam) (*v1.Exam, error) {
+	m := exam.MutateKey(key(e.GetId()))
+	if err := setExam(&m, e); err != nil {
+		return nil, err
+	}
+	// The client's optimistic check compares this stamp, so it must move
+	// on every save, even two in one transaction.
+	m.SetUpdatedAt(time.Now())
+	if err := m.Update(ctx, tx); err != nil {
+		return nil, err
+	}
+	return getExam(ctx, tx, e.GetId(), false)
+}
+
+func insertExam(ctx context.Context, tx *db.Tx, e *v1.Exam) (*v1.Exam, error) {
+	e = proto.Clone(e).(*v1.Exam)
+	e.Status, e.Version, e.PublishedVersion = v1.Status_STATUS_DRAFT, 1, 0
+	n := exam.Create()
+	n.SetTenantID(tx.Tenant())
+	if err := setExam(&n, e); err != nil {
+		return nil, err
+	}
+	r, err := n.Insert(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	return scanExam(tx.QueryRow(ctx, `INSERT INTO exams (tenant_id, kind, status, version, published_version,
-		title, issuer, tier, pass_pct, shuffle, timed, anonymous, sections)
-		VALUES (am_tenant(), $1, $2, 1, 0, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING `+examColumns,
-		int16(e.GetKind()), int16(v1.Status_STATUS_DRAFT), e.GetTitle(), e.GetIssuer(), int16(e.GetTier()),
-		int16(e.GetPassPct()), e.GetShuffle(), e.GetTimed(), e.GetAnonymous(), sections))
+	return examOf(r)
 }
 
 func (s *examService) ListExams(ctx context.Context, _ *connect.Request[v1.ListExamsRequest]) (*connect.Response[v1.ListExamsResponse], error) {
 	var out []*v1.Exam
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT `+examColumns+` FROM exams ORDER BY updated_at DESC LIMIT 1000`)
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		rows, err := exam.New().Order(exam.UpdatedAt.Desc()).Limit(1000).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			e, err := scanExam(rows)
+		for _, r := range rows {
+			e, err := examOf(r)
 			if err != nil {
 				return err
 			}
 			out = append(out, e)
 		}
-		return rows.Err()
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "ListExams", err)
@@ -165,7 +207,7 @@ func (s *examService) ListExams(ctx context.Context, _ *connect.Request[v1.ListE
 
 func (s *examService) GetExam(ctx context.Context, req *connect.Request[v1.GetExamRequest]) (*connect.Response[v1.GetExamResponse], error) {
 	var e *v1.Exam
-	err := s.tx(ctx, func(tx pgx.Tx) (err error) {
+	err := s.tx(ctx, func(tx *db.Tx) (err error) {
 		e, err = getExam(ctx, tx, req.Msg.GetId(), false)
 		return err
 	})
@@ -209,7 +251,7 @@ func (s *examService) CreateExam(ctx context.Context, req *connect.Request[v1.Cr
 		return nil, invalidArg(errors.New("kind must be exam, quiz or survey"))
 	}
 	var e *v1.Exam
-	err := s.tx(ctx, func(tx pgx.Tx) (err error) {
+	err := s.tx(ctx, func(tx *db.Tx) (err error) {
 		if e, err = insertExam(ctx, tx, blankExam(kind)); err != nil {
 			return err
 		}
@@ -234,7 +276,7 @@ func (s *examService) SaveExam(ctx context.Context, req *connect.Request[v1.Save
 		mode = v1.SaveMode_SAVE_MODE_DRAFT
 	}
 	var out *v1.Exam
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		cur, err := getExam(ctx, tx, in.GetId(), true)
 		if err != nil {
 			return err
@@ -286,7 +328,7 @@ func (s *examService) SaveExam(ctx context.Context, req *connect.Request[v1.Save
 
 func (s *examService) DuplicateExam(ctx context.Context, req *connect.Request[v1.DuplicateExamRequest]) (*connect.Response[v1.DuplicateExamResponse], error) {
 	var out *v1.Exam
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		src, err := getExam(ctx, tx, req.Msg.GetId(), false)
 		if err != nil {
 			return err
@@ -329,7 +371,7 @@ func (s *examService) SetExamStatus(ctx context.Context, req *connect.Request[v1
 		return nil, invalidArg(errors.New("unknown status"))
 	}
 	var out *v1.Exam
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		e, err := getExam(ctx, tx, req.Msg.GetId(), true)
 		if err != nil {
 			return err
@@ -364,7 +406,7 @@ func (s *examService) SetExamStatus(ctx context.Context, req *connect.Request[v1
 }
 
 func (s *examService) DeleteExam(ctx context.Context, req *connect.Request[v1.DeleteExamRequest]) (*connect.Response[v1.DeleteExamResponse], error) {
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		e, err := getExam(ctx, tx, req.Msg.GetId(), true)
 		if err != nil {
 			return err
@@ -372,14 +414,14 @@ func (s *examService) DeleteExam(ctx context.Context, req *connect.Request[v1.De
 		if e.GetStatus() != v1.Status_STATUS_ARCHIVED {
 			return failedPrecondition("archive an instrument before deleting it")
 		}
-		var sat bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM attempts WHERE exam_id = $1)`, e.GetId()).Scan(&sat); err != nil {
+		sat, err := attempt.New().Where(attempt.ExamID.Eq(key(e.GetId()))).Exists(ctx, tx)
+		if err != nil {
 			return err
 		}
 		if sat {
 			return failedPrecondition("this instrument has been sat; its attempts are evidence and it can only stay archived")
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM exams WHERE id = $1`, e.GetId()); err != nil {
+		if err := exam.Delete(ctx, tx, key(e.GetId())); err != nil {
 			return err
 		}
 		return audit(ctx, tx, "exam.deleted", e.GetId(), map[string]any{"title": e.GetTitle()})
@@ -392,33 +434,24 @@ func (s *examService) DeleteExam(ctx context.Context, req *connect.Request[v1.De
 
 func (s *examService) ListExamVersions(ctx context.Context, req *connect.Request[v1.ListExamVersionsRequest]) (*connect.Response[v1.ListExamVersionsResponse], error) {
 	var out []*v1.ExamVersion
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		if _, err := getExam(ctx, tx, req.Msg.GetExamId(), false); err != nil {
 			return err
 		}
-		rows, err := tx.Query(ctx, `SELECT version, published_at, note, snapshot FROM exam_versions
-			WHERE exam_id = $1 ORDER BY version DESC`, req.Msg.GetExamId())
+		rows, err := examversion.New().Where(examversion.ExamID.Eq(key(req.Msg.GetExamId()))).
+			Order(examversion.Version.Desc()).Limit(maxVersions).All(ctx, tx, nil)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var (
-				v    v1.ExamVersion
-				at   time.Time
-				snap []byte
-			)
-			if err := rows.Scan(&v.Version, &at, &v.Note, &snap); err != nil {
-				return err
-			}
-			e, err := decodeSnapshot(snap)
+		for _, r := range rows {
+			e, err := decodeSnapshot(r.Snapshot)
 			if err != nil {
 				return err
 			}
-			v.ExamId, v.PublishedAt, v.Exam = req.Msg.GetExamId(), at.UnixMilli(), e
-			out = append(out, &v)
+			out = append(out, &v1.ExamVersion{ExamId: req.Msg.GetExamId(), Version: r.Version,
+				PublishedAt: r.PublishedAt.UnixMilli(), Note: r.Note, Exam: e})
 		}
-		return rows.Err()
+		return nil
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "ListExamVersions", err)

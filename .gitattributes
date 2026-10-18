@@ -1,0 +1,2 @@
+# storm generates these from internal/store/model; review the model, not the output.
+services/core/internal/store/**/*.gen.go linguist-generated=true
