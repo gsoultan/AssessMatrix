@@ -12,6 +12,13 @@
  * a batch is not sent until the save that created it is on disk, so a kill at
  * any moment leaves either the events or their acknowledged batch, never a
  * batch the server may have but the device forgot it sent.
+ *
+ * A send seals everything waiting into batches first, and a sealed batch
+ * never changes. So what is on disk is always a row of batches the service
+ * worker can send as they are, when the tab is gone (Background Sync, in
+ * vite.runner.config.ts), without writing anything back: the server
+ * recognises each batch id, whoever sends it first. The two senders take
+ * turns on one Web Lock, and both send from the front of the row.
  */
 import { ConnectError, Code } from '@connectrpc/connect'
 import { api } from '../api/client'
@@ -31,12 +38,17 @@ export type Pending = {
   clientTime: number
 }
 
+type Batch = { batchId: string; events: Pending[] }
+
 type Queue = {
+  /** Not yet in a batch. */
   events: Pending[]
-  inflight?: { batchId: string; events: Pending[] }
-  /** After a refused batch, send this many events one at a time to find the bad one. */
-  isolate?: number
+  /** Sealed, oldest first: each keeps its id until the server acknowledges it. */
+  batches?: Batch[]
 }
+
+/** A queue saved by a version that had one batch in flight at a time. */
+type Legacy = Queue & { inflight?: Batch; isolate?: number }
 
 const MAX_BATCH = 500
 const key = (attemptId: string) => `am.pending.v1.${attemptId}`
@@ -68,7 +80,7 @@ function write(attemptId: string, q: Queue) {
   const next = prev.then(async () => {
     due.delete(attemptId)
     const now = mem.get(attemptId)
-    const text = !now || (now.events.length === 0 && !now.inflight) ? null : JSON.stringify(now)
+    const text = !now || (now.events.length === 0 && !now.batches?.length) ? null : JSON.stringify(now)
     const s = await shelf()
     try {
       await s.save(key(attemptId), text)
@@ -107,7 +119,10 @@ async function load(attemptId: string) {
   if (!text && legacy) text = legacy
   let q: Queue = { events: [] }
   try {
-    if (text) q = JSON.parse(text) as Queue
+    if (text) {
+      const { inflight, isolate: _, ...rest } = JSON.parse(text) as Legacy
+      q = { ...rest, batches: [...(inflight ? [inflight] : []), ...(rest.batches ?? [])] }
+    }
   } catch {
     /* unreadable: nothing to resend */
   }
@@ -124,15 +139,12 @@ async function load(attemptId: string) {
 }
 
 /** Events not yet acknowledged by the server. */
-export const pendingCount = (attemptId: string) => {
-  const q = read(attemptId)
-  return q.events.length + (q.inflight?.events.length ?? 0)
-}
+export const pendingCount = (attemptId: string) => pendingEvents(attemptId).length
 
 /** Every unacknowledged event, oldest first. */
 export const pendingEvents = (attemptId: string) => {
   const q = read(attemptId)
-  return [...(q.inflight?.events ?? []), ...q.events]
+  return [...(q.batches ?? []).flatMap((b) => b.events), ...q.events]
 }
 
 export function enqueue(attemptId: string, ev: Pending) {
@@ -191,28 +203,39 @@ export function flush(attemptId: string): Promise<Flushed> {
   return p
 }
 
+/**
+ * One sender at a time per attempt, across this tab and the service worker,
+ * holding on from the send until its acknowledgement is on disk: the worker
+ * then never reads a row that the server has already taken part of.
+ */
+const turn = <T>(attemptId: string, fn: () => Promise<T>): Promise<T> =>
+  typeof navigator !== 'undefined' && navigator.locks ? navigator.locks.request(`am.send.${attemptId}`, fn) : fn()
+
 async function drain(attemptId: string): Promise<Flushed> {
   await open(attemptId)
   let last: Flushed = { ok: true, serverNow: Date.now() }
   for (;;) {
     const q = read(attemptId)
-    if (!q.inflight) {
-      if (q.events.length === 0) return last
-      const size = q.isolate ? 1 : MAX_BATCH
-      q.inflight = { batchId: batchId(), events: q.events.slice(0, size) }
-      q.events = q.events.slice(size)
-      if (q.isolate) q.isolate--
-      write(attemptId, q)
+    if (q.events.length) {
+      const batches = [...(q.batches ?? [])]
+      for (let i = 0; i < q.events.length; i += MAX_BATCH) batches.push({ batchId: batchId(), events: q.events.slice(i, i + MAX_BATCH) })
+      write(attemptId, { ...q, events: [], batches })
       // The batch id must be on disk before the batch leaves: a retry after a
       // kill then reuses it, and the server recognises it.
       await durable(attemptId)
+      continue
     }
-    const batch = q.inflight
+    const batch = q.batches?.[0]
+    if (!batch) return last
     try {
-      const r = await api.candidate.appendEvents({ attemptId, batchId: batch.batchId, events: batch.events.map(toWire) })
-      const after = read(attemptId)
-      if (after.inflight?.batchId === batch.batchId) delete after.inflight
-      write(attemptId, after)
+      const r = await turn(attemptId, async () => {
+        const r = await api.candidate.appendEvents({ attemptId, batchId: batch.batchId, events: batch.events.map(toWire) })
+        const after = read(attemptId)
+        if (after.batches?.[0]?.batchId === batch.batchId) after.batches.shift()
+        write(attemptId, after)
+        await durable(attemptId)
+        return r
+      })
       last = { ok: true, serverNow: Number(r.serverNow), deadlineAt: Number(r.deadlineAt) || undefined }
     } catch (err) {
       if (err instanceof ConnectError) {
@@ -224,19 +247,35 @@ async function drain(attemptId: string): Promise<Flushed> {
         }
         if (err.code === Code.InvalidArgument) {
           // A batch the server will never take would block everything behind
-          // it. Resend its events one by one so only the bad one is dropped.
+          // it. It stored none of it, so its events go again one per batch,
+          // and only the bad one is dropped.
           const after = read(attemptId)
-          delete after.inflight
-          if (batch.events.length > 1) {
-            after.events = [...batch.events, ...after.events]
-            after.isolate = batch.events.length
-          } else console.warn('dropped an event the server refused:', batch.events[0]?.kind, err.rawMessage)
-          write(attemptId, after)
+          const rest = (after.batches ?? []).filter((b) => b.batchId !== batch.batchId)
+          if (batch.events.length > 1) rest.unshift(...batch.events.map((e) => ({ batchId: batchId(), events: [e] })))
+          else console.warn('dropped an event the server refused:', batch.events[0]?.kind, err.rawMessage)
+          write(attemptId, { ...after, batches: rest })
+          await durable(attemptId)
           continue
         }
       }
+      void later()
       return { ok: false, why: 'offline' }
     }
+  }
+}
+
+/**
+ * Ask the service worker to send what is waiting once the network is back,
+ * even if this tab is closed by then. Only where there is one (the built
+ * runner) and the browser has Background Sync (Chromium); elsewhere the queue
+ * waits on the device for the sitting to be reopened, as before.
+ */
+async function later() {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration('/take/')
+    await (reg as (ServiceWorkerRegistration & { sync?: { register(tag: string): Promise<void> } }) | undefined)?.sync?.register('am-queue')
+  } catch {
+    /* refused (no permission, a private window): the tab still retries */
   }
 }
 

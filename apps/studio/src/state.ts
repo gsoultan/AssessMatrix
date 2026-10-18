@@ -295,10 +295,15 @@ export const useApp = create<AppState>((set, get) => {
     }
   })
 
-  // Back online: send what is waiting now rather than at the next retry.
-  window.addEventListener('online', () => {
+  // Back online: send what is waiting now rather than at the next retry. The
+  // service worker says so too, when a background sync finds this tab open.
+  const now = () => {
     const id = get().attempt?.id
     if (id && !get().attempt?.submittedAt) void drain(id)
+  }
+  window.addEventListener('online', now)
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    if (e.data === 'am-flush') now()
   })
 
   return {
