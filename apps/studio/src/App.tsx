@@ -68,7 +68,8 @@ const ALL_SCREENS = [
   // Needs the core: people score essays and the worker analyses items there.
   ...(CORE ? [{ key: 'scoring', name: 'Scoring', sub: 'Essays · item analysis', Icon: IconChecklist, El: Scoring } as const] : []),
   // Needs the core: it signs and sends the requests.
-  ...(CORE ? [{ key: 'webhooks', more: true, name: 'Webhooks', sub: 'Events to your systems', Icon: IconWebhook, El: Webhooks } as const] : []),
+  // Webhooks send candidate data out and show a signing secret: administrators only.
+  ...(CORE ? [{ key: 'webhooks', more: true, admin: true, name: 'Webhooks', sub: 'Events to your systems', Icon: IconWebhook, El: Webhooks } as const] : []),
   { key: 'monitor', name: 'Proctor monitor', sub: 'Live attempts', Icon: IconEye, El: CORE ? LiveMonitor : ProctorMonitor },
   { key: 'player', name: 'Candidate preview', sub: 'See it as a candidate does', Icon: IconDeviceLaptop, El: CandidateApp },
   // Tenants exist only on the core, and only an administrator manages them.

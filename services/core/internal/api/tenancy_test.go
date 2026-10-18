@@ -328,3 +328,60 @@ func TestSharingRollsAVersionOutToChosenTenants(t *testing.T) {
 		t.Errorf("B holds %d images, want the one the instrument shows", images)
 	}
 }
+
+// Webhooks send candidate data out of the tenant and show a signing secret,
+// so only an administrator manages them; a member is refused before the
+// handler runs, whatever the procedure.
+func TestOnlyAnAdminManagesWebhooks(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	admin := h.tenant("Org Hooks")
+	member := newEmail("member")
+	if err := admin.setAccess(member, h.lastTenant, v1.Role_ROLE_MEMBER); err != nil {
+		t.Fatal(err)
+	}
+	m := h.signIn(member)
+
+	if _, err := admin.hooks.ListWebhooks(ctx, connect.NewRequest(&v1.ListWebhooksRequest{})); err != nil {
+		t.Fatalf("an administrator listing webhooks: %v", err)
+	}
+	calls := map[string]func() error{
+		"ListWebhooks": func() error {
+			_, err := m.hooks.ListWebhooks(ctx, connect.NewRequest(&v1.ListWebhooksRequest{}))
+			return err
+		},
+		"CreateWebhook": func() error {
+			_, err := m.hooks.CreateWebhook(ctx, connect.NewRequest(&v1.CreateWebhookRequest{Url: "https://hooks.example.com/x", Events: []string{EventAttemptStarted}}))
+			return err
+		},
+		"UpdateWebhook": func() error {
+			_, err := m.hooks.UpdateWebhook(ctx, connect.NewRequest(&v1.UpdateWebhookRequest{}))
+			return err
+		},
+		"RotateWebhookSecret": func() error {
+			_, err := m.hooks.RotateWebhookSecret(ctx, connect.NewRequest(&v1.RotateWebhookSecretRequest{}))
+			return err
+		},
+		"DeleteWebhook": func() error {
+			_, err := m.hooks.DeleteWebhook(ctx, connect.NewRequest(&v1.DeleteWebhookRequest{}))
+			return err
+		},
+		"ListDeliveries": func() error {
+			_, err := m.hooks.ListDeliveries(ctx, connect.NewRequest(&v1.ListDeliveriesRequest{}))
+			return err
+		},
+		"Redeliver": func() error {
+			_, err := m.hooks.Redeliver(ctx, connect.NewRequest(&v1.RedeliverRequest{}))
+			return err
+		},
+		"PingWebhook": func() error {
+			_, err := m.hooks.PingWebhook(ctx, connect.NewRequest(&v1.PingWebhookRequest{}))
+			return err
+		},
+	}
+	for name, call := range calls {
+		if err := call(); code(err) != connect.CodePermissionDenied {
+			t.Errorf("a member calling %s: got %v, want PermissionDenied", name, err)
+		}
+	}
+}
