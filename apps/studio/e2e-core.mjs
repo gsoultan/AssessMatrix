@@ -15,6 +15,7 @@
  *                it can cut the candidate's network (default 8091)
  *   STAFF_EMAIL  a staff member of a fresh tenant (scripts/e2e-core.sh makes one)
  *   OUTAGE_SECONDS  how long the candidate's network is down (default 300)
+ *   METRICS_PORT the core's metrics listener, to see events arrive with no tab open (default 8092)
  */
 import { chromium } from 'playwright'
 import net from 'node:net'
@@ -27,6 +28,9 @@ const URL = process.env.URL ?? 'http://localhost:8090'
 const RUNNER_PORT = Number(process.env.RUNNER_PORT ?? 8091)
 const RUNNER = `http://localhost:${RUNNER_PORT}`
 const OUTAGE = Number(process.env.OUTAGE_SECONDS ?? 300)
+const METRICS = `http://localhost:${Number(process.env.METRICS_PORT ?? 8092)}/metrics`
+/** Candidate events the core has stored, from its own counter. */
+const stored = async () => Number((await (await fetch(METRICS)).text()).match(/^am_events_stored_total (\S+)$/m)?.[1] ?? 0)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
@@ -571,6 +575,10 @@ try {
     onDisk.length
       ? ok('the queue is in the origin-private file system, flushed to disk')
       : bad('the queue is not in OPFS')
+    const tags = await p.evaluate(async () => (await (await navigator.serviceWorker.getRegistration('/take/'))?.sync?.getTags()) ?? [])
+    tags.includes('am-queue')
+      ? ok('a background sync is waiting to send it')
+      : bad(`no background sync was asked for: ${JSON.stringify(tags)}`)
 
     real.proc.kill('SIGKILL')
     await new Promise((r) => real.proc.once('exit', r))
@@ -578,7 +586,33 @@ try {
     await wire.up()
     ok(`the network was down ${Math.round((Date.now() - downAt) / 1000)} s, and the browser was killed during it`)
 
+    // The browser is back but the sitting is not open: the service worker
+    // sends what the killed tab left on disk, as a background sync does. The
+    // browser may also fire the waiting sync itself; the batch is stored once.
+    const before = await stored()
     real = await realBrowser(profile)
+    const cdp = await real.p.context().newCDPSession(real.p)
+    const regs = new Map()
+    cdp.on('ServiceWorker.workerRegistrationUpdated', ({ registrations }) => {
+      for (const r of registrations) if (r.scopeURL === `${RUNNER}/take/` && !r.isDeleted) regs.set(r.scopeURL, r.registrationId)
+    })
+    await cdp.send('ServiceWorker.enable')
+    for (let i = 0; i < 20 && !regs.size; i++) await sleep(250)
+    const registrationId = regs.get(`${RUNNER}/take/`)
+    if (!registrationId) bad('reopened, the runner has no service worker')
+    else {
+      await cdp.send('ServiceWorker.dispatchSyncEvent', { origin: RUNNER, registrationId, tag: 'am-queue', lastChance: false })
+      let after = before
+      for (let i = 0; i < 40 && after <= before; i++) {
+        await sleep(250)
+        after = await stored()
+      }
+      after > before
+        ? ok(`with no tab open, the service worker sent the answer made offline (${after - before} event(s))`)
+        : bad('with no tab open, the background sync sent nothing')
+    }
+    await cdp.detach()
+
     const q = real.p
     await q.goto(`${RUNNER}/take/#/session`, { waitUntil: 'networkidle' })
     await q.waitForTimeout(1200)

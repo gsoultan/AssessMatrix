@@ -88,9 +88,9 @@ const MANIFEST = JSON.stringify(
 )
 
 /*
- * The service worker. It never touches an RPC: answers go through the queue,
- * which is already durable on the device, and a cached RPC response would be
- * a lie about the server. It keeps three things:
+ * The service worker. It never caches an RPC: a cached response would be a
+ * lie about the server. It sends one, AppendEvents, when a background sync
+ * fires (below). It keeps three things:
  *   - the shell (index + hashed assets), so a reload with no network still
  *     opens the exam and its queued answers;
  *   - images the exam has shown, so they still show after an offline reload;
@@ -119,6 +119,96 @@ self.addEventListener('message', (e) => {
   // The session ended on this device: its images are no one else's business.
   if (e.data === 'forget-media') e.waitUntil(caches.delete(MEDIA))
 })
+
+/*
+ * Background Sync: the runner asks for one whenever a send fails, so answers
+ * waiting on the device reach the server once the network is back, even if
+ * the candidate has closed the tab or the browser was killed.
+ *
+ * It sends the queue's sealed batches as they are on disk (src/backend/sync.ts),
+ * oldest first, and writes nothing: each batch keeps its id, so the server
+ * stores it once, whether this or a runner tab sends it first. It takes the
+ * same Web Lock the tab sends under, so the two never interleave, and tells
+ * any open runner tab to send too, for what it has not sealed yet. A sync
+ * that cannot reach the server fails, and the browser tries it again later.
+ */
+self.addEventListener('sync', (e) => {
+  if (e.tag === 'am-queue') e.waitUntil(deliver())
+})
+
+async function deliver() {
+  for (const c of await self.clients.matchAll({ type: 'window' })) if (new URL(c.url).pathname.startsWith('/take')) c.postMessage('am-flush')
+  const root = await navigator.storage.getDirectory()
+  const ids = new Set()
+  for await (const name of root.keys()) {
+    const m = /^am\\.pending\\.v1\\.(.+)\\.[ab]$/.exec(name)
+    if (m) ids.add(m[1])
+  }
+  let retry = false
+  for (const id of ids) {
+    const sent = await navigator.locks.request('am.send.' + id, () => send(root, id))
+    if (sent === 'retry') retry = true
+  }
+  // A rejected sync is tried again by the browser, later.
+  if (retry) throw new Error('the server is not reachable yet')
+}
+
+/** The newest whole slot of a queue, as opfs.worker.ts writes them: <seq>\\n<json>. */
+async function slot(root, name) {
+  try {
+    const raw = await (await (await root.getFileHandle(name)).getFile()).text()
+    const nl = raw.indexOf('\\n')
+    const seq = Number(raw.slice(0, nl))
+    if (nl < 0 || !Number.isSafeInteger(seq)) return null
+    const text = raw.slice(nl + 1)
+    return { seq, q: text === '' ? null : JSON.parse(text) }
+  } catch (err) {
+    // Missing, or torn mid-write: the other slot has it. Busy: try again later.
+    return err && (err.name === 'NotFoundError' || err.name === 'SyntaxError') ? null : 'busy'
+  }
+}
+
+async function send(root, id) {
+  const [a, b] = await Promise.all([slot(root, 'am.pending.v1.' + id + '.a'), slot(root, 'am.pending.v1.' + id + '.b')])
+  if (a === 'busy' || b === 'busy') return 'retry'
+  const newest = !a ? b : !b ? a : a.seq >= b.seq ? a : b
+  const q = newest && newest.q
+  if (!q) return 'done'
+  // A queue saved before batches were sealed has at most one, in flight.
+  const batches = [...(q.inflight ? [q.inflight] : []), ...(q.batches || [])]
+  for (const batch of batches) {
+    let res
+    try {
+      res = await fetch('/assessmatrix.v1.CandidateService/AppendEvents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1' },
+        body: JSON.stringify({ attemptId: id, batchId: batch.batchId, events: batch.events.map(wire) }),
+        // Never hold the lock on a connection that went quiet: the tab may want it.
+        signal: AbortSignal.timeout(20000),
+      })
+    } catch {
+      return 'retry'
+    }
+    if (res.status >= 500 || res.status === 408 || res.status === 429) return 'retry'
+    // Signed out, submitted, refused: the reopened tab knows what to do with it.
+    if (!res.ok) return 'done'
+  }
+  return 'done'
+}
+
+/** One queued event as AppendEvents takes it in JSON, as the tab's client sends it. */
+function wire(e) {
+  const f = e.file
+  return {
+    kind: e.kind,
+    itemId: e.itemId || '',
+    values: e.values || [],
+    text: e.text || '',
+    file: f ? { id: f.id, url: f.url, alt: f.alt, w: f.w, h: f.h, bytes: String(Math.round(f.bytes)) } : undefined,
+    detail: e.detail || '',
+    clientTime: String(e.clientTime),
+  }
+}
 
 self.addEventListener('fetch', (e) => {
   const req = e.request
