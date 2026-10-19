@@ -90,6 +90,7 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.CandidateServiceStartAttemptProcedure,
 		assessmatrixv1connect.CandidateServiceAppendEventsProcedure,
 		assessmatrixv1connect.CandidateServiceSubmitAttemptProcedure,
+		assessmatrixv1connect.CandidateServiceGetRecordProcedure,
 	)
 	set(auth.Staff,
 		assessmatrixv1connect.AuthServiceWhoAmIProcedure,

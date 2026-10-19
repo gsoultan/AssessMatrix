@@ -28,15 +28,19 @@ const (
 	WatchKeepAlive = 20 * time.Second
 	// Bound on what one stream tracks; an exam is a cohort, not a census.
 	MaxSittings = 5000
+	// An unchanged attempt is re-checked this often anyway: a row edited in
+	// place does not grow the log, and the monitor must still show the break.
+	WatchRecheck = time.Minute
 )
 
-// sittingCache keeps one attempt's derived view until its log grows, so an
-// unchanged attempt is never re-read or re-evaluated.
+// sittingCache keeps one attempt's derived view until its log grows or it is
+// due a re-check, so a quiet attempt is not re-read on every tick.
 type sittingCache struct {
-	lastSeq  int64
-	answered int32
-	lastSeen int64
-	flags    []*v1.Flag
+	checkedAt time.Time
+	lastSeq   int64
+	answered  int32
+	lastSeen  int64
+	flags     []*v1.Flag
 }
 
 func (s *proctorService) WatchExam(ctx context.Context, req *connect.Request[v1.WatchExamRequest], stream *connect.ServerStream[v1.WatchExamResponse]) error {
@@ -151,7 +155,7 @@ func (s *proctorService) sittings(ctx context.Context, examID string, cache map[
 					r.sit.SubmittedAt = r.submitted.UnixMilli()
 				}
 				c := cache[r.sit.AttemptId]
-				if c == nil || c.lastSeq != r.lastSeq {
+				if c == nil || c.lastSeq != r.lastSeq || s.now().Sub(c.checkedAt) >= WatchRecheck {
 					att, err := attemptBy(ctx, tx, "id", r.sit.AttemptId, false)
 					if err != nil {
 						return err
@@ -161,7 +165,7 @@ func (s *proctorService) sittings(ctx context.Context, examID string, cache map[
 						return err
 					}
 					answers, _ := domain.Fold(events, att.deadline())
-					c = &sittingCache{lastSeq: att.LastSeq, answered: int32(len(answers)),
+					c = &sittingCache{checkedAt: s.now(), lastSeq: att.LastSeq, answered: int32(len(answers)),
 						flags: flagsOut(domain.Flags(events, questionNumbers(e), intact, brokenAt))}
 					if n := len(events); n > 0 {
 						c.lastSeen = events[n-1].GetServerTime()

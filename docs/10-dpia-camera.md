@@ -57,16 +57,20 @@ party learns who is sitting an exam. They are fetched only by a tier 2 attempt.
 | Collection beyond consent by a modified client | Low | Medium | Server drops unconsented signals (tested: `TestNoSignalWithoutItsConsent`) |
 | Over-retention | Medium | Medium | Attempt records, signals included, are deleted at most one year after the exam by an hourly job, with an audit record (`internal/api/retention.go`, tested: `TestRetentionDeletesTheRecordAndKeepsTheScore`). A tenant may shorten the period, never lengthen it past the year the consent text promises (database check) |
 | Pressure to consent | Medium | Medium | The organiser, not us, decides the tier; the consent text says the alternative is to contact the organiser. Organisers must offer a non-camera route on request (to put in the customer terms) |
-| Candidate cannot see what was recorded | Medium | Medium | The attempt record shows every event and flag reason to staff; a candidate-facing view of their own record is still to build (access right, art. 7) |
+| Candidate cannot see what was recorded | Medium | Medium | The attempt record shows every event and flag reason to staff. After hand-in the candidate sees the reason for every flag on their attempt, in Indonesian, on the result page and whenever they reopen their link (tested: `TestAlteredRecordEarnsNoCredential`). On the same page they can open their whole record (every event, the consents, the seal check, each score) and download it as JSON (`CandidateService.GetRecord`, tested: `TestCandidateReadsTheirWholeRecord`). Only which staff member scored an essay is held back |
 
 ## 5. Rights
 
 - **Information and consent:** per purpose, before the start, in Indonesian.
-- **Access:** staff can show the full record today; a self-service view for candidates is open.
-- **Objection and withdrawal:** declining before the start is built. Withdrawing mid-attempt is
-  not built: today the candidate leaves the attempt and contacts the organiser. To build: a
-  "stop the camera" control that ends camera processing, records the withdrawal, and flags the
-  attempt for review rather than failing it.
+- **Access:** candidates read their whole record themselves, from the result page, and can
+  download it (art. 7). Staff see the same record, plus who scored each essay.
+- **Objection and withdrawal:** declining before the start is built. Mid-attempt, "Matikan
+  kamera" releases the camera at once and records `consent.camera.withdrawn` in the sealed log;
+  the server stores nothing under the camera's consent after it, even from a modified client, and
+  a resumed or second device does not turn the camera back on. The attempt continues, its
+  answers count, and it carries a `consent_withdrawn` flag for review, worded as the candidate's
+  right, never as a failure (tested: `TestCameraConsentCanBeWithdrawnMidExam`). A consent once
+  withdrawn is not given again within the attempt.
 - **Erasure:** at the end of retention (above), or on request through the organiser: the
   studio's "Erase" on a person deletes them, their attempts, credentials, uploads and mail
   (`PersonService.ErasePerson`, tested: `TestErasureRemovesEverythingAboutThePerson`).
@@ -76,7 +80,7 @@ party learns who is sitting an exam. They are fetched only by a tier 2 attempt.
 
 - [ ] DPO review and sign-off of this draft.
 - [ ] Detector accuracy across skin tones and lighting measured and recorded (§4).
-- [ ] Mid-attempt withdrawal control (§5).
-- [ ] Candidate view of their own record (§5).
+- [x] Mid-attempt withdrawal control (§5).
+- [x] Candidate view of their own record (§5).
 - [x] Retention job live, with deletion audit.
 - [ ] Customer terms: organisers offer a non-camera route on request.

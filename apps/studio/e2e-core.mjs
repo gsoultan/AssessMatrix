@@ -387,6 +387,13 @@ try {
   // The fake camera shows no face: give the face check a stretch long enough to report.
   await cand.getByText(/^Kamera aktif/).waitFor({ timeout: 20000 }).catch(() => {})
   await cand.waitForTimeout(4500)
+  // The candidate's right: the camera goes off for the rest of the exam.
+  await cand.getByRole('button', { name: 'Matikan kamera' }).click()
+  await cand.getByRole('button', { name: 'Ya, matikan' }).click()
+  await cand.getByText(/^Anda telah mematikan kamera/).waitFor({ timeout: 5000 }).then(
+    () => ok('the candidate can turn the camera off mid-exam'),
+    async () => bad(`turning the camera off did not take: ${await cand.locator('main').innerText()}`),
+  )
   await cand.getByRole('button', { name: /^Selesai/ }).click()
   await cand.waitForTimeout(300)
   await cand.getByRole('button', { name: /^Kumpulkan$/ }).click()
@@ -396,6 +403,19 @@ try {
   ;(await cand.getByText(/^100%$/).count()) && (await cand.getByText(/^Lulus$/).count())
     ? ok('the server scores the attempt: 100%, passed')
     : bad(`the score was not 100%: ${await cand.locator('main').innerText()}`)
+
+  // Their own copy of the whole record, from the server.
+  await cand.getByRole('button', { name: /Apa yang kami catat/ }).click()
+  await cand.getByRole('button', { name: /Tampilkan catatan lengkap/ }).click()
+  const mine = cand.getByRole('list', { name: 'Catatan lengkap' })
+  await mine.waitFor({ timeout: 5000 }).catch(() => {})
+  const own = await mine.innerText().catch(() => '')
+  ;(await cand.getByText(/Catatan ini utuh/).count()) &&
+  /Persetujuan diberikan: pemeriksaan wajah/.test(own) &&
+  /Persetujuan ditarik: pemeriksaan wajah/.test(own) &&
+  /Diserahkan/.test(own)
+    ? ok('the candidate reads their whole record, sealed, with the consent they gave and took back')
+    : bad(`the candidate's record is incomplete: ${own.slice(0, 1200)}`)
 
   /* ---------------- the credential, checked by a stranger ---------------- */
   const credLink = await cand.getByRole('link', { name: /Lihat dan bagikan sertifikat/ }).getAttribute('href').catch(() => null)
@@ -453,8 +473,8 @@ try {
   const record = page.getByRole('list', { name: 'Events' })
   await record.waitFor({ timeout: 5000 }).catch(() => {})
   const said = await record.innerText().catch(() => '')
-  ;(await page.getByText(/Record intact/).count()) && /Agreed to: camera/.test(said) && /Came back after \d+ s/.test(said) && /No face in view for \d+ s/.test(said)
-    ? ok('the attempt record shows the consents, the time away and the face check, sealed and intact')
+  ;(await page.getByText(/Record intact/).count()) && /Agreed to: camera/.test(said) && /Withdrew consent: camera/.test(said) && /Came back after \d+ s/.test(said) && /No face in view for \d+ s/.test(said)
+    ? ok('the attempt record shows the consents, the camera turned off, the time away and the face check, sealed and intact')
     : (await page.screenshot({ path: process.env.SHOT ?? '/dev/null', fullPage: true }), bad(`the attempt record is missing signals: ${said.slice(0, 1600)}`))
   await nav(/Assignments/)
   await page.reload({ waitUntil: 'networkidle' })

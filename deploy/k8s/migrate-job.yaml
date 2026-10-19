@@ -25,6 +25,9 @@ spec:
           env:
             - name: AM_MIGRATE_DATABASE_URL
               valueFrom: { secretKeyRef: { name: assessmatrix, key: AM_MIGRATE_DATABASE_URL } }
+            # Seals attempts written before attempt rows were sealed (migration 0008).
+            - name: AM_SECRET
+              valueFrom: { secretKeyRef: { name: assessmatrix, key: AM_SECRET } }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

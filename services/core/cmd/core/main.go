@@ -83,6 +83,36 @@ func migrate(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	log.Info("migrations applied", "applied", applied)
+	if os.Getenv("AM_SECRET") == "" {
+		log.Warn("AM_SECRET is not set: attempts from before sealing stay unsealed and read as altered until migrate runs with it")
+		return nil
+	}
+	secret, err := decodeSecret(os.Getenv("AM_SECRET"))
+	if err != nil {
+		return err
+	}
+	keys, err := secure.NewKeys(secret)
+	if err != nil {
+		return err
+	}
+	return sealLegacy(ctx, log, cfg.MigrateURL, keys)
+}
+
+// sealLegacy seals attempts written before attempt rows were sealed. Cheap
+// when there are none, so it runs after every migrate.
+func sealLegacy(ctx context.Context, log *slog.Logger, ownerURL string, keys *secure.Keys) error {
+	conn, err := pgx.Connect(ctx, ownerURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+	sealed, left, err := api.SealUnsealed(ctx, conn, keys)
+	if err != nil {
+		return fmt.Errorf("seal attempts: %w", err)
+	}
+	if sealed > 0 || left > 0 {
+		log.Info("attempts sealed", "sealed", sealed, "altered_left_unsealed", left)
+	}
 	return nil
 }
 
@@ -173,6 +203,9 @@ func serve(ctx context.Context, log *slog.Logger) error {
 			return fmt.Errorf("set up the database: %w", err)
 		}
 		log.Info("migrations applied", "applied", applied)
+		if err := sealLegacy(ctx, log, cfg.MigrateURL, keys); err != nil {
+			return err
+		}
 	}
 	database, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {

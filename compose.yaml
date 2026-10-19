@@ -41,6 +41,8 @@ services:
     command: ["migrate"]
     environment:
       AM_MIGRATE_DATABASE_URL: postgres://am_owner:${AM_OWNER_PASSWORD}@postgres:5432/assessmatrix
+      # Seals attempts written before attempt rows were sealed (migration 0008).
+      AM_SECRET: ${AM_SECRET:?set AM_SECRET in .env (openssl rand -hex 32)}
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"

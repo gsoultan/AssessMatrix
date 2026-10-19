@@ -333,6 +333,15 @@ func TestTenantIsolationAcrossEveryEndpoint(t *testing.T) {
 			_, err := b.hooks.PingWebhook(ctx, connect.NewRequest(&v1.PingWebhookRequest{Id: hookA.GetId()}))
 			denied("PingWebhook", err)
 		},
+		"/assessmatrix.v1.CandidateService/GetRecord": func() {
+			// B's own attempt, or none yet; never A's.
+			r, err := candB.candidate.GetRecord(ctx, connect.NewRequest(&v1.GetRecordRequest{}))
+			if err == nil && r.Msg.GetAttempt().GetId() == attA.GetId() {
+				t.Error("GetRecord: B's candidate read A's record")
+			} else if err != nil && code(err) != connect.CodeNotFound {
+				t.Errorf("GetRecord: %v", err)
+			}
+		},
 		"/assessmatrix.v1.CandidateService/SubmitAttempt": func() {
 			_, err := candB.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: attA.GetId()}))
 			denied("SubmitAttempt", err)

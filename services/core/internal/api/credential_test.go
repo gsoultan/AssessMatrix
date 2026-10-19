@@ -114,10 +114,47 @@ func TestPassingEarnsAVerifiableCredential(t *testing.T) {
 		t.Fatalf("issuer profile: %d %v", code, profile)
 	}
 
+	// Any verifier holding only the signed credential can check revocation.
+	status, _ := vc["credentialStatus"].(map[string]any)
+	if status["type"] != "1EdTechRevocationList" || status["id"] != "http://exam.test/credentials/"+id+"/status" {
+		t.Fatalf("credentialStatus = %v", vc["credentialStatus"])
+	}
+	type revocations struct {
+		Issuer  string `json:"issuer"`
+		Revoked []struct {
+			ID     string `json:"id"`
+			Reason string `json:"revocationReason"`
+		} `json:"revokedCredentials"`
+	}
+	var list revocations
+	if code := fetchJSON(t, h.http.URL+"/credentials/"+id+"/status", &list); code != 200 || len(list.Revoked) != 0 || list.Issuer != iss {
+		t.Fatalf("status of a standing credential: %d %+v", code, list)
+	}
+
+	// Coming back to the link later, the candidate sees the review and the credential.
+	back := get(cand.candidate.GetSession(ctx, connect.NewRequest(&v1.GetSessionRequest{}))).Msg
+	if back.GetCredentialUrl() != rev.GetCredentialUrl() {
+		t.Fatalf("credential on return = %q, want %q", back.GetCredentialUrl(), rev.GetCredentialUrl())
+	}
+	if rs := back.GetAttempt().GetReviews(); len(rs) != 1 || rs[0].GetItemId() != "q4" || rs[0].GetPoints() != 5 || rs[0].GetMaxPoints() != 5 {
+		t.Fatalf("reviews on return = %+v", rs)
+	}
+
 	// A second look marks the essay down: the result no longer passes.
-	get(staff.results.ScoreAnswer(ctx, connect.NewRequest(&v1.ScoreAnswerRequest{AttemptId: att.GetId(), ItemId: "q4", Points: 0})))
+	get(staff.results.ScoreAnswer(ctx, connect.NewRequest(&v1.ScoreAnswerRequest{AttemptId: att.GetId(), ItemId: "q4", Points: 0, Note: "Tidak menjawab pertanyaan."})))
 	if fetchJSON(t, h.http.URL+"/credentials/"+id, &pub); !pub.Revoked {
 		t.Fatal("a credential whose result no longer passes must read as revoked")
+	}
+	if mail := h.mail(f.email, "result"); !strings.Contains(mail, "Skor akhir Anda") || strings.Contains(mail, "Hasil: lulus") {
+		t.Fatalf("the candidate must be told the result that took the credential back, got %q", mail)
+	}
+	list = revocations{}
+	if fetchJSON(t, h.http.URL+"/credentials/"+id+"/status", &list); len(list.Revoked) != 1 || list.Revoked[0].ID != "urn:uuid:"+id || list.Revoked[0].Reason == "" {
+		t.Fatalf("the revocation list must name it, got %+v", list)
+	}
+	back = get(cand.candidate.GetSession(ctx, connect.NewRequest(&v1.GetSessionRequest{}))).Msg
+	if back.GetCredentialUrl() != "" || back.GetAttempt().GetReviews()[0].GetNote() != "Tidak menjawab pertanyaan." {
+		t.Fatalf("after the re-review: credential %q, reviews %+v", back.GetCredentialUrl(), back.GetAttempt().GetReviews())
 	}
 	again := get(staff.results.ScoreAnswer(ctx, connect.NewRequest(&v1.ScoreAnswerRequest{AttemptId: att.GetId(), ItemId: "q4", Points: 5}))).Msg
 	if fetchJSON(t, h.http.URL+"/credentials/"+id, &pub); pub.Revoked || again.GetCredentialUrl() != rev.GetCredentialUrl() {
