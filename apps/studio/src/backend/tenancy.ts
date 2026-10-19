@@ -12,12 +12,13 @@ import { Status } from '@assessmatrix/proto/exam_pb'
 import type { ExamCopy as ExamCopyMsg, Tenant as TenantMsg } from '@assessmatrix/proto/tenant_pb'
 import { type Staff, type StaffRole, roleIn, staffIn } from './staff'
 
-export type Tenant = { id: string; name: string; region: string; role: StaffRole; current: boolean }
+/** role 'none': a tenant a super administrator manages without working in it. */
+export type Tenant = { id: string; name: string; region: string; role: StaffRole | 'none'; current: boolean }
 
 /** No access, or a role. */
 export type Grant = StaffRole | 'none'
 
-export type StaffAccess = { email: string; name: string; grants: Record<string, StaffRole> }
+export type StaffAccess = { email: string; name: string; grants: Record<string, StaffRole>; superAdmin: boolean }
 
 export type ExamCopy = {
   tenantId: string
@@ -37,7 +38,7 @@ const tenantIn = (t: TenantMsg): Tenant => ({
   id: t.id,
   name: t.name,
   region: t.region,
-  role: roleIn(t.role),
+  role: t.role === Role.UNSPECIFIED ? 'none' : roleIn(t.role),
   current: t.current,
 })
 
@@ -61,8 +62,9 @@ export const tenancy = {
     if (!r.staff) throw new Error('The switch did not complete. Reload and try again.')
     return staffIn(r.staff)
   },
-  async create(name: string, region = ''): Promise<Tenant> {
-    const r = await api.tenants.createTenant({ name, region })
+  /** Super administrators only. An empty adminEmail makes the caller its administrator. */
+  async create(name: string, region = '', adminEmail = '', adminName = ''): Promise<Tenant> {
+    const r = await api.tenants.createTenant({ name, region, adminEmail, adminName })
     if (!r.tenant) throw new Error('The tenant was not created. Try again.')
     return tenantIn(r.tenant)
   },
@@ -74,6 +76,7 @@ export const tenancy = {
         email: s.email,
         name: s.name,
         grants: Object.fromEntries(s.grants.map((g) => [g.tenantId, roleIn(g.role)])),
+        superAdmin: s.superAdmin,
       })),
     }
   },

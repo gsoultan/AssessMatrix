@@ -22,14 +22,15 @@ const trouble = (err: unknown) => {
 }
 
 /**
- * First run, at /setup: checks the database, then creates the organisation
- * and its first administrator, who is signed in straight away. Once that is
- * done the server refuses a second setup, and this page says so.
+ * First run, at /setup: checks the database, then creates the super
+ * administrator and the default tenant they also administer, and signs them
+ * in straight away. Once that is done the server refuses a second setup, and
+ * this page says so.
  */
 export function Setup() {
   const signedIn = useApp((s) => s.signedIn)
   const [status, setStatus] = useState<SetupStatus | 'error' | undefined>()
-  const [form, setForm] = useState({ code: '', organization: '', name: '', email: '', region: '' })
+  const [form, setForm] = useState({ code: '', organization: 'Default', name: '', email: '', region: '' })
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
 
@@ -47,7 +48,7 @@ export function Setup() {
 
   const submit = async () => {
     if (!form.code.trim()) return setNote('Enter the setup code from the server log.')
-    if (!form.organization.trim()) return setNote('Name your organisation.')
+    if (!form.organization.trim()) return setNote('Name the default tenant.')
     if (!form.email.includes('@')) return setNote('Enter your work email. You will sign in with it.')
     setBusy(true)
     setNote('')
@@ -101,7 +102,7 @@ export function Setup() {
           <div>
             <h1 className="text-[17px] font-semibold tracking-tight">Already set up</h1>
             <p className="mt-1 text-[12.5px] leading-snug text-ink-muted">
-              This server has its organisation and administrator. To add people, ask an administrator.
+              This server has its super administrator and default tenant. To get access, ask an administrator.
             </p>
             <a href="/" className={primary} style={{ background: 'var(--color-s1)' }}>
               Go to sign in <IconArrowRight size={16} stroke={2.2} />
@@ -118,7 +119,7 @@ export function Setup() {
           >
             <h1 className="text-[17px] font-semibold tracking-tight">Set up AssessMatrix</h1>
             <p className="mt-1 text-[12.5px] leading-snug text-ink-muted">
-              Create your organisation and its first administrator. This page works once; after that, people sign in.
+              Create the super administrator and the default tenant. This page works once; after that, users sign in.
             </p>
 
             <div
@@ -164,9 +165,19 @@ export function Setup() {
             </p>
 
             <label htmlFor="setup-org" className={label}>
-              Organisation name
+              Default tenant
             </label>
-            <input id="setup-org" autoComplete="organization" value={form.organization} onChange={set('organization')} className={field} />
+            <input
+              id="setup-org"
+              autoComplete="organization"
+              value={form.organization}
+              onChange={set('organization')}
+              aria-describedby="setup-org-help"
+              className={field}
+            />
+            <p id="setup-org-help" className="mt-1 text-[12px] leading-snug text-ink-muted">
+              The first tenant, where you start working. You can create more tenants from Access afterwards.
+            </p>
 
             <label htmlFor="setup-name" className={label}>
               Your name
@@ -186,7 +197,8 @@ export function Setup() {
               className={field}
             />
             <p id="setup-email-help" className="mt-1 text-[12px] leading-snug text-ink-muted">
-              You will be the administrator. Later you sign in with this address and a code sent to it.
+              You will be the super administrator: you create tenants and choose who administers each. You sign in
+              with this address and a code sent to it.
             </p>
 
             <label htmlFor="setup-region" className={label}>
@@ -204,7 +216,7 @@ export function Setup() {
             </p>
 
             <button type="submit" disabled={busy || !!behind} className={primary} style={{ background: 'var(--color-s1)' }}>
-              Create organisation and sign in <IconArrowRight size={16} stroke={2.2} />
+              Create super administrator and sign in <IconArrowRight size={16} stroke={2.2} />
             </button>
           </form>
         )}

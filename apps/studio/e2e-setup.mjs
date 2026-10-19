@@ -2,8 +2,8 @@
  * A fresh install, first run, in a browser: the core started on an empty
  * database sets up its own schema, says in its log where to finish, and the
  * first visitor is sent to /setup. A wrong setup code is refused; the right
- * one creates the organisation and signs its administrator straight into the
- * studio. After that /setup is closed, and says so.
+ * one creates the super administrator and the default tenant and signs them
+ * straight into the studio. After that /setup is closed, and says so.
  *
  *   URL         where the core serves the built studio
  *   SETUP_CODE  the code the core printed (scripts/e2e-setup.sh reads its log)
@@ -46,10 +46,10 @@ try {
   check(serious.length === 0, 'axe finds no serious or critical WCAG problem on /setup', `axe: ${serious.map((v) => v.id).join(', ')}`)
 
   await page.getByLabel('Setup code').fill('AAAA-BBBB-CCCC')
-  await page.getByLabel('Organisation name').fill('Lembaga Sertifikasi Uji')
+  await page.getByLabel('Default tenant').fill('Lembaga Sertifikasi Uji')
   await page.getByLabel('Your name').fill('Admin Pertama')
   await page.getByLabel('Your work email').fill('admin@lembaga.example.id')
-  await page.getByRole('button', { name: /Create organisation/ }).click()
+  await page.getByRole('button', { name: /Create super administrator/ }).click()
   await page.getByText('That setup code is wrong').waitFor({ timeout: 10_000 }).then(
     () => ok('a wrong setup code is refused, with where to find the right one'),
     () => bad('a wrong setup code was not refused'),
@@ -57,11 +57,12 @@ try {
 
   // Typed as read off a log: lower case, spaces for dashes.
   await page.getByLabel('Setup code').fill(CODE.toLowerCase().replaceAll('-', ' '))
-  await page.getByRole('button', { name: /Create organisation/ }).click()
+  await page.getByRole('button', { name: /Create super administrator/ }).click()
   await page.getByText('Lembaga Sertifikasi Uji').first().waitFor({ timeout: 15_000 }).then(
-    () => ok('the right code creates the organisation and signs the administrator into the studio'),
+    () => ok('the right code creates the default tenant and signs the super administrator into the studio'),
     () => bad('setup did not end signed in to the studio'),
   )
+  check(await page.getByText('Super administrator').first().isVisible(), 'the studio shows them as the super administrator')
   check(new globalThis.URL(page.url()).pathname === '/', 'the address is back to / after setup')
 
   await page.reload()

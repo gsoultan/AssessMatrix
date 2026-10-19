@@ -26,8 +26,11 @@ const (
 	Public Access = iota + 1
 	Staff
 	Candidate
-	// Admin is a staff member whose role in the session's tenant is admin.
+	// Admin is a staff member whose role in the session's tenant is admin,
+	// or a super administrator.
 	Admin
+	// SuperAdmin is a staff member who runs the whole installation.
+	SuperAdmin
 )
 
 // Roles a staff member can hold in a tenant, as stored.
@@ -50,6 +53,8 @@ type Principal struct {
 	AssignmentID string
 	// Role is the staff member's role in Tenant. Empty for a candidate.
 	Role string
+	// Super is a super administrator: tenants, and who administers them.
+	Super bool
 }
 
 type ctxKey struct{}
@@ -77,6 +82,9 @@ var errUnauthenticated = connect.NewError(connect.CodeUnauthenticated, errors.Ne
 
 // ErrNotAdmin refuses a member an administrator's procedure.
 var ErrNotAdmin = connect.NewError(connect.CodePermissionDenied, errors.New("only an administrator of this tenant can do this"))
+
+// ErrNotSuperAdmin refuses anyone else a super administrator's procedure.
+var ErrNotSuperAdmin = connect.NewError(connect.CodePermissionDenied, errors.New("only a super administrator can do this"))
 
 // Interceptor enforces the policy on every unary call.
 func (a *Authenticator) Interceptor() connect.Interceptor { return interceptor{a} }
@@ -131,8 +139,17 @@ func (a *Authenticator) authorize(ctx context.Context, procedure string, h http.
 		if err != nil {
 			return nil, err
 		}
-		if p.Role != RoleAdmin {
+		if p.Role != RoleAdmin && !p.Super {
 			return nil, ErrNotAdmin
+		}
+		return with(ctx, p), nil
+	case SuperAdmin:
+		p, err := a.staff(ctx, h)
+		if err != nil {
+			return nil, err
+		}
+		if !p.Super {
+			return nil, ErrNotSuperAdmin
 		}
 		return with(ctx, p), nil
 	case Candidate:
@@ -161,8 +178,8 @@ func (a *Authenticator) staff(ctx context.Context, h http.Header) (*Principal, e
 	}
 	var p Principal
 	err := a.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT tenant_id, staff_id, role FROM am_staff_session($1)`, a.Keys.SessionHash(token)).
-			Scan(&p.Tenant, &p.StaffID, &p.Role)
+		return tx.QueryRow(ctx, `SELECT tenant_id, staff_id, role, super_admin FROM am_staff_session($1)`, a.Keys.SessionHash(token)).
+			Scan(&p.Tenant, &p.StaffID, &p.Role, &p.Super)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errUnauthenticated

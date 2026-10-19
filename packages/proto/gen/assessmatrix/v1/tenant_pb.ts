@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/tenant.proto.
  */
 export const file_assessmatrix_v1_tenant: GenFile = /*@__PURE__*/
-  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvdGVuYW50LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiaAoGVGVuYW50EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGcmVnaW9uGAMgASgJEiMKBHJvbGUYBCABKA4yFS5hc3Nlc3NtYXRyaXgudjEuUm9sZRIPCgdjdXJyZW50GAUgASgIIhYKFExpc3RNeVRlbmFudHNSZXF1ZXN0IkEKFUxpc3RNeVRlbmFudHNSZXNwb25zZRIoCgd0ZW5hbnRzGAEgAygLMhcuYXNzZXNzbWF0cml4LnYxLlRlbmFudCIoChNTd2l0Y2hUZW5hbnRSZXF1ZXN0EhEKCXRlbmFudF9pZBgBIAEoCSI9ChRTd2l0Y2hUZW5hbnRSZXNwb25zZRIlCgVzdGFmZhgBIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TdGFmZiIzChNDcmVhdGVUZW5hbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGcmVnaW9uGAIgASgJIj8KFENyZWF0ZVRlbmFudFJlc3BvbnNlEicKBnRlbmFudBgBIAEoCzIXLmFzc2Vzc21hdHJpeC52MS5UZW5hbnQiEwoRTGlzdEFjY2Vzc1JlcXVlc3QiRQoLQWNjZXNzR3JhbnQSEQoJdGVuYW50X2lkGAEgASgJEiMKBHJvbGUYAiABKA4yFS5hc3Nlc3NtYXRyaXgudjEuUm9sZSJYCgtTdGFmZkFjY2VzcxINCgVlbWFpbBgBIAEoCRIMCgRuYW1lGAIgASgJEiwKBmdyYW50cxgDIAMoCzIcLmFzc2Vzc21hdHJpeC52MS5BY2Nlc3NHcmFudCJrChJMaXN0QWNjZXNzUmVzcG9uc2USKAoHdGVuYW50cxgBIAMoCzIXLmFzc2Vzc21hdHJpeC52MS5UZW5hbnQSKwoFc3RhZmYYAiADKAsyHC5hc3Nlc3NtYXRyaXgudjEuU3RhZmZBY2Nlc3MiZwoQU2V0QWNjZXNzUmVxdWVzdBINCgVlbWFpbBgBIAEoCRIMCgRuYW1lGAIgASgJEhEKCXRlbmFudF9pZBgDIAEoCRIjCgRyb2xlGAQgASgOMhUuYXNzZXNzbWF0cml4LnYxLlJvbGUiQAoRU2V0QWNjZXNzUmVzcG9uc2USKwoFc3RhZmYYASABKAsyHC5hc3Nlc3NtYXRyaXgudjEuU3RhZmZBY2Nlc3MiKAoVTGlzdEV4YW1Db3BpZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkinwEKCEV4YW1Db3B5EhEKCXRlbmFudF9pZBgBIAEoCRITCgt0ZW5hbnRfbmFtZRgCIAEoCRIPCgdleGFtX2lkGAMgASgJEhYKDnNvdXJjZV92ZXJzaW9uGAQgASgFEhkKEXB1Ymxpc2hlZF92ZXJzaW9uGAUgASgFEicKBnN0YXR1cxgGIAEoDjIXLmFzc2Vzc21hdHJpeC52MS5TdGF0dXMiQwoWTGlzdEV4YW1Db3BpZXNSZXNwb25zZRIpCgZjb3BpZXMYASADKAsyGS5hc3Nlc3NtYXRyaXgudjEuRXhhbUNvcHkiSAoQU2hhcmVFeGFtUmVxdWVzdBIPCgdleGFtX2lkGAEgASgJEg8KB3ZlcnNpb24YAiABKAUSEgoKdGVuYW50X2lkcxgDIAMoCSJYCgtTaGFyZVJlc3VsdBIRCgl0ZW5hbnRfaWQYASABKAkSJwoEY29weRgCIAEoCzIZLmFzc2Vzc21hdHJpeC52MS5FeGFtQ29weRINCgVlcnJvchgDIAEoCSJCChFTaGFyZUV4YW1SZXNwb25zZRItCgdyZXN1bHRzGAEgAygLMhwuYXNzZXNzbWF0cml4LnYxLlNoYXJlUmVzdWx0MosFCg1UZW5hbnRTZXJ2aWNlEl4KDUxpc3RNeVRlbmFudHMSJS5hc3Nlc3NtYXRyaXgudjEuTGlzdE15VGVuYW50c1JlcXVlc3QaJi5hc3Nlc3NtYXRyaXgudjEuTGlzdE15VGVuYW50c1Jlc3BvbnNlElsKDFN3aXRjaFRlbmFudBIkLmFzc2Vzc21hdHJpeC52MS5Td2l0Y2hUZW5hbnRSZXF1ZXN0GiUuYXNzZXNzbWF0cml4LnYxLlN3aXRjaFRlbmFudFJlc3BvbnNlElsKDENyZWF0ZVRlbmFudBIkLmFzc2Vzc21hdHJpeC52MS5DcmVhdGVUZW5hbnRSZXF1ZXN0GiUuYXNzZXNzbWF0cml4LnYxLkNyZWF0ZVRlbmFudFJlc3BvbnNlElUKCkxpc3RBY2Nlc3MSIi5hc3Nlc3NtYXRyaXgudjEuTGlzdEFjY2Vzc1JlcXVlc3QaIy5hc3Nlc3NtYXRyaXgudjEuTGlzdEFjY2Vzc1Jlc3BvbnNlElIKCVNldEFjY2VzcxIhLmFzc2Vzc21hdHJpeC52MS5TZXRBY2Nlc3NSZXF1ZXN0GiIuYXNzZXNzbWF0cml4LnYxLlNldEFjY2Vzc1Jlc3BvbnNlEmEKDkxpc3RFeGFtQ29waWVzEiYuYXNzZXNzbWF0cml4LnYxLkxpc3RFeGFtQ29waWVzUmVxdWVzdBonLmFzc2Vzc21hdHJpeC52MS5MaXN0RXhhbUNvcGllc1Jlc3BvbnNlElIKCVNoYXJlRXhhbRIhLmFzc2Vzc21hdHJpeC52MS5TaGFyZUV4YW1SZXF1ZXN0GiIuYXNzZXNzbWF0cml4LnYxLlNoYXJlRXhhbVJlc3BvbnNlQtIBChNjb20uYXNzZXNzbWF0cml4LnYxQgtUZW5hbnRQcm90b1ABWlFnaXRodWIuY29tL2dzb3VsdGFuL2Fzc2Vzc21hdHJpeC9zZXJ2aWNlcy9jb3JlL2dlbi9hc3Nlc3NtYXRyaXgvdjE7YXNzZXNzbWF0cml4djGiAgNBWFiqAg9Bc3Nlc3NtYXRyaXguVjHKAg9Bc3Nlc3NtYXRyaXhcVjHiAhtBc3Nlc3NtYXRyaXhcVjFcR1BCTWV0YWRhdGHqAhBBc3Nlc3NtYXRyaXg6OlYxYgZwcm90bzM", [file_assessmatrix_v1_auth, file_assessmatrix_v1_exam]);
+  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvdGVuYW50LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEiaAoGVGVuYW50EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDgoGcmVnaW9uGAMgASgJEiMKBHJvbGUYBCABKA4yFS5hc3Nlc3NtYXRyaXgudjEuUm9sZRIPCgdjdXJyZW50GAUgASgIIhYKFExpc3RNeVRlbmFudHNSZXF1ZXN0IkEKFUxpc3RNeVRlbmFudHNSZXNwb25zZRIoCgd0ZW5hbnRzGAEgAygLMhcuYXNzZXNzbWF0cml4LnYxLlRlbmFudCIoChNTd2l0Y2hUZW5hbnRSZXF1ZXN0EhEKCXRlbmFudF9pZBgBIAEoCSI9ChRTd2l0Y2hUZW5hbnRSZXNwb25zZRIlCgVzdGFmZhgBIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TdGFmZiJcChNDcmVhdGVUZW5hbnRSZXF1ZXN0EgwKBG5hbWUYASABKAkSDgoGcmVnaW9uGAIgASgJEhMKC2FkbWluX2VtYWlsGAMgASgJEhIKCmFkbWluX25hbWUYBCABKAkiPwoUQ3JlYXRlVGVuYW50UmVzcG9uc2USJwoGdGVuYW50GAEgASgLMhcuYXNzZXNzbWF0cml4LnYxLlRlbmFudCITChFMaXN0QWNjZXNzUmVxdWVzdCJFCgtBY2Nlc3NHcmFudBIRCgl0ZW5hbnRfaWQYASABKAkSIwoEcm9sZRgCIAEoDjIVLmFzc2Vzc21hdHJpeC52MS5Sb2xlIm0KC1N0YWZmQWNjZXNzEg0KBWVtYWlsGAEgASgJEgwKBG5hbWUYAiABKAkSLAoGZ3JhbnRzGAMgAygLMhwuYXNzZXNzbWF0cml4LnYxLkFjY2Vzc0dyYW50EhMKC3N1cGVyX2FkbWluGAQgASgIImsKEkxpc3RBY2Nlc3NSZXNwb25zZRIoCgd0ZW5hbnRzGAEgAygLMhcuYXNzZXNzbWF0cml4LnYxLlRlbmFudBIrCgVzdGFmZhgCIAMoCzIcLmFzc2Vzc21hdHJpeC52MS5TdGFmZkFjY2VzcyJnChBTZXRBY2Nlc3NSZXF1ZXN0Eg0KBWVtYWlsGAEgASgJEgwKBG5hbWUYAiABKAkSEQoJdGVuYW50X2lkGAMgASgJEiMKBHJvbGUYBCABKA4yFS5hc3Nlc3NtYXRyaXgudjEuUm9sZSJAChFTZXRBY2Nlc3NSZXNwb25zZRIrCgVzdGFmZhgBIAEoCzIcLmFzc2Vzc21hdHJpeC52MS5TdGFmZkFjY2VzcyIoChVMaXN0RXhhbUNvcGllc1JlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCSKfAQoIRXhhbUNvcHkSEQoJdGVuYW50X2lkGAEgASgJEhMKC3RlbmFudF9uYW1lGAIgASgJEg8KB2V4YW1faWQYAyABKAkSFgoOc291cmNlX3ZlcnNpb24YBCABKAUSGQoRcHVibGlzaGVkX3ZlcnNpb24YBSABKAUSJwoGc3RhdHVzGAYgASgOMhcuYXNzZXNzbWF0cml4LnYxLlN0YXR1cyJDChZMaXN0RXhhbUNvcGllc1Jlc3BvbnNlEikKBmNvcGllcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5FeGFtQ29weSJIChBTaGFyZUV4YW1SZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkSDwoHdmVyc2lvbhgCIAEoBRISCgp0ZW5hbnRfaWRzGAMgAygJIlgKC1NoYXJlUmVzdWx0EhEKCXRlbmFudF9pZBgBIAEoCRInCgRjb3B5GAIgASgLMhkuYXNzZXNzbWF0cml4LnYxLkV4YW1Db3B5Eg0KBWVycm9yGAMgASgJIkIKEVNoYXJlRXhhbVJlc3BvbnNlEi0KB3Jlc3VsdHMYASADKAsyHC5hc3Nlc3NtYXRyaXgudjEuU2hhcmVSZXN1bHQyiwUKDVRlbmFudFNlcnZpY2USXgoNTGlzdE15VGVuYW50cxIlLmFzc2Vzc21hdHJpeC52MS5MaXN0TXlUZW5hbnRzUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5MaXN0TXlUZW5hbnRzUmVzcG9uc2USWwoMU3dpdGNoVGVuYW50EiQuYXNzZXNzbWF0cml4LnYxLlN3aXRjaFRlbmFudFJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuU3dpdGNoVGVuYW50UmVzcG9uc2USWwoMQ3JlYXRlVGVuYW50EiQuYXNzZXNzbWF0cml4LnYxLkNyZWF0ZVRlbmFudFJlcXVlc3QaJS5hc3Nlc3NtYXRyaXgudjEuQ3JlYXRlVGVuYW50UmVzcG9uc2USVQoKTGlzdEFjY2VzcxIiLmFzc2Vzc21hdHJpeC52MS5MaXN0QWNjZXNzUmVxdWVzdBojLmFzc2Vzc21hdHJpeC52MS5MaXN0QWNjZXNzUmVzcG9uc2USUgoJU2V0QWNjZXNzEiEuYXNzZXNzbWF0cml4LnYxLlNldEFjY2Vzc1JlcXVlc3QaIi5hc3Nlc3NtYXRyaXgudjEuU2V0QWNjZXNzUmVzcG9uc2USYQoOTGlzdEV4YW1Db3BpZXMSJi5hc3Nlc3NtYXRyaXgudjEuTGlzdEV4YW1Db3BpZXNSZXF1ZXN0GicuYXNzZXNzbWF0cml4LnYxLkxpc3RFeGFtQ29waWVzUmVzcG9uc2USUgoJU2hhcmVFeGFtEiEuYXNzZXNzbWF0cml4LnYxLlNoYXJlRXhhbVJlcXVlc3QaIi5hc3Nlc3NtYXRyaXgudjEuU2hhcmVFeGFtUmVzcG9uc2VC0gEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCC1RlbmFudFByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw", [file_assessmatrix_v1_auth, file_assessmatrix_v1_exam]);
 
 /**
  * @generated from message assessmatrix.v1.Tenant
@@ -38,7 +38,8 @@ export type Tenant = Message<"assessmatrix.v1.Tenant"> & {
   region: string;
 
   /**
-   * The caller's role there.
+   * The caller's role there. Unspecified for a tenant a super administrator
+   * manages without working in it.
    *
    * @generated from field: assessmatrix.v1.Role role = 4;
    */
@@ -138,6 +139,20 @@ export type CreateTenantRequest = Message<"assessmatrix.v1.CreateTenantRequest">
    * @generated from field: string region = 2;
    */
   region: string;
+
+  /**
+   * Its first administrator. Empty means the caller.
+   *
+   * @generated from field: string admin_email = 3;
+   */
+  adminEmail: string;
+
+  /**
+   * Used when the administrator is new to the installation.
+   *
+   * @generated from field: string admin_name = 4;
+   */
+  adminName: string;
 };
 
 /**
@@ -219,6 +234,11 @@ export type StaffAccess = Message<"assessmatrix.v1.StaffAccess"> & {
    * @generated from field: repeated assessmatrix.v1.AccessGrant grants = 3;
    */
   grants: AccessGrant[];
+
+  /**
+   * @generated from field: bool super_admin = 4;
+   */
+  superAdmin: boolean;
 };
 
 /**
@@ -233,7 +253,8 @@ export const StaffAccessSchema: GenMessage<StaffAccess> = /*@__PURE__*/
  */
 export type ListAccessResponse = Message<"assessmatrix.v1.ListAccessResponse"> & {
   /**
-   * The tenants the caller administers: the columns of the access table.
+   * The tenants the caller administers (every tenant, for a super
+   * administrator): the columns of the access table.
    *
    * @generated from field: repeated assessmatrix.v1.Tenant tenants = 1;
    */
@@ -491,7 +512,7 @@ export const TenantService: GenService<{
     output: typeof SwitchTenantResponseSchema;
   },
   /**
-   * Admin. A new tenant, with the caller as its first admin.
+   * Super administrator. A new tenant and its first administrator.
    *
    * @generated from rpc assessmatrix.v1.TenantService.CreateTenant
    */
@@ -501,7 +522,8 @@ export const TenantService: GenService<{
     output: typeof CreateTenantResponseSchema;
   },
   /**
-   * Admin. Everyone with access to any tenant the caller administers.
+   * Admin. Everyone with access to any tenant the caller administers; for a
+   * super administrator, every tenant.
    *
    * @generated from rpc assessmatrix.v1.TenantService.ListAccess
    */
@@ -511,7 +533,9 @@ export const TenantService: GenService<{
     output: typeof ListAccessResponseSchema;
   },
   /**
-   * Admin of the named tenant. Grants, changes or withdraws one person's access.
+   * Admin of the named tenant, or a super administrator. Grants, changes or
+   * withdraws one person's access. Only a super administrator grants the
+   * admin role or changes an administrator's access.
    *
    * @generated from rpc assessmatrix.v1.TenantService.SetAccess
    */

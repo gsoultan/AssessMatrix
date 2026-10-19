@@ -63,9 +63,9 @@ docker compose --profile tls up -d
 docker compose logs core | grep setup_code
 ```
 
-Then open `https://<AM_DOMAIN>/setup`, enter that code, and create your organisation and its
-administrator. The database schema is applied before the core starts; `/setup` shows it is
-ready and locks itself once the first administrator exists.
+Then open `https://<AM_DOMAIN>/setup`, enter that code, and create the super administrator
+and the default tenant. The database schema is applied before the core starts; `/setup` shows
+it is ready and locks itself once the first tenant exists.
 
 ## Run it locally
 

@@ -278,11 +278,10 @@ func checkIsolation(t *testing.T, memberOfA bool) {
 			get(b.tenants.SwitchTenant(ctx, connect.NewRequest(&v1.SwitchTenantRequest{TenantId: tenantB})))
 		},
 		"/assessmatrix.v1.TenantService/CreateTenant": func() {
-			made := get(b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Beta Two"}))).Msg.GetTenant()
-			for _, tn := range get(a.tenants.ListMyTenants(ctx, connect.NewRequest(&v1.ListMyTenantsRequest{}))).Msg.GetTenants() {
-				if tn.GetId() == made.GetId() {
-					t.Error("CreateTenant: B's new tenant was handed to A")
-				}
+			// Only a super administrator makes tenants; B administers one.
+			_, err := b.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Beta Two", AdminEmail: "mole@example.test"}))
+			if code(err) != connect.CodePermissionDenied {
+				t.Errorf("CreateTenant by a tenant's administrator: %v, want permission denied", err)
 			}
 		},
 		"/assessmatrix.v1.TenantService/ListAccess": func() {
@@ -301,7 +300,7 @@ func checkIsolation(t *testing.T, memberOfA bool) {
 			}
 		},
 		"/assessmatrix.v1.TenantService/SetAccess": func() {
-			_, err := b.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: "mole@example.test", TenantId: tenantA, Role: v1.Role_ROLE_ADMIN}))
+			_, err := b.tenants.SetAccess(ctx, connect.NewRequest(&v1.SetAccessRequest{Email: "mole@example.test", TenantId: tenantA, Role: v1.Role_ROLE_MEMBER}))
 			if memberOfA {
 				if code(err) != connect.CodePermissionDenied {
 					t.Errorf("SetAccess: a member of A changed who works there (err %v)", err)
@@ -528,6 +527,10 @@ func TestNoTenantSeesNothing(t *testing.T) {
 // must be scoped by row-level security, so a new table without it fails here.
 var unscopedTables = map[string]string{
 	"schema_migrations": "migration bookkeeping; the application role has no grant on it",
+	// A property of a person across the installation, not of one tenant.
+	// RLS is on with no policy and the application role has no grant; it is
+	// read only through am_super_admin and am_staff_session.
+	"super_admins": "installation-wide; the application role has no grant on it",
 	// River's own tables. Job arguments carry ids only (mail.SendArgs,
 	// webhook.DeliverArgs, RetentionArgs); each worker looks the row up with
 	// a SECURITY DEFINER function and then works inside that row's tenant.
@@ -660,6 +663,7 @@ func TestForeignKeysStayInsideATenant(t *testing.T) {
 // a hole in it by design. Each is listed here with what keeps it narrow; a new
 // one fails this test until someone has looked at it.
 var definerFunctions = map[string]string{
+	"am_all_tenants":             "every tenant's id, name and region; called only for a super administrator",
 	"am_assignment_by_session":   "candidate cookie hash to its one assignment",
 	"am_assignment_by_token":     "invitation link hash to its one assignment",
 	"am_outbox_sweep":            "deletes sent mail past its keep; returns a count",
@@ -669,6 +673,7 @@ var definerFunctions = map[string]string{
 	"am_purge_attempt":           "refuses unless the attempt is in the caller's tenant",
 	"am_retention_due":           "retention worker: ids due for purging, across tenants",
 	"am_schema_version":          "newest migration name",
+	"am_super_admin":             "whether one address is a super administrator; says nothing else",
 	"am_setup_first_tenant":      "refuses once any tenant exists",
 	"am_setup_needed":            "whether any tenant exists",
 	"am_staff_by_email":          "sign-in: an address to one of its own memberships",

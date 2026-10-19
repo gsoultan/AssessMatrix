@@ -30,7 +30,25 @@ func (c *client) setAccess(email, tenant string, role v1.Role) error {
 
 func (c *client) newTenant(t *testing.T, name string) string {
 	t.Helper()
-	return get(c.tenants.CreateTenant(context.Background(), connect.NewRequest(&v1.CreateTenantRequest{Name: name}))).Msg.GetTenant().GetId()
+	return c.newTenantFor(t, name, "")
+}
+
+// newTenantFor is a super administrator making a tenant for an administrator.
+func (c *client) newTenantFor(t *testing.T, name, admin string) string {
+	t.Helper()
+	return get(c.tenants.CreateTenant(context.Background(), connect.NewRequest(&v1.CreateTenantRequest{Name: name, AdminEmail: admin}))).
+		Msg.GetTenant().GetId()
+}
+
+// superAdmin creates a tenant whose signed-in administrator also runs the
+// installation.
+func (h *harness) superAdmin(name string) *client {
+	h.t.Helper()
+	c := h.tenant(name)
+	if _, err := h.owner.Exec(context.Background(), `INSERT INTO super_admins (email) VALUES (lower($1))`, c.me(h.t).GetEmail()); err != nil {
+		h.t.Fatal(err)
+	}
+	return c
 }
 
 func (c *client) switchTo(t *testing.T, tenant string) {
@@ -52,11 +70,12 @@ func TestAdminLimitsAMemberToChosenTenants(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 	admin := h.tenant("Org A")
-	tA := h.lastTenant
-	tB := admin.newTenant(t, "Org B")
-	tC := admin.newTenant(t, "Org C")
+	tA, adminEmail := h.lastTenant, admin.me(t).GetEmail()
+	super := h.superAdmin("Org HQ")
+	tB := super.newTenantFor(t, "Org B", adminEmail)
+	tC := super.newTenantFor(t, "Org C", adminEmail)
 	if n := len(admin.myTenants(t)); n != 3 {
-		t.Fatalf("the admin should be in the three tenants they made, got %d", n)
+		t.Fatalf("the admin should be in the three tenants they were given, got %d", n)
 	}
 
 	member := newEmail("member")
@@ -119,6 +138,11 @@ func TestAdminLimitsAMemberToChosenTenants(t *testing.T) {
 	_, err = m.tenants.ShareExam(ctx, connect.NewRequest(&v1.ShareExamRequest{ExamId: inA.GetId(), TenantIds: []string{tC}}))
 	denied("ShareExam", err)
 
+	// An administrator adds users but makes no tenants and no administrators.
+	_, err = admin.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Mine"}))
+	denied("CreateTenant by an administrator", err)
+	denied("SetAccess as admin by an administrator", admin.setAccess(member, tA, v1.Role_ROLE_ADMIN))
+
 	// The admin's table shows the member in A and B only.
 	access := get(admin.tenants.ListAccess(ctx, connect.NewRequest(&v1.ListAccessRequest{}))).Msg
 	if len(access.GetTenants()) != 3 {
@@ -154,26 +178,104 @@ func TestAdminLimitsAMemberToChosenTenants(t *testing.T) {
 	}
 }
 
-// A tenant always keeps an administrator.
+// A tenant always keeps an administrator, and only a super administrator
+// changes who administers it.
 func TestATenantKeepsAnAdministrator(t *testing.T) {
 	h := newHarness(t)
 	admin := h.tenant("Solo")
 	tn, me := h.lastTenant, admin.me(t).GetEmail()
-	if err := admin.setAccess(me, tn, v1.Role_ROLE_MEMBER); code(err) != connect.CodeFailedPrecondition {
-		t.Errorf("the last admin demoted themselves: %v", err)
+	if err := admin.setAccess(me, tn, v1.Role_ROLE_MEMBER); code(err) != connect.CodePermissionDenied {
+		t.Errorf("an administrator demoted themselves: %v", err)
 	}
-	if err := admin.setAccess(me, tn, v1.Role_ROLE_UNSPECIFIED); code(err) != connect.CodeFailedPrecondition {
-		t.Errorf("the last admin removed themselves: %v", err)
+	if err := admin.setAccess(newEmail("deputy"), tn, v1.Role_ROLE_ADMIN); code(err) != connect.CodePermissionDenied {
+		t.Errorf("an administrator made another: %v", err)
 	}
-	if err := admin.setAccess(newEmail("deputy"), tn, v1.Role_ROLE_ADMIN); err != nil {
-		t.Fatal(err)
+
+	super := h.superAdmin("Solo HQ")
+	if err := super.setAccess(me, tn, v1.Role_ROLE_MEMBER); code(err) != connect.CodeFailedPrecondition {
+		t.Errorf("the super administrator demoted the last admin: %v", err)
 	}
-	if err := admin.setAccess(me, tn, v1.Role_ROLE_MEMBER); err != nil {
-		t.Fatalf("with a second admin, stepping down should work: %v", err)
+	if err := super.setAccess(me, tn, v1.Role_ROLE_UNSPECIFIED); code(err) != connect.CodeFailedPrecondition {
+		t.Errorf("the super administrator removed the last admin: %v", err)
+	}
+	deputy := newEmail("deputy")
+	if err := super.setAccess(deputy, tn, v1.Role_ROLE_ADMIN); err != nil {
+		t.Fatalf("the super administrator, in a tenant they do not work in, making an admin: %v", err)
+	}
+	if err := super.setAccess(me, tn, v1.Role_ROLE_MEMBER); err != nil {
+		t.Fatalf("with a second admin, stepping someone down should work: %v", err)
 	}
 	// The role is read on every request, so the change applies at once.
 	if _, err := admin.tenants.ListAccess(context.Background(), connect.NewRequest(&v1.ListAccessRequest{})); code(err) != connect.CodePermissionDenied {
-		t.Errorf("an admin who stepped down still administers: %v", err)
+		t.Errorf("an admin who was stepped down still administers: %v", err)
+	}
+	// The new administrator can remove a member, but not the super
+	// administrator's choice of administrators.
+	d := h.signIn(deputy)
+	if err := d.setAccess(me, tn, v1.Role_ROLE_UNSPECIFIED); err != nil {
+		t.Errorf("an administrator removing a member: %v", err)
+	}
+	if err := d.setAccess(deputy, tn, v1.Role_ROLE_MEMBER); code(err) != connect.CodePermissionDenied {
+		t.Errorf("an administrator changing an administrator: %v", err)
+	}
+	var by string
+	if err := h.owner.QueryRow(context.Background(), `SELECT detail->>'by' FROM audit_log WHERE tenant_id = $1
+		AND action = 'staff.access' AND detail->>'email' = $2`, tn, deputy).Scan(&by); err != nil {
+		t.Fatal(err)
+	}
+	if by != super.me(t).GetEmail() {
+		t.Errorf("the audit log says %q made the deputy an admin, want the super administrator", by)
+	}
+}
+
+// A super administrator makes a tenant for someone new; that administrator
+// adds users to it and nowhere else.
+func TestSuperAdminCreatesTenantsForAdministrators(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	super := h.superAdmin("Pusat")
+	if !super.me(t).GetSuperAdmin() {
+		t.Fatal("WhoAmI does not say the super administrator is one")
+	}
+	boss := newEmail("boss")
+	tn := get(super.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Cabang", AdminEmail: boss, AdminName: "Bu Boss"}))).Msg.GetTenant()
+	if tn.GetRole() != v1.Role_ROLE_UNSPECIFIED {
+		t.Errorf("the super administrator was given %v in a tenant made for someone else", tn.GetRole())
+	}
+	for _, m := range super.myTenants(t) {
+		if m.GetId() == tn.GetId() {
+			t.Error("a tenant made for someone else is among the super administrator's own")
+		}
+	}
+	h.mail(boss, "staff-access")
+
+	a := h.signIn(boss)
+	if me := a.me(t); me.GetRole() != v1.Role_ROLE_ADMIN || me.GetTenantId() != tn.GetId() || me.GetSuperAdmin() {
+		t.Fatalf("the new administrator signed in as %v (super %v) in %s", me.GetRole(), me.GetSuperAdmin(), me.GetTenantName())
+	}
+	user := newEmail("user")
+	if err := a.setAccess(user, tn.GetId(), v1.Role_ROLE_MEMBER); err != nil {
+		t.Fatalf("the administrator adding a user: %v", err)
+	}
+	if err := a.setAccess(newEmail("user"), h.lastTenant, v1.Role_ROLE_MEMBER); code(err) != connect.CodeNotFound {
+		t.Errorf("the administrator adding a user to a tenant they were not given: %v", err)
+	}
+	if _, err := a.tenants.CreateTenant(ctx, connect.NewRequest(&v1.CreateTenantRequest{Name: "Sendiri"})); code(err) != connect.CodePermissionDenied {
+		t.Errorf("an administrator creating a tenant: %v", err)
+	}
+	if err := super.setAccess(user, h.lastTenant, v1.Role_ROLE_MEMBER); err != nil {
+		t.Fatalf("the super administrator adding a user to their own tenant: %v", err)
+	}
+	// The administrator's table has their tenant only, the super
+	// administrator's grants elsewhere not included.
+	access := get(a.tenants.ListAccess(ctx, connect.NewRequest(&v1.ListAccessRequest{}))).Msg
+	if len(access.GetTenants()) != 1 || access.GetTenants()[0].GetId() != tn.GetId() {
+		t.Fatalf("the administrator's access table has %d tenants", len(access.GetTenants()))
+	}
+	for _, st := range access.GetStaff() {
+		if st.GetEmail() == user && len(st.GetGrants()) != 1 {
+			t.Errorf("the administrator sees %d grants for the user, want just their tenant", len(st.GetGrants()))
+		}
 	}
 }
 
@@ -189,10 +291,10 @@ func TestAdminRightsAreCheckedInEachTenant(t *testing.T) {
 	if err := y.setAccess(emailX, tY, v1.Role_ROLE_MEMBER); err != nil {
 		t.Fatal(err)
 	}
-	if err := x.setAccess(newEmail("friend"), tY, v1.Role_ROLE_ADMIN); code(err) != connect.CodePermissionDenied {
+	if err := x.setAccess(newEmail("friend"), tY, v1.Role_ROLE_MEMBER); code(err) != connect.CodePermissionDenied {
 		t.Errorf("granting access where you are only a member: %v", err)
 	}
-	if err := x.setAccess(newEmail("friend"), tZ, v1.Role_ROLE_ADMIN); code(err) != connect.CodeNotFound {
+	if err := x.setAccess(newEmail("friend"), tZ, v1.Role_ROLE_MEMBER); code(err) != connect.CodeNotFound {
 		t.Errorf("granting access to a tenant you are not in: %v", err)
 	}
 	f := h.publishedFixture(x)
@@ -222,7 +324,7 @@ func TestAdminRightsAreCheckedInEachTenant(t *testing.T) {
 func TestSharingRollsAVersionOutToChosenTenants(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
-	a := h.tenant("Head office")
+	a := h.superAdmin("Head office")
 	email := a.me(t).GetEmail()
 	tB := a.newTenant(t, "Branch B")
 	tC := a.newTenant(t, "Branch C")
