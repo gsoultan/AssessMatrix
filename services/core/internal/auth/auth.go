@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
+
+	"github.com/gsoultan/storm"
 
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
 )
 
 // Access is who may call a procedure.
@@ -176,18 +178,22 @@ func (a *Authenticator) staff(ctx context.Context, h http.Header) (*Principal, e
 	if !secure.ValidToken(token) {
 		return nil, errUnauthenticated
 	}
-	var p Principal
-	err := a.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT tenant_id, staff_id, role, super_admin FROM am_staff_session($1)`, a.Keys.SessionHash(token)).
-			Scan(&p.Tenant, &p.StaffID, &p.Role, &p.Super)
+	var r queries.StaffSessionRow
+	var ok bool
+	err := a.DB.Unscoped(ctx, func(tx *db.Tx) (err error) {
+		r, ok, err = queries.StaffSession.One(ctx, tx, a.Keys.SessionHash(token))
+		return err
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, errUnauthenticated
-	}
 	if err != nil {
 		return nil, fmt.Errorf("resolve staff session: %w", err)
 	}
-	return &p, nil
+	if !ok {
+		return nil, errUnauthenticated
+	}
+	return &Principal{
+		Tenant: db.TenantID(storm.UUID(r.TenantID).String()), StaffID: storm.UUID(r.StaffID).String(),
+		Role: r.Role, Super: r.SuperAdmin,
+	}, nil
 }
 
 func (a *Authenticator) candidate(ctx context.Context, h http.Header) (*Principal, error) {
@@ -195,18 +201,21 @@ func (a *Authenticator) candidate(ctx context.Context, h http.Header) (*Principa
 	if !secure.ValidToken(token) {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no invitation session"))
 	}
-	var p Principal
-	err := a.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT tenant_id, assignment_id FROM am_assignment_by_session($1)`, a.Keys.SessionHash(token)).
-			Scan(&p.Tenant, &p.AssignmentID)
+	var r queries.SessionAssignment
+	var ok bool
+	err := a.DB.Unscoped(ctx, func(tx *db.Tx) (err error) {
+		r, ok, err = queries.AssignmentBySession.One(ctx, tx, a.Keys.SessionHash(token))
+		return err
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("this session has ended"))
-	}
 	if err != nil {
 		return nil, fmt.Errorf("resolve candidate session: %w", err)
 	}
-	return &p, nil
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("this session has ended"))
+	}
+	return &Principal{
+		Tenant: db.TenantID(storm.UUID(r.TenantID).String()), AssignmentID: storm.UUID(r.AssignmentID).String(),
+	}, nil
 }
 
 // SetCookie writes an HttpOnly, SameSite=Strict session cookie.

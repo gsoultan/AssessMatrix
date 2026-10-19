@@ -13,6 +13,7 @@ import (
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
 )
 
 // procedures lists every RPC in the schema, from the generated descriptors,
@@ -513,8 +514,8 @@ func TestNoTenantSeesNothing(t *testing.T) {
 	ctx := context.Background()
 	for _, table := range tenantTables(t, h) {
 		var n int
-		err := h.srv.DB.Unscoped(ctx, func(tx pgx.Tx) error {
-			return tx.QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()).Scan(&n)
+		err := h.srv.DB.Unscoped(ctx, func(tx *db.Tx) error {
+			return tx.Pgx().QueryRow(ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()).Scan(&n)
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -524,8 +525,8 @@ func TestNoTenantSeesNothing(t *testing.T) {
 		}
 	}
 	var other int
-	err := h.srv.DB.InTenant(ctx, db.TenantID("00000000-0000-0000-0000-000000000000"), func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT count(*) FROM exams`).Scan(&other)
+	err := h.srv.DB.InTenant(ctx, db.TenantID("00000000-0000-0000-0000-000000000000"), func(tx *db.Tx) error {
+		return tx.Pgx().QueryRow(ctx, `SELECT count(*) FROM exams`).Scan(&other)
 	})
 	if err != nil || other != 0 {
 		t.Errorf("a tenant with no data sees %d exams (err %v)", other, err)
@@ -658,9 +659,14 @@ func TestForeignKeysStayInsideATenant(t *testing.T) {
 	b := h.tenant("KeysB")
 	tenantB := h.lastTenant
 	fb := h.publishedFixture(b)
-	err = h.srv.DB.InTenant(ctx, db.TenantID(tenantB), func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO assignments (tenant_id, exam_id, exam_version, person_id, sitting)
-			VALUES (am_tenant(), $1, 1, $2, 99)`, fa.exam.GetId(), fb.person.GetId())
+	err = h.srv.DB.InTenant(ctx, db.TenantID(tenantB), func(tx *db.Tx) error {
+		n := assignment.Create()
+		n.SetTenantID(tx.Tenant())
+		n.SetExamID(key(fa.exam.GetId()))
+		n.SetExamVersion(1)
+		n.SetPersonID(key(fb.person.GetId()))
+		n.SetSitting(99)
+		_, err := n.Insert(ctx, tx)
 		return err
 	})
 	if !isForeignKeyViolation(err) {

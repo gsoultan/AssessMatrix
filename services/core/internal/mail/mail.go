@@ -13,12 +13,14 @@ import (
 	"net/smtp"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
+	"github.com/gsoultan/storm"
+
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/outbox"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
 )
 
 // Message is one email.
@@ -52,29 +54,38 @@ func (w *Worker) Work(ctx context.Context, job *river.Job[SendArgs]) error {
 
 // Deliver sends one outbox row if it has not been sent. Idempotent.
 func Deliver(ctx context.Context, d *db.DB, s Sender, id string) error {
-	var tenant string
-	err := d.Unscoped(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT am_outbox_tenant($1)::text`, id).Scan(&tenant)
+	key, err := storm.ParseUUID(id)
+	if err != nil {
+		return river.JobCancel(fmt.Errorf("outbox row %q: %w", id, err))
+	}
+	var tenant queries.TenantOf
+	err = d.Unscoped(ctx, func(tx *db.Tx) (err error) {
+		tenant, _, err = queries.OutboxTenant.One(ctx, tx, key)
+		return err
 	})
-	if err != nil || tenant == "" {
+	t, found := tenant.TenantID.Get()
+	if err != nil || !found {
 		return river.JobCancel(fmt.Errorf("outbox row %s not found: %w", id, err))
 	}
-	return d.InTenant(ctx, db.TenantID(tenant), func(tx pgx.Tx) error {
-		var m Message
-		var sent *time.Time
-		err := tx.QueryRow(ctx, `SELECT id, kind, to_addr, subject, body, sent_at FROM outbox WHERE id = $1 FOR UPDATE`, id).
-			Scan(&m.ID, &m.Kind, &m.To, &m.Subject, &m.Body, &sent)
+	return d.InTenant(ctx, db.TenantID(storm.UUID(t).String()), func(tx *db.Tx) error {
+		r, ok, err := outbox.New().IDEq(key).ForUpdate().One(ctx, tx)
 		if err != nil {
 			return err
 		}
-		if sent != nil {
+		if !ok {
+			return fmt.Errorf("outbox row %s not found", id)
+		}
+		if r.SentAt.Valid {
 			return nil
 		}
+		m := Message{ID: id, Kind: r.Kind, To: r.ToAddr, Subject: r.Subject, Body: r.Body}
 		if err := s.Send(ctx, m); err != nil {
 			return fmt.Errorf("send %s: %w", id, err)
 		}
-		_, err = tx.Exec(ctx, `UPDATE outbox SET sent_at = now(), body = '' WHERE id = $1`, id)
-		return err
+		mu := outbox.MutateKey(key)
+		mu.SetSentAtNow()
+		mu.SetBody("")
+		return mu.Update(ctx, tx)
 	})
 }
 

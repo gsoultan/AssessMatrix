@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/mail"
 )
@@ -22,7 +20,7 @@ func TestMailIsQueuedOnlyIfTheChangeCommits(t *testing.T) {
 	to := "rollback-" + h.lastTenant[:8] + "@example.test"
 
 	boom := errors.New("the change failed")
-	err := h.srv.DB.InTenant(ctx, db.TenantID(h.lastTenant), func(tx pgx.Tx) error {
+	err := h.srv.DB.InTenant(ctx, db.TenantID(h.lastTenant), func(tx *db.Tx) error {
 		if err := h.srv.queueMail(ctx, tx, "invite", to, "Undangan", "a link"); err != nil {
 			return err
 		}

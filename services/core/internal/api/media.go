@@ -8,8 +8,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	mediarow "github.com/gsoultan/assessmatrix/services/core/internal/store/media"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/tenant"
+
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/media"
@@ -79,18 +82,25 @@ func (s *Server) uploadMedia(w http.ResponseWriter, r *http.Request) {
 	sum := sha256.Sum256(body)
 	ctx := auth.With(r.Context(), p)
 	var id string
-	err = s.tx(ctx, func(tx pgx.Tx) error {
-		var region string
-		if err := tx.QueryRow(ctx, `SELECT region FROM tenants WHERE id = am_tenant()`).Scan(&region); err != nil {
+	err = s.tx(ctx, func(tx *db.Tx) error {
+		ten, ok, err := tenant.New().IDEq(tx.Tenant()).One(ctx, tx)
+		if err != nil {
 			return err
 		}
-		if region != s.Media.Region {
+		if !ok || ten.Region != s.Media.Region {
 			return errResidency
 		}
-		if err := tx.QueryRow(ctx, `INSERT INTO media (tenant_id, content_type, bytes, sha256, uploaded_by)
-			VALUES (am_tenant(), $1, $2, $3, $4) RETURNING id`, ctype, len(body), sum[:], by).Scan(&id); err != nil {
+		n := mediarow.Create()
+		n.SetTenantID(tx.Tenant())
+		n.SetContentType(ctype)
+		n.SetBytes(int32(len(body)))
+		n.SetSha256(sum[:])
+		n.SetUploadedBy(by)
+		row, err := n.Insert(ctx, tx)
+		if err != nil {
 			return err
 		}
+		id = idText(row.ID)
 		key, err := media.Key(string(p.Tenant), id)
 		if err != nil {
 			return err
@@ -126,10 +136,13 @@ func (s *Server) serveMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := auth.With(r.Context(), p)
 	var ctype string
-	err := s.tx(ctx, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT content_type FROM media WHERE id = $1`, id).Scan(&ctype)
+	var found bool
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		m, ok, err := mediarow.New().IDEq(key(id)).One(ctx, tx)
+		ctype, found = m.ContentType, ok
+		return err
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if err == nil && !found {
 		http.NotFound(w, r)
 		return
 	}

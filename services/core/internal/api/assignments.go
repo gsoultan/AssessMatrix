@@ -6,34 +6,31 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/jackc/pgx/v5"
+	"github.com/gsoultan/storm/runtime"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/db"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/exam"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/person"
 )
 
 type assignmentService struct{ *Server }
 
 const maxAssignAtOnce = 5000
 
-func (s *assignmentService) list(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]*v1.Assignment, error) {
-	rows, err := tx.Query(ctx, `SELECT `+assignmentColumns+` FROM assignments `+where+` ORDER BY assigned_at LIMIT 50000`, args...)
+func (s *assignmentService) list(ctx context.Context, tx *db.Tx, q assignment.Query) ([]*v1.Assignment, error) {
+	rows, err := q.Order(assignment.AssignedAt.Asc(), assignment.ID.Asc()).Limit(50000).All(ctx, tx, nil)
 	if err != nil {
 		return nil, err
 	}
-	var as []*assignmentRow
-	var ids []string
-	for rows.Next() {
-		a, err := scanAssignment(rows)
-		if err != nil {
-			rows.Close()
-			return nil, err
-		}
+	as := make([]*assignmentRow, 0, len(rows))
+	ids := make([]string, 0, len(rows))
+	for _, r := range rows {
+		a := assignmentOf(r)
 		as = append(as, a)
 		ids = append(ids, a.ID)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	hist, err := histories(ctx, tx, ids)
 	if err != nil {
@@ -49,15 +46,15 @@ func (s *assignmentService) list(ctx context.Context, tx pgx.Tx, where string, a
 
 func (s *assignmentService) ListAssignments(ctx context.Context, req *connect.Request[v1.ListAssignmentsRequest]) (*connect.Response[v1.ListAssignmentsResponse], error) {
 	var out []*v1.Assignment
-	err := s.tx(ctx, func(tx pgx.Tx) (err error) {
+	err := s.tx(ctx, func(tx *db.Tx) (err error) {
 		if id := req.Msg.GetExamId(); id != "" {
 			if !validUUID(id) {
 				return notFound("instrument")
 			}
-			out, err = s.list(ctx, tx, `WHERE exam_id = $1`, id)
+			out, err = s.list(ctx, tx, assignment.New().ExamIDEq(key(id)))
 			return err
 		}
-		out, err = s.list(ctx, tx, ``)
+		out, err = s.list(ctx, tx, assignment.New())
 		return err
 	})
 	if err != nil {
@@ -82,7 +79,7 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 		due = &t
 	}
 	var out v1.AssignPeopleResponse
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		e, err := getExam(ctx, tx, m.GetExamId(), false)
 		if err != nil {
 			return err
@@ -103,42 +100,55 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 			}
 			version = want
 		}
+		// The people must exist in this tenant. RLS makes another tenant's
+		// person invisible to this read, but a foreign key is checked without
+		// it, so the insert alone cannot be relied on to refuse one.
+		pids := keys(m.GetPersonIds())
+		found, err := person.New().Where(person.ID.In(pids...)).Limit(maxAssignAtOnce).All(ctx, tx, nil)
+		if err != nil {
+			return err
+		}
+		here := make(map[[16]byte]bool, len(found))
+		for _, p := range found {
+			here[p.ID] = true
+		}
+		examID := key(e.GetId())
 		now := s.now()
 		var fresh []string
-		for _, pid := range m.GetPersonIds() {
+		for _, pid := range pids {
+			if !here[pid] {
+				return notFound("person")
+			}
 			// A new sitting only once the last one is closed; otherwise a no-op.
 			sitting := int32(1)
-			last, err := scanAssignment(tx.QueryRow(ctx, `SELECT `+assignmentColumns+` FROM assignments
-				WHERE exam_id = $1 AND person_id = $2 ORDER BY sitting DESC LIMIT 1 FOR UPDATE`, e.GetId(), pid))
+			last, ok, err := assignment.New().Where(assignment.ExamID.Eq(examID), assignment.PersonID.Eq(pid)).
+				Order(assignment.Sitting.Desc()).ForUpdate().One(ctx, tx)
 			switch {
-			case errors.Is(err, pgx.ErrNoRows):
 			case err != nil:
 				return err
-			case !last.closed(now):
+			case !ok:
+			case !assignmentOf(last).closed(now):
 				continue
 			default:
 				sitting = last.Sitting + 1
 			}
-			var id string
-			// The person must exist in this tenant; RLS makes another tenant's
-			// person invisible, so the FK alone cannot be relied on to say so.
-			err = tx.QueryRow(ctx, `INSERT INTO assignments (tenant_id, exam_id, exam_version, person_id, due_at, sitting)
-				SELECT am_tenant(), $1, $2, p.id, $4, $5 FROM people p WHERE p.id = $3
-				ON CONFLICT (exam_id, person_id, sitting) DO NOTHING RETURNING id`, e.GetId(), version, pid, due, sitting).Scan(&id)
-			if errors.Is(err, pgx.ErrNoRows) {
-				var exists bool
-				if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM people WHERE id = $1)`, pid).Scan(&exists); err != nil {
-					return err
-				}
-				if !exists {
-					return notFound("person")
-				}
+			n := assignment.Create()
+			n.SetTenantID(tx.Tenant())
+			n.SetExamID(examID)
+			n.SetExamVersion(version)
+			n.SetPersonID(pid)
+			if due != nil {
+				n.SetDueAt(*due)
+			}
+			n.SetSitting(sitting)
+			row, err := n.OnConflictExamIDPersonIDSitting().DoNothing().Insert(ctx, tx)
+			if errors.Is(err, runtime.ErrConflict) {
 				continue // another request added this sitting first
 			}
 			if err != nil {
 				return err
 			}
-			fresh = append(fresh, id)
+			fresh = append(fresh, idText(row.ID))
 		}
 		if e.GetStatus() == v1.Status_STATUS_PUBLISHED {
 			n, err := s.send(ctx, tx, fresh)
@@ -147,7 +157,7 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 			}
 			out.Sent = n
 		}
-		if out.Assignments, err = s.list(ctx, tx, `WHERE id = ANY($1)`, fresh); err != nil {
+		if out.Assignments, err = s.list(ctx, tx, assignment.New().Where(assignment.ID.In(keys(fresh)...))); err != nil {
 			return err
 		}
 		return audit(ctx, tx, "assignments.created", e.GetId(), map[string]any{"count": len(fresh), "sent": out.Sent, "version": version})
@@ -160,7 +170,7 @@ func (s *assignmentService) AssignPeople(ctx context.Context, req *connect.Reque
 
 // send mints and mails a link for each assignment that can be opened:
 // not submitted, and on a published instrument.
-func (s *assignmentService) send(ctx context.Context, tx pgx.Tx, ids []string) (int32, error) {
+func (s *assignmentService) send(ctx context.Context, tx *db.Tx, ids []string) (int32, error) {
 	now := s.now()
 	var n int32
 	for _, id := range ids {
@@ -168,11 +178,14 @@ func (s *assignmentService) send(ctx context.Context, tx pgx.Tx, ids []string) (
 		if err != nil {
 			return n, err
 		}
-		var status int16
-		if err := tx.QueryRow(ctx, `SELECT status FROM exams WHERE id = $1`, a.ExamID).Scan(&status); err != nil {
+		e, ok, err := exam.New().IDEq(key(a.ExamID)).One(ctx, tx)
+		if err != nil {
 			return n, err
 		}
-		if a.Status == v1.AssignStatus_ASSIGN_STATUS_SUBMITTED || v1.Status(status) != v1.Status_STATUS_PUBLISHED {
+		if !ok {
+			return n, notFound("instrument")
+		}
+		if a.Status == v1.AssignStatus_ASSIGN_STATUS_SUBMITTED || v1.Status(e.Status) != v1.Status_STATUS_PUBLISHED {
 			continue
 		}
 		kind := "link.sent"
@@ -193,7 +206,7 @@ func (s *assignmentService) SendInvites(ctx context.Context, req *connect.Reques
 		return nil, invalidArg(errors.New("at most 5,000 invitations at once"))
 	}
 	var sent int32
-	err := s.tx(ctx, func(tx pgx.Tx) (err error) {
+	err := s.tx(ctx, func(tx *db.Tx) (err error) {
 		if sent, err = s.send(ctx, tx, ids); err != nil {
 			return err
 		}
@@ -207,7 +220,7 @@ func (s *assignmentService) SendInvites(ctx context.Context, req *connect.Reques
 
 func (s *assignmentService) RevokeInvite(ctx context.Context, req *connect.Request[v1.RevokeInviteRequest]) (*connect.Response[v1.RevokeInviteResponse], error) {
 	var out *v1.Assignment
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		a, err := getAssignment(ctx, tx, req.Msg.GetAssignmentId(), true)
 		if err != nil {
 			return err
@@ -216,14 +229,19 @@ func (s *assignmentService) RevokeInvite(ctx context.Context, req *connect.Reque
 			return err
 		}
 		// Kills the link and the session it started. The row and history stay.
-		if _, err := tx.Exec(ctx, `UPDATE assignments SET revoked_at = now(), token_hash = NULL, session_hash = NULL,
-			otp_hash = NULL, otp_expires_at = NULL WHERE id = $1`, a.ID); err != nil {
+		m := assignment.MutateKey(key(a.ID))
+		m.SetRevokedAtNow()
+		m.SetTokenHash(nil)
+		m.SetSessionHash(nil)
+		m.SetOtpHash(nil)
+		m.SetOtpExpiresAtNull()
+		if err := m.Update(ctx, tx); err != nil {
 			return err
 		}
 		if err := logInvite(ctx, tx, a.ID, "link.revoked", "by an administrator"); err != nil {
 			return err
 		}
-		list, err := s.list(ctx, tx, `WHERE id = $1`, a.ID)
+		list, err := s.list(ctx, tx, assignment.New().IDEq(key(a.ID)))
 		if err != nil {
 			return err
 		}
@@ -237,19 +255,19 @@ func (s *assignmentService) RevokeInvite(ctx context.Context, req *connect.Reque
 }
 
 func (s *assignmentService) Unassign(ctx context.Context, req *connect.Request[v1.UnassignRequest]) (*connect.Response[v1.UnassignResponse], error) {
-	err := s.tx(ctx, func(tx pgx.Tx) error {
+	err := s.tx(ctx, func(tx *db.Tx) error {
 		a, err := getAssignment(ctx, tx, req.Msg.GetId(), true)
 		if err != nil {
 			return err
 		}
-		var sat bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM attempts WHERE assignment_id = $1)`, a.ID).Scan(&sat); err != nil {
+		sat, err := attempt.New().AssignmentIDEq(key(a.ID)).Exists(ctx, tx)
+		if err != nil {
 			return err
 		}
 		if sat {
 			return failedPrecondition("this invitation has an attempt; revoke it instead")
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM assignments WHERE id = $1`, a.ID); err != nil {
+		if err := assignment.Delete(ctx, tx, key(a.ID)); err != nil {
 			return err
 		}
 		return audit(ctx, tx, "assignment.deleted", a.ID, nil)

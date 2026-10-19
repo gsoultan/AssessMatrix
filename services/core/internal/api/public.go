@@ -3,13 +3,12 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
 )
 
 // Public, unauthenticated reads that make a credential checkable by anyone:
@@ -43,24 +42,22 @@ func (s *Server) publicCredential(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	var jwt string
-	var revoked *time.Time
-	var why *string
-	err := s.DB.Pool.QueryRow(r.Context(), `SELECT jwt, revoked_at, revoked_why FROM am_public_credential($1)`, id).Scan(&jwt, &revoked, &why)
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.NotFound(w, r)
-		return
-	}
+	c, ok, err := queries.PublicCredential.One(r.Context(), s.DB.Executor(), key(id))
 	if err != nil {
 		s.Log.ErrorContext(r.Context(), "public credential", "err", err)
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	out := map[string]any{"jwt": jwt, "revoked": revoked != nil}
-	if revoked != nil {
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	revoked, isRevoked := c.RevokedAt.Get()
+	out := map[string]any{"jwt": c.Jwt, "revoked": isRevoked}
+	if isRevoked {
 		out["revokedAt"] = revoked.UTC().Format(time.RFC3339)
-		if why != nil {
-			out["revokedReason"] = *why
+		if why, ok := c.RevokedWhy.Get(); ok {
+			out["revokedReason"] = why
 		}
 	}
 	// Short: a revocation must reach verifiers soon.
@@ -77,19 +74,17 @@ func (s *Server) publicCredentialStatus(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
-	var jwt string
-	var revoked *time.Time
-	var why *string
-	err := s.DB.Pool.QueryRow(r.Context(), `SELECT jwt, revoked_at, revoked_why FROM am_public_credential($1)`, id).Scan(&jwt, &revoked, &why)
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.NotFound(w, r)
-		return
-	}
+	c, ok, err := queries.PublicCredential.One(r.Context(), s.DB.Executor(), key(id))
 	if err != nil {
 		s.Log.ErrorContext(r.Context(), "public credential status", "err", err)
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	jwt := c.Jwt
 	var claims struct {
 		Iss string `json:"iss"`
 	}
@@ -99,10 +94,10 @@ func (s *Server) publicCredentialStatus(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	revokedList := []map[string]any{}
-	if revoked != nil {
+	if c.RevokedAt.Valid {
 		entry := map[string]any{"id": "urn:uuid:" + id}
-		if why != nil {
-			entry["revocationReason"] = *why
+		if why, ok := c.RevokedWhy.Get(); ok {
+			entry["revocationReason"] = why
 		}
 		revokedList = append(revokedList, entry)
 	}
@@ -117,18 +112,17 @@ func (s *Server) publicIssuer(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	var name string
-	var keys json.RawMessage
-	err := s.DB.Pool.QueryRow(r.Context(), `SELECT name, keys FROM am_public_issuer($1)`, id).Scan(&name, &keys)
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.NotFound(w, r)
-		return
-	}
+	iss, ok, err := queries.PublicIssuer.One(r.Context(), s.DB.Executor(), key(id))
 	if err != nil {
 		s.Log.ErrorContext(r.Context(), "public issuer", "err", err)
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		return
 	}
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	name, keys := iss.Name, json.RawMessage(iss.Keys)
 	if strings.HasSuffix(r.URL.Path, "/jwks") {
 		publicJSON(w, 5*time.Minute, map[string]any{"keys": keys})
 		return
