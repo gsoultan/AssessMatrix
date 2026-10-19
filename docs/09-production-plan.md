@@ -187,7 +187,7 @@ Where the tracks stand:
 
 - [x] Tenant-isolation test covers every RPC and is green.
 - [ ] Kill-the-browser and network-partition tests pass against production-like infrastructure.
-- [ ] Invite tests from `08` §4 pass, and the kill-the-browser test runs with the real session cookie.
+- [x] Invite tests from `08` §4 pass, and the kill-the-browser test runs with the real session cookie.
 - [ ] Tampered-attempt replay is detected.
 - [ ] axe clean; keyboard path through every item type.
 - [ ] Backup restore drill done on the production database size.

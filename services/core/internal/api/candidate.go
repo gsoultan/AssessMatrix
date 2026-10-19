@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"connectrpc.com/connect"
+	"github.com/gsoultan/storm"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
 	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
@@ -51,6 +52,15 @@ var errSlowDown = connect.NewError(connect.CodeResourceExhausted, errors.New("to
 
 func (s *candidateService) limited(peer connect.Peer, h interface{ Get(string) string }) error {
 	if !s.ipLimit.Allow(clientIP(peer, h)) {
+		return errSlowDown
+	}
+	return nil
+}
+
+// tenantLimited counts one costly call (a code mailed or guessed, a link
+// reissued) against the tenant the link belongs to.
+func (s *candidateService) tenantLimited(t db.TenantID) error {
+	if !s.tenantLimit.Allow(string(t)) {
 		return errSlowDown
 	}
 	return nil
@@ -190,6 +200,9 @@ func (s *candidateService) RequestCode(ctx context.Context, req *connect.Request
 	if l == nil {
 		return connect.NewResponse(out), nil
 	}
+	if err := s.tenantLimited(l.tenant); err != nil {
+		return nil, err
+	}
 	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
@@ -255,6 +268,9 @@ func (s *candidateService) VerifyCode(ctx context.Context, req *connect.Request[
 	}
 	if l == nil {
 		return connect.NewResponse(out), nil
+	}
+	if err := s.tenantLimited(l.tenant); err != nil {
+		return nil, err
 	}
 	var session string
 	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
@@ -325,6 +341,9 @@ func (s *candidateService) RequestNewLink(ctx context.Context, req *connect.Requ
 	if l == nil {
 		return connect.NewResponse(out), nil
 	}
+	if err := s.tenantLimited(l.tenant); err != nil {
+		return nil, err
+	}
 	err = s.DB.InTenant(ctx, l.tenant, func(tx *db.Tx) error {
 		c, err := s.check(ctx, tx, l)
 		if err != nil {
@@ -361,7 +380,35 @@ func (s *candidateService) RequestNewLink(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(out), nil
 }
 
+// EndSession ends the session on the server as well as clearing the cookie,
+// so a copy of the cookie opens nothing afterwards. The way back in is a new
+// link, mailed to the address on file.
 func (s *candidateService) EndSession(ctx context.Context, req *connect.Request[v1.EndSessionRequest]) (*connect.Response[v1.EndSessionResponse], error) {
+	if token := auth.CookieValue(req.Header(), auth.CandidateCookie); secure.ValidToken(token) {
+		hash := s.Keys.SessionHash(token)
+		var r queries.SessionAssignment
+		var ok bool
+		err := s.DB.Unscoped(ctx, func(tx *db.Tx) (err error) {
+			r, ok, err = queries.AssignmentBySession.One(ctx, tx, hash)
+			return err
+		})
+		if err == nil && ok {
+			err = s.DB.InTenant(ctx, db.TenantID(storm.UUID(r.TenantID).String()), func(tx *db.Tx) error {
+				// Only while the cookie is still this assignment's session.
+				var m assignment.Mut
+				m.SetSessionHash(nil)
+				n, err := assignment.New().Where(assignment.ID.Eq(r.AssignmentID), assignment.SessionHash.Eq(hash)).
+					UpdateAll(ctx, tx, m)
+				if err != nil || n == 0 {
+					return err
+				}
+				return logInvite(ctx, tx, idText(r.AssignmentID), "session.ended", "by the candidate")
+			})
+		}
+		if err != nil {
+			return nil, s.internal(ctx, "EndSession", err)
+		}
+	}
 	res := connect.NewResponse(&v1.EndSessionResponse{})
 	s.Auth.ClearCookie(res.Header(), auth.CandidateCookie)
 	return res, nil

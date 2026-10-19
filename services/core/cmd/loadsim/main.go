@@ -7,8 +7,9 @@
 // It needs a core started with AM_DEV=1 AM_MAILER=mailbox (it reads the
 // links and codes candidates would get by email), AM_TRUST_PROXY=1 (each
 // simulated candidate comes from its own address, as in an exam hall behind
-// NAT they would not, but the per-address limits are not what is measured)
-// and AM_DEV_MAILBOX_KEEP at least 3× the cohort. scripts/load.sh does that.
+// NAT they would not, but the per-address limits are not what is measured),
+// AM_DEV_MAILBOX_KEEP at least 3× the cohort, and AM_LIMIT_PER_TENANT above
+// 4× it, since the whole cohort is one tenant. scripts/load.sh does that.
 //
 //	loadsim -url http://localhost:8090 -staff staff@example.id -n 200 -minutes 3
 package main

@@ -61,6 +61,10 @@ services:
       AM_MAILER: ${AM_MAILER:-log}
       # 1 behind the tls profile's Caddy, so rate limits see the real client.
       AM_TRUST_PROXY: ${AM_TRUST_PROXY:-0}
+      # Calls a minute per address and per tenant; raise the first for an
+      # exam hall behind one NAT address. Empty is the default (60, 600).
+      AM_LIMIT_PER_IP: ${AM_LIMIT_PER_IP:-}
+      AM_LIMIT_PER_TENANT: ${AM_LIMIT_PER_TENANT:-}
       AM_DEV: ${AM_DEV:-0}
       AM_SMTP_ADDR: ${AM_SMTP_ADDR:-}
       AM_SMTP_FROM: ${AM_SMTP_FROM:-}
