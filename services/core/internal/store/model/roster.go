@@ -23,6 +23,8 @@ type Person struct {
 
 func (p *Person) Schema(t *storm.Table) {
 	t.PrimaryKey(&p.ID)
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("people_tenant_id_key", &p.Tenant, &p.ID)
 	t.Name("people")
 	t.Col(&p.ID).Default("gen_random_uuid()")
 	t.Col(&p.Tenant).ConstraintName("people_tenant_id_fkey")
@@ -70,6 +72,8 @@ type Assignment struct {
 
 func (a *Assignment) Schema(t *storm.Table) {
 	t.PrimaryKey(&a.ID)
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("assignments_tenant_id_key", &a.Tenant, &a.ID)
 	t.Col(&a.ID).Default("gen_random_uuid()")
 	t.Col(&a.Tenant).ConstraintName("assignments_tenant_id_fkey")
 	t.Col(&a.Exam).ConstraintName("assignments_exam_id_fkey")

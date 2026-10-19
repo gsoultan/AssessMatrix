@@ -28,6 +28,9 @@ type Attempt struct {
 	LastHash    []byte
 	PurgedAt    *time.Time
 	PurgedWhy   *string
+	// Seal is keyed over the chain's head and the purge time
+	// (secure.AttemptSeal), so a truncated log or a hand-marked purge shows.
+	Seal []byte
 
 	Events     []AttemptEvent
 	Batches    []AttemptBatch
@@ -36,6 +39,8 @@ type Attempt struct {
 
 func (a *Attempt) Schema(t *storm.Table) {
 	t.PrimaryKey(&a.ID)
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("attempts_tenant_id_key", &a.Tenant, &a.ID)
 	t.Col(&a.ID).Default("gen_random_uuid()")
 	t.Col(&a.Tenant).ConstraintName("attempts_tenant_id_fkey")
 	t.Col(&a.Assignment).ConstraintName("attempts_assignment_id_fkey")

@@ -285,6 +285,10 @@ function InstrumentList({ exams, assignments, onOpen }: { exams: Exam[]; assignm
   )
 }
 
+/** No verdict (undefined) while essays wait for a person: neither green nor red. */
+const verdictColor = (passed?: boolean) =>
+  passed === undefined ? 'var(--color-ink-2)' : passed ? 'var(--color-good-text)' : 'var(--color-critical)'
+
 export function Assignments({ isDesktop }: { isDesktop: boolean }) {
   const exams = useApp((s) => s.exams)
   const people = useApp((s) => s.people)
@@ -619,8 +623,8 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                             {r.scorePct === undefined ? (
                               <span className="text-ink-muted">—</span>
                             ) : (
-                              <span style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
-                                {r.scorePct}%
+                              <span style={{ color: verdictColor(r.passed) }} title={r.passed === undefined ? 'Waiting for essay review' : undefined}>
+                                {r.scorePct}%{r.passed === undefined && ' · review'}
                               </span>
                             )}
                           </td>
@@ -719,8 +723,8 @@ export function Assignments({ isDesktop }: { isDesktop: boolean }) {
                       </div>
                     </details>
                     {r.scorePct !== undefined && (
-                      <p className="tnum mt-1.5 text-[12px]" style={{ color: r.passed ? 'var(--color-good-text)' : 'var(--color-critical)' }}>
-                        {r.scorePct}% · {r.passed ? 'lulus' : 'belum lulus'}
+                      <p className="tnum mt-1.5 text-[12px]" style={{ color: verdictColor(r.passed) }}>
+                        {r.scorePct}% · {r.passed === undefined ? 'menunggu penilaian' : r.passed ? 'lulus' : 'belum lulus'}
                       </p>
                     )}
                     {r.status === 'submitted' && !exam.anonymous && (

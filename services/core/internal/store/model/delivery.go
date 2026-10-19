@@ -47,6 +47,8 @@ type WebhookEndpoint struct {
 }
 
 func (w *WebhookEndpoint) Schema(t *storm.Table) {
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("webhook_endpoints_tenant_id_key", &w.Tenant, &w.ID)
 	t.Col(&w.Tenant).ConstraintName("webhook_endpoints_tenant_id_fkey")
 	t.Col(&w.Description).Default("''::text")
 	t.Col(&w.Active).Default("true")
@@ -74,6 +76,8 @@ type WebhookEvent struct {
 
 func (e *WebhookEvent) Schema(t *storm.Table) {
 	t.PrimaryKey(&e.ID)
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("webhook_events_tenant_id_key", &e.Tenant, &e.ID)
 	t.Col(&e.Tenant).ConstraintName("webhook_events_tenant_id_fkey")
 	t.Col(&e.CreatedAt).Default("now()")
 	t.CheckNamed("webhook_events_body_check", "length(body) <= 65536")

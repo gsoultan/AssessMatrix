@@ -215,7 +215,9 @@ func ForCandidate(e *v1.Exam) *v1.Exam {
 // machine-scored. Essays are never machine-scored: one a person has reviewed
 // counts with the points they gave; one still waiting is reported as pending
 // and left out of raw, max and pct, so pct is always over what has been
-// scored. Scales measure opinion and are not scored at all.
+// scored. Scales measure opinion and are not scored at all. Passed is false
+// while points are pending: the verdict waits for the person, since the
+// pending points can turn it either way.
 func Score(e *v1.Exam, answers map[string]*v1.ItemAnswer, reviews map[string]Review) *v1.Score {
 	var raw, max, pending int32
 	for _, it := range AllItems(e) {
@@ -238,7 +240,7 @@ func Score(e *v1.Exam, answers map[string]*v1.ItemAnswer, reviews map[string]Rev
 	if max > 0 {
 		pct = int32((float64(raw)/float64(max))*100 + 0.5)
 	}
-	return &v1.Score{Raw: raw, Max: max, Pct: pct, Passed: pct >= e.GetPassPct(), PendingHuman: pending}
+	return &v1.Score{Raw: raw, Max: max, Pct: pct, Passed: pending == 0 && pct >= e.GetPassPct(), PendingHuman: pending}
 }
 
 func max32(a, b int32) int32 {

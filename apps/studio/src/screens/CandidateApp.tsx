@@ -24,9 +24,11 @@ import {
   IconCertificate,
   IconRotate,
   IconPlayerPlay,
+  IconHourglass,
 } from '@tabler/icons-react'
 import { ItemView, mmss } from '../components/ItemView'
 import { ItemImage } from '../components/ItemImage'
+import { MyRecord } from '../components/MyRecord'
 import { Meter } from '../components/Viz'
 import type { Media } from '../media'
 import { SESSION_HASH, useApp, useResponses } from '../state'
@@ -51,6 +53,13 @@ import {
   totalPoints,
   getAttempt,
 } from '../store'
+
+type Verdict = 'pass' | 'fail' | 'waiting'
+const VERDICT: Record<Verdict, { word: string; wash: string; ink: string }> = {
+  pass: { word: 'Lulus', wash: 'var(--color-wash-good)', ink: 'var(--color-good-text)' },
+  fail: { word: 'Belum lulus', wash: 'var(--color-wash-critical)', ink: 'var(--color-critical)' },
+  waiting: { word: 'Menunggu penilaian', wash: 'var(--color-wash-warn)', ink: 'var(--color-ink)' },
+}
 
 type Stage = 'pick' | 'gate' | 'invite' | 'consent' | 'ready' | 'attempt' | 'review' | 'done'
 
@@ -366,6 +375,8 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
   const [declined, setDeclined] = useState(false)
   const [camera, setCamera] = useState<VisionState | null>(null)
   const signal = useApp((s) => s.signal)
+  const withdraw = useApp((s) => s.withdraw)
+  const [askCameraOff, setAskCameraOff] = useState(false)
 
   /** Past the gate: this tab now acts for one assignment and nothing else. */
   const admit = useCallback(
@@ -522,8 +533,9 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
 
   // Tier 2: the face check, on this device, for as long as the attempt runs.
   const cam = useRef<Camera | null>(null)
+  const cameraWithdrawn = !!attempt?.withdrawn?.includes('camera')
   useEffect(() => {
-    if (!live || tier < 2) return
+    if (!live || tier < 2 || cameraWithdrawn) return
     let gone = false
     void import('../backend/vision').then((v) => {
       if (!gone) cam.current = v.watchCamera(signal, setCamera)
@@ -533,7 +545,15 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
       cam.current?.stop()
       cam.current = null
     }
-  }, [live, tier, signal])
+  }, [live, tier, signal, cameraWithdrawn])
+  /** The candidate's right to take the camera consent back: recorded first, then the camera is released. */
+  const cameraOff = () => {
+    setAskCameraOff(false)
+    cam.current?.stop()
+    cam.current = null
+    withdraw('camera')
+    setCamera('off')
+  }
 
   // The device is checked for real: on the start page itself when there is no
   // camera to ask about, and on its own step after consent when there is — the
@@ -1013,14 +1033,47 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           Pertanyaan {idx + 1} dari {items.length}
           {item.skill ? ` · ${item.skill}` : ''}
         </p>
-        {tier >= 2 && camera && (
-          <p role="status" className="mt-1 text-[12px] text-ink-muted">
-            {camera === 'on'
-              ? 'Kamera aktif · diperiksa di perangkat ini, tidak direkam'
-              : camera === 'starting'
-                ? 'Menyalakan kamera…'
-                : 'Kamera tidak aktif · ini dicatat untuk ditinjau'}
-          </p>
+        {tier >= 2 && (camera || cameraWithdrawn) && (
+          <div className="mt-1 text-[12px] text-ink-muted">
+            <p role="status" className="inline">
+              {cameraWithdrawn
+                ? 'Anda telah mematikan kamera · tidak ada lagi yang diperiksa; penyelenggara akan meninjau pengerjaan ini'
+                : camera === 'on'
+                  ? 'Kamera aktif · diperiksa di perangkat ini, tidak direkam'
+                  : camera === 'starting'
+                    ? 'Menyalakan kamera…'
+                    : 'Kamera tidak aktif · ini dicatat untuk ditinjau'}
+            </p>
+            {!cameraWithdrawn && camera !== 'off' && !askCameraOff && (
+              <button onClick={() => setAskCameraOff(true)} className="ml-2 font-medium text-ink-2 underline underline-offset-2">
+                Matikan kamera
+              </button>
+            )}
+            {askCameraOff && !cameraWithdrawn && (
+              <div role="alertdialog" aria-labelledby="camera-off-title" className="hair mt-2 rounded-xl bg-surface p-3.5">
+                <p id="camera-off-title" className="text-[13px] font-medium text-ink">
+                  Matikan kamera sampai ujian selesai?
+                </p>
+                <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
+                  Ini hak Anda. Kamera dilepas sekarang dan tidak dinyalakan lagi untuk ujian ini. Jawaban Anda tetap tersimpan.
+                  Penyelenggara akan melihat bahwa Anda mematikannya, dan merekalah yang memutuskan apakah hasilnya tetap dapat
+                  disahkan.
+                </p>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    onClick={cameraOff}
+                    className="h-9 rounded-lg px-3.5 text-[12.5px] font-medium text-white"
+                    style={{ background: 'var(--color-s1)' }}
+                  >
+                    Ya, matikan
+                  </button>
+                  <button onClick={() => setAskCameraOff(false)} className="h-9 rounded-lg px-3.5 text-[12.5px] font-medium text-ink-2">
+                    Batal
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         <p className="mt-2 text-[18px] font-semibold leading-snug text-ink">
           {item.stem}
@@ -1111,6 +1164,10 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
     )
   else if (stage === 'done' && attempt) {
     const s = exam ? score(exam, attempt) : null
+    // The server's count when there is one: it knows which essays were reviewed.
+    const pending = attempt.score?.pendingHuman ?? s?.pendingHuman ?? 0
+    const verdict: Verdict = pending > 0 ? 'waiting' : attempt.score?.passed ? 'pass' : 'fail'
+    const numberOf = (id: string) => (exam ? allItems(exam).findIndex((it) => it.id === id) + 1 : 0)
     body = (
       <Screen>
         {survey ? (
@@ -1133,10 +1190,12 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
             <div className="text-center">
               <span
                 className="mx-auto grid h-16 w-16 place-items-center rounded-2xl"
-                style={{ background: attempt.score?.passed ? 'var(--color-wash-good)' : 'var(--color-wash-critical)' }}
+                style={{ background: VERDICT[verdict].wash }}
               >
-                {attempt.score?.passed ? (
+                {verdict === 'pass' ? (
                   <IconShieldCheck size={30} stroke={1.7} style={{ color: 'var(--color-good)' }} />
+                ) : verdict === 'waiting' ? (
+                  <IconHourglass size={30} stroke={1.7} style={{ color: 'var(--color-ink-2)' }} />
                 ) : (
                   <IconX size={30} stroke={2} style={{ color: 'var(--color-critical)' }} />
                 )}
@@ -1149,22 +1208,36 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
               </p>
               <p
                 className="mt-3 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold"
-                style={{
-                  background: attempt.score?.passed ? 'var(--color-wash-good)' : 'var(--color-wash-critical)',
-                  color: attempt.score?.passed ? 'var(--color-good-text)' : 'var(--color-critical)',
-                }}
+                style={{ background: VERDICT[verdict].wash, color: VERDICT[verdict].ink }}
               >
-                {attempt.score?.passed ? 'Lulus' : 'Belum lulus'}
+                {VERDICT[verdict].word}
               </p>
             </div>
             <div className="mt-5">
-              <Meter value={attempt.score?.pct ?? 0} sev={attempt.score?.passed ? 'ok' : 'critical'} />
+              <Meter value={attempt.score?.pct ?? 0} sev={verdict === 'pass' ? 'ok' : verdict === 'waiting' ? 'warning' : 'critical'} />
             </div>
-            {s && s.pendingHuman > 0 && (
+            {pending > 0 && (
               <p className="mt-4 rounded-xl p-3.5 text-[12.5px] leading-snug text-ink-2" style={{ background: 'var(--color-wash-warn)' }}>
-                <strong className="tnum font-medium text-ink">{s.pendingHuman} poin</strong> menunggu penilaian
-                manusia dan belum termasuk di atas. Skor akhir dapat naik.
+                <strong className="tnum font-medium text-ink">{pending} poin</strong> menunggu penilaian manusia dan belum
+                termasuk di atas. Hasil lulus atau tidaknya baru ditentukan setelah itu, dan skornya dapat naik atau turun.
               </p>
+            )}
+            {attempt.reviews && attempt.reviews.length > 0 && (
+              <section className="hair mt-4 rounded-xl bg-surface p-4" aria-labelledby="reviews-title">
+                <h2 id="reviews-title" className="text-[13px] font-medium text-ink">
+                  Penilaian oleh penilai
+                </h2>
+                <ul className="mt-2 flex flex-col gap-2.5">
+                  {attempt.reviews.map((r) => (
+                    <li key={r.itemId} className="text-[12.5px] leading-snug text-ink-2">
+                      <span className="tnum font-medium text-ink">
+                        Soal {numberOf(r.itemId)}: {r.points} / {r.maxPoints} poin
+                      </span>
+                      {r.note && <span className="mt-0.5 block">{r.note}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
             {(CORE ? !!attempt.credentialUrl : attempt.score?.passed) && (
               <div className="mt-4 rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, var(--color-credential-from) 0%, var(--color-credential-to) 100%)' }}>
@@ -1187,27 +1260,53 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           </>
         )}
 
+        {attempt.flagReasons && attempt.flagReasons.length > 0 && (
+          <section className="hair mt-6 rounded-xl bg-surface p-4" aria-labelledby="flags-title">
+            <h2 id="flags-title" className="text-[13px] font-medium text-ink">
+              Catatan untuk ditinjau penyelenggara
+            </h2>
+            <p className="mt-1 text-[12px] leading-snug text-ink-muted">
+              Ini bukan tuduhan. Penyelenggara akan melihatnya sebelum hasil Anda dipakai. Jika ada yang tidak sesuai
+              dengan yang Anda lakukan, sampaikan kepada penyelenggara dengan menyebut catatan ini.
+            </p>
+            <ul className="mt-3 flex flex-col gap-2">
+              {attempt.flagReasons.map((r, i) => (
+                <li key={i} className="rounded-lg p-3 text-[12.5px] leading-snug text-ink-2" style={{ background: 'var(--color-wash-warn)' }}>
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* transparency: show the participant exactly what was recorded */}
         <div className="hair mt-6 rounded-xl bg-surface">
           <button
             onClick={() => setShowLog((v) => !v)}
             className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+            aria-expanded={showLog}
           >
             <span className="text-[13px] font-medium text-ink">Apa yang kami catat</span>
             <IconChevronDown size={15} stroke={2} className={`text-ink-muted transition-transform ${showLog ? 'rotate-180' : ''}`} />
           </button>
           <Collapse expanded={showLog} keepMounted={false}>
-            <ol className="border-t border-hair px-4 py-3">
-              {attempt.events.slice(-10).map((e) => (
-                <li key={e.seq} className="tnum flex items-baseline justify-between gap-3 py-1 text-[12px]">
-                  <span className="text-ink-2">{e.kind}</span>
-                  <span className="text-ink-muted">{new Date(e.t).toLocaleTimeString()}</span>
-                </li>
-              ))}
-              <li className="tnum mt-1.5 border-t border-hair pt-2 text-[11.5px] text-ink-muted">
-                {attempt.events.length} peristiwa · tidak ada video yang diunggah
-              </li>
-            </ol>
+            <div className="border-t border-hair">
+              {CORE && attempt.id ? (
+                <MyRecord numberOf={numberOf} />
+              ) : (
+                <ol className="px-4 py-3">
+                  {attempt.events.slice(-10).map((e) => (
+                    <li key={e.seq} className="tnum flex items-baseline justify-between gap-3 py-1 text-[12px]">
+                      <span className="text-ink-2">{e.kind}</span>
+                      <span className="text-ink-muted">{new Date(e.t).toLocaleTimeString()}</span>
+                    </li>
+                  ))}
+                  <li className="tnum mt-1.5 border-t border-hair pt-2 text-[11.5px] text-ink-muted">
+                    {attempt.events.length} peristiwa · tidak ada video yang diunggah
+                  </li>
+                </ol>
+              )}
+            </div>
           </Collapse>
         </div>
 

@@ -55,7 +55,8 @@ type ResultServiceClient interface {
 	ListResponses(context.Context, *connect.Request[v1.ListResponsesRequest]) (*connect.Response[v1.ListResponsesResponse], error)
 	// The full, hash-chained event log of one attempt, with a check of the chain.
 	GetAttemptLog(context.Context, *connect.Request[v1.GetAttemptLogRequest]) (*connect.Response[v1.GetAttemptLogResponse], error)
-	// Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+	// Essays waiting for a person, blind: the reviewer sees "Answer 7 to
+	// question 3", not a name, an attempt or a hand-in time.
 	ListReviews(context.Context, *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error)
 	// A person's score for one essay. Written to the attempt's log; the
 	// attempt's score and its assignment's are recomputed from it.
@@ -148,7 +149,8 @@ type ResultServiceHandler interface {
 	ListResponses(context.Context, *connect.Request[v1.ListResponsesRequest]) (*connect.Response[v1.ListResponsesResponse], error)
 	// The full, hash-chained event log of one attempt, with a check of the chain.
 	GetAttemptLog(context.Context, *connect.Request[v1.GetAttemptLogRequest]) (*connect.Response[v1.GetAttemptLogResponse], error)
-	// Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+	// Essays waiting for a person, blind: the reviewer sees "Answer 7 to
+	// question 3", not a name, an attempt or a hand-in time.
 	ListReviews(context.Context, *connect.Request[v1.ListReviewsRequest]) (*connect.Response[v1.ListReviewsResponse], error)
 	// A person's score for one essay. Written to the attempt's log; the
 	// attempt's score and its assignment's are recomputed from it.

@@ -77,6 +77,14 @@ func (t *Tx) Tenant() storm.UUID { return t.tenant }
 // the same Executor.
 func Conn(c *pgx.Conn) runtime.Executor { return pgxdrv.Conn{C: c} }
 
+// OnConn runs fn in a transaction on a single connection, such as the
+// owner's in `core migrate`. It is unscoped: the owner is not held to RLS.
+func OnConn(ctx context.Context, c *pgx.Conn, fn func(*Tx) error) error {
+	return pgx.BeginFunc(ctx, c, func(ptx pgx.Tx) error {
+		return fn(&Tx{ex: pgxdrv.Tx{T: ptx}})
+	})
+}
+
 func Open(ctx context.Context, url string) (*DB, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {

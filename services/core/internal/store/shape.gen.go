@@ -74,6 +74,7 @@ func _assertAttemptShape(m m0.Attempt) {
 		m.LastHash,
 		m.PurgedAt,
 		m.PurgedWhy,
+		m.Seal,
 		m.Events,
 		m.Batches,
 		m.ItemScores,

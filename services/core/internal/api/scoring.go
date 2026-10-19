@@ -35,7 +35,12 @@ func storeScore(ctx context.Context, tx *db.Tx, att *attemptRow, e *v1.Exam, ans
 	att.Score = body
 	mg := assignment.MutateKey(key(att.AssignmentID))
 	mg.SetScorePct(int16(score.GetPct()))
-	mg.SetPassed(score.GetPassed())
+	// No verdict (NULL) while points wait for a person.
+	if score.GetPendingHuman() == 0 {
+		mg.SetPassed(score.GetPassed())
+	} else {
+		mg.SetPassedNull()
+	}
 	if err := mg.Update(ctx, tx); err != nil {
 		return err
 	}

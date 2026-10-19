@@ -39,6 +39,12 @@ const (
 // IssuerURL is the issuer's id: a URL that serves its profile.
 func (s *Server) IssuerURL(tenant string) string { return s.PublicURL + "/issuers/" + tenant }
 
+// CredentialStatusURL is the credential's revocation list (1EdTech
+// Revocation List Status Method): empty while it stands.
+func (s *Server) CredentialStatusURL(id string) string {
+	return s.PublicURL + "/credentials/" + id + "/status"
+}
+
 // CredentialURL is where a person checks a credential.
 func (s *Server) CredentialURL(id string) string { return s.PublicURL + "/verify/#" + id }
 
@@ -125,9 +131,11 @@ func signJWT(k *issuerKey, claims any) (string, error) {
 
 // settleCredential issues, revokes or restores the attempt's credential to
 // match its score: a passed exam with nothing left for a person to score
-// earns one. Returns the credential id when one is in force.
-func (s *Server) settleCredential(ctx context.Context, tx *db.Tx, att *attemptRow, e *v1.Exam, score *v1.Score) (string, error) {
-	earned := e.GetKind() == v1.Kind_KIND_EXAM && score != nil && score.GetPassed() && score.GetPendingHuman() == 0 && score.GetMax() > 0
+// earns one, if its record is intact. A credential vouches for the record, so
+// one whose record was altered is never issued, and is revoked if it was.
+// Returns the credential id when one is in force.
+func (s *Server) settleCredential(ctx context.Context, tx *db.Tx, att *attemptRow, e *v1.Exam, score *v1.Score, intact bool) (string, error) {
+	earned := intact && e.GetKind() == v1.Kind_KIND_EXAM && score != nil && score.GetPassed() && score.GetPendingHuman() == 0 && score.GetMax() > 0
 	cur, exists, err := credential.New().Where(credential.AttemptID.Eq(key(att.ID))).ForUpdate().One(ctx, tx)
 	if err != nil {
 		return "", err
@@ -145,6 +153,9 @@ func (s *Server) settleCredential(ctx context.Context, tx *db.Tx, att *attemptRo
 	case exists && !earned:
 		if !revoked {
 			why := "a later review of the attempt brought the score below the pass mark"
+			if !intact {
+				why = "the attempt's stored record no longer matches its seal"
+			}
 			m := credential.Mutate(cur)
 			m.SetRevokedAtNow()
 			m.SetRevokedWhy(why)
@@ -203,6 +214,8 @@ func (s *Server) settleCredential(ctx context.Context, tx *db.Tx, att *attemptRo
 		"issuer":    map[string]any{"id": issuer, "type": []string{"Profile"}, "name": tenantName},
 		"validFrom": now.Format(time.RFC3339),
 		"name":      title,
+		// Revocation that any verifier can check, not only ours.
+		"credentialStatus": map[string]any{"id": s.CredentialStatusURL(id), "type": "1EdTechRevocationList"},
 		"credentialSubject": map[string]any{
 			"type": []string{"AchievementSubject"},
 			"identifier": []map[string]any{{

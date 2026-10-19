@@ -34,6 +34,7 @@ type Row struct {
 	LastHash     []byte
 	PurgedAt     runtime.Null[time.Time]
 	PurgedWhy    runtime.Null[string]
+	Seal         []byte
 }
 
 // Operator ids. Argument-taking operators are numbered first, so the
@@ -72,7 +73,7 @@ const (
 	opNotExists runtime.Op = 27
 )
 
-const nCols = 14
+const nCols = 15
 
 // Query is a value type: composing one allocates nothing. Predicates
 // are a postfix token stream, so disjunction and negation are
@@ -280,6 +281,13 @@ func (q *Query) cursor(col uint32, r Row) {
 		}
 		q.strs[q.ns] = r.PurgedWhy.V
 		q.ns++
+	case 14:
+		if int(q.nby) >= len(q.byts) {
+			q.over = true
+			return
+		}
+		q.byts[q.nby] = r.Seal
+		q.nby++
 	}
 }
 
@@ -456,6 +464,7 @@ var (
 	LastHash     = BytesCol{11}
 	PurgedAt     = NullTimeCol{12}
 	PurgedWhy    = NullTextCol{13}
+	Seal         = NullBytesCol{14}
 )
 
 // UUIDCol addresses a uuid column.
@@ -634,6 +643,23 @@ func (h NullTextCol) In(v ...string) Pred   { return Pred{col: h.c, op: opIn, an
 func (h NullTextCol) NotIn(v ...string) Pred { return Pred{col: h.c, op: opNotIn, anyStr: v} }
 func (h NullTextCol) IsNull() Pred           { return Pred{col: h.c, op: opIsNull} }
 func (h NullTextCol) IsNotNull() Pred        { return Pred{col: h.c, op: opIsNotNull} }
+
+// NullBytesCol addresses a bytea column.
+type NullBytesCol struct{ c uint8 }
+
+func (h NullBytesCol) Asc() Sort  { return Sort(runtime.MakeOrder(runtime.Asc, uint32(h.c))) }
+func (h NullBytesCol) Desc() Sort { return Sort(runtime.MakeOrder(runtime.Desc, uint32(h.c))) }
+func (h NullBytesCol) AscNullsFirst() Sort {
+	return Sort(runtime.MakeOrder(runtime.AscNullsFirst, uint32(h.c)))
+}
+func (h NullBytesCol) DescNullsLast() Sort {
+	return Sort(runtime.MakeOrder(runtime.DescNullsLast, uint32(h.c)))
+}
+
+func (h NullBytesCol) Eq(v []byte) Pred    { return Pred{col: h.c, op: opEq, byt: v} }
+func (h NullBytesCol) NotEq(v []byte) Pred { return Pred{col: h.c, op: opNotEq, byt: v} }
+func (h NullBytesCol) IsNull() Pred        { return Pred{col: h.c, op: opIsNull} }
+func (h NullBytesCol) IsNotNull() Pred     { return Pred{col: h.c, op: opIsNotNull} }
 
 // Where applies predicates, ANDed together.
 func (q Query) Where(ps ...Pred) Query {
@@ -946,6 +972,13 @@ func (q *Query) leaf(p Pred) {
 		}
 		q.strs[q.ns] = p.str
 		q.ns++
+	case 14:
+		if int(q.nby) >= 2 {
+			q.over = true
+			return
+		}
+		q.byts[q.nby] = p.byt
+		q.nby++
 	}
 	q.push(runtime.MakeLeaf(uint32(p.op), uint32(p.col)))
 }
@@ -954,12 +987,12 @@ func (q *Query) leaf(p Pred) {
 // least one related row; HasNoPosts() matches the rest. Both compose
 // under Where/Any/Not like any predicate, because both lower to constant
 // fragments: no bound value, one compiled statement per structure.
-func HasEvents() Pred       { return Pred{col: 14, op: opExists} }
-func HasNoEvents() Pred     { return Pred{col: 14, op: opNotExists} }
-func HasBatches() Pred      { return Pred{col: 15, op: opExists} }
-func HasNoBatches() Pred    { return Pred{col: 15, op: opNotExists} }
-func HasItemScores() Pred   { return Pred{col: 16, op: opExists} }
-func HasNoItemScores() Pred { return Pred{col: 16, op: opNotExists} }
+func HasEvents() Pred       { return Pred{col: 15, op: opExists} }
+func HasNoEvents() Pred     { return Pred{col: 15, op: opNotExists} }
+func HasBatches() Pred      { return Pred{col: 16, op: opExists} }
+func HasNoBatches() Pred    { return Pred{col: 16, op: opNotExists} }
+func HasItemScores() Pred   { return Pred{col: 17, op: opExists} }
+func HasNoItemScores() Pred { return Pred{col: 17, op: opNotExists} }
 
 // Chained predicate sugar. Identical to Where(Col.Op(v)).
 func (q Query) IDEq(v [16]byte) Query                 { return q.Where(ID.Eq(v)) }
@@ -1049,8 +1082,12 @@ func (q Query) PurgedWhyIn(v ...string) Query         { return q.Where(PurgedWhy
 func (q Query) PurgedWhyNotIn(v ...string) Query      { return q.Where(PurgedWhy.NotIn(v...)) }
 func (q Query) PurgedWhyIsNull() Query                { return q.Where(PurgedWhy.IsNull()) }
 func (q Query) PurgedWhyIsNotNull() Query             { return q.Where(PurgedWhy.IsNotNull()) }
+func (q Query) SealEq(v []byte) Query                 { return q.Where(Seal.Eq(v)) }
+func (q Query) SealNotEq(v []byte) Query              { return q.Where(Seal.NotEq(v)) }
+func (q Query) SealIsNull() Query                     { return q.Where(Seal.IsNull()) }
+func (q Query) SealIsNotNull() Query                  { return q.Where(Seal.IsNotNull()) }
 
-const selectPrefix = `SELECT "id", "tenant_id", "assignment_id", "exam_id", "exam_version", "person_id", "started_at", "deadline_at", "submitted_at", "score", "last_seq", "last_hash", "purged_at", "purged_why" FROM "attempts"`
+const selectPrefix = `SELECT "id", "tenant_id", "assignment_id", "exam_id", "exam_version", "person_id", "started_at", "deadline_at", "submitted_at", "score", "last_seq", "last_hash", "purged_at", "purged_why", "seal" FROM "attempts"`
 const countPrefix = `SELECT count(*) FROM "attempts"`
 const existsPrefix = `SELECT 1 FROM "attempts"`
 const existsSuffix = ` LIMIT 1`
@@ -1171,6 +1208,12 @@ var orderTable = [nCols][4]string{
 		"\"purged_why\" ASC NULLS FIRST",
 		"\"purged_why\" DESC NULLS LAST",
 	},
+	{ // seal
+		"\"seal\"",
+		"\"seal\" DESC",
+		"\"seal\" ASC NULLS FIRST",
+		"\"seal\" DESC NULLS LAST",
+	},
 }
 
 // identTable is each column's bare quoted name, for the left side of a
@@ -1190,6 +1233,7 @@ var identTable = [nCols]string{
 	"\"last_hash\"",
 	"\"purged_at\"",
 	"\"purged_why\"",
+	"\"seal\"",
 }
 
 var lowering = runtime.Lowering{
@@ -1222,7 +1266,7 @@ func orderOf(dir, col uint32) string {
 
 // fragTable is every predicate this table can produce, lowered at build
 // time. Runtime splices; it never formats.
-var fragTable = [17][28]runtime.Frag{
+var fragTable = [18][28]runtime.Frag{
 	{ // id
 		{}, // opNone
 		{A: "\"id\" = $", B: ""},
@@ -1643,6 +1687,36 @@ var fragTable = [17][28]runtime.Frag{
 		{},
 		{},
 	},
+	{ // seal
+		{}, // opNone
+		{A: "\"seal\" = $", B: ""},
+		{A: "\"seal\" <> $", B: ""},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{A: "\"seal\" IS NULL", B: ""},
+		{A: "\"seal\" IS NOT NULL", B: ""},
+		{},
+		{},
+	},
 	{ // relation Events (pseudo-column)
 		{}, // opNone
 		{},
@@ -1903,6 +1977,7 @@ func scan(rv [][]byte, r *Row, sl *runtime.Slab) error {
 	r.LastHash = runtime.Bytes(rv[11])
 	r.PurgedAt = runtime.Nullable(rv[12], runtime.Timestamptz)
 	r.PurgedWhy = runtime.NullText(rv[13], sl)
+	r.Seal = runtime.Bytes(rv[14])
 	return nil
 }
 
@@ -2074,6 +2149,10 @@ func (q Query) bindPreds(b *binder) []any {
 			b.strs[ns] = q.strs[ns]
 			v = append(v, &b.strs[ns])
 			ns++
+		case 14:
+			b.byts[nby] = q.byts[nby]
+			v = append(v, &b.byts[nby])
+			nby++
 		}
 	}
 	b.vals = v
@@ -2211,7 +2290,7 @@ func (q Query) Prepare(b *Binder) (string, []any) {
 
 // insertSQL does not vary: the column list is fixed by the table, so
 // the placeholders are known at build time and nothing is spliced.
-const insertSQL = `INSERT INTO "attempts" ("id", "tenant_id", "assignment_id", "exam_id", "exam_version", "person_id", "started_at", "deadline_at", "submitted_at", "score", "last_seq", "last_hash", "purged_at", "purged_why") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING "id", "tenant_id", "assignment_id", "exam_id", "exam_version", "person_id", "started_at", "deadline_at", "submitted_at", "score", "last_seq", "last_hash", "purged_at", "purged_why"`
+const insertSQL = `INSERT INTO "attempts" ("id", "tenant_id", "assignment_id", "exam_id", "exam_version", "person_id", "started_at", "deadline_at", "submitted_at", "score", "last_seq", "last_hash", "purged_at", "purged_why", "seal") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING "id", "tenant_id", "assignment_id", "exam_id", "exam_version", "person_id", "started_at", "deadline_at", "submitted_at", "score", "last_seq", "last_hash", "purged_at", "purged_why", "seal"`
 
 const updatePrefix = `UPDATE "attempts" SET `
 const deletePrefix = `DELETE FROM "attempts"`
@@ -2232,9 +2311,10 @@ const (
 	dLastHash     uint64 = 1 << 10
 	dPurgedAt     uint64 = 1 << 11
 	dPurgedWhy    uint64 = 1 << 12
+	dSeal         uint64 = 1 << 13
 )
 
-const nUpdatable = 13
+const nUpdatable = 14
 
 // setFrags is every assignment this table can make, lowered at build time.
 var setFrags = [nUpdatable]runtime.Frag{
@@ -2251,6 +2331,7 @@ var setFrags = [nUpdatable]runtime.Frag{
 	{A: "\"last_hash\" = $", B: ""},     // last_hash
 	{A: "\"purged_at\" = $", B: ""},     // purged_at
 	{A: "\"purged_why\" = $", B: ""},    // purged_why
+	{A: "\"seal\" = $", B: ""},          // seal
 }
 
 // exprFrags is the SERVER-side assignment each column may take instead
@@ -2270,6 +2351,7 @@ var exprFrags = [nUpdatable]runtime.Frag{
 	{},                                  // last_hash has no server-side form
 	{A: "\"purged_at\" = now()", B: ""}, // purged_at = the database's clock
 	{},                                  // purged_why has no server-side form
+	{},                                  // seal has no server-side form
 }
 
 // pkFrags addresses one row.
@@ -2295,9 +2377,10 @@ const (
 	iLastHash     uint64 = 1 << 11
 	iPurgedAt     uint64 = 1 << 12
 	iPurgedWhy    uint64 = 1 << 13
+	iSeal         uint64 = 1 << 14
 )
 
-const nInsertable = 14
+const nInsertable = 15
 
 // insCols is the quoted column name for each insert bit.
 var insCols = [nInsertable]string{
@@ -2315,6 +2398,7 @@ var insCols = [nInsertable]string{
 	"\"last_hash\"",
 	"\"purged_at\"",
 	"\"purged_why\"",
+	"\"seal\"",
 }
 
 // insParts and insPlaceholder come from the back end at build time; the
@@ -2323,7 +2407,7 @@ var insParts = runtime.InsertParts{Open: " (", Sep: ", ", Mid: ") VALUES (", Clo
 var insPlaceholder = runtime.Placeholder{}
 
 const insPrefix = "INSERT INTO \"attempts\""
-const insReturning = " RETURNING \"id\", \"tenant_id\", \"assignment_id\", \"exam_id\", \"exam_version\", \"person_id\", \"started_at\", \"deadline_at\", \"submitted_at\", \"score\", \"last_seq\", \"last_hash\", \"purged_at\", \"purged_why\""
+const insReturning = " RETURNING \"id\", \"tenant_id\", \"assignment_id\", \"exam_id\", \"exam_version\", \"person_id\", \"started_at\", \"deadline_at\", \"submitted_at\", \"score\", \"last_seq\", \"last_hash\", \"purged_at\", \"purged_why\", \"seal\""
 
 var insCache = runtime.NewMaskCache()
 
@@ -2342,7 +2426,7 @@ var updOpCache = runtime.NewMaskCache()
 // part of it. Without it m.Row() would hold what the row held BEFORE
 // the statement, so a caller reading back the counter it just
 // incremented would get the old number and never know.
-const updReturning = " RETURNING \"id\", \"tenant_id\", \"assignment_id\", \"exam_id\", \"exam_version\", \"person_id\", \"started_at\", \"deadline_at\", \"submitted_at\", \"score\", \"last_seq\", \"last_hash\", \"purged_at\", \"purged_why\""
+const updReturning = " RETURNING \"id\", \"tenant_id\", \"assignment_id\", \"exam_id\", \"exam_version\", \"person_id\", \"started_at\", \"deadline_at\", \"submitted_at\", \"score\", \"last_seq\", \"last_hash\", \"purged_at\", \"purged_why\", \"seal\""
 
 // Masks reports how many distinct UPDATE shapes have compiled.
 func Masks() int { return updCache.Masks() }
@@ -2572,6 +2656,12 @@ func (m *Mut) SetPurgedWhyNull() {
 	m.expr &^= dPurgedWhy
 }
 
+func (m *Mut) SetSeal(v []byte) {
+	m.row.Seal = v
+	m.dirty |= dSeal
+	m.expr &^= dSeal
+}
+
 // Ins stages a new row. Unlike Mut it has a setter for every insertable
 // column including the primary key and Immutable ones — supplying your
 // own id is legitimate, changing it later is not.
@@ -2738,6 +2828,11 @@ func (n *Ins) SetPurgedWhyNull() {
 	n.set |= iPurgedWhy
 }
 
+func (n *Ins) SetSeal(v []byte) {
+	n.row.Seal = v
+	n.set |= iSeal
+}
+
 // The conflict encoding. One byte holds both which unique index an
 // upsert names and what it does on collision, so the insert statement
 // cache stays keyed by one mask and one byte:
@@ -2784,11 +2879,12 @@ func upsertTail(conflict uint8, mask uint64, add uint64) string {
 var conflictSpecs = []string{
 	" ON CONFLICT (\"id\")",
 	" ON CONFLICT (\"assignment_id\")",
+	" ON CONFLICT (\"tenant_id\", \"id\")",
 }
 
 // assignable is the columns target i may overwrite, given the mask.
 func assignable(i uint8, mask uint64) []string {
-	set := make([]string, 0, 13)
+	set := make([]string, 0, 14)
 	switch i {
 	case 0:
 		if mask&(1<<1) != 0 {
@@ -2830,6 +2926,9 @@ func assignable(i uint8, mask uint64) []string {
 		if mask&(1<<13) != 0 {
 			set = append(set, "purged_why")
 		}
+		if mask&(1<<14) != 0 {
+			set = append(set, "seal")
+		}
 	case 1:
 		if mask&(1<<1) != 0 {
 			set = append(set, "tenant_id")
@@ -2867,6 +2966,49 @@ func assignable(i uint8, mask uint64) []string {
 		if mask&(1<<13) != 0 {
 			set = append(set, "purged_why")
 		}
+		if mask&(1<<14) != 0 {
+			set = append(set, "seal")
+		}
+	case 2:
+		if mask&(1<<2) != 0 {
+			set = append(set, "assignment_id")
+		}
+		if mask&(1<<3) != 0 {
+			set = append(set, "exam_id")
+		}
+		if mask&(1<<4) != 0 {
+			set = append(set, "exam_version")
+		}
+		if mask&(1<<5) != 0 {
+			set = append(set, "person_id")
+		}
+		if mask&(1<<6) != 0 {
+			set = append(set, "started_at")
+		}
+		if mask&(1<<7) != 0 {
+			set = append(set, "deadline_at")
+		}
+		if mask&(1<<8) != 0 {
+			set = append(set, "submitted_at")
+		}
+		if mask&(1<<9) != 0 {
+			set = append(set, "score")
+		}
+		if mask&(1<<10) != 0 {
+			set = append(set, "last_seq")
+		}
+		if mask&(1<<11) != 0 {
+			set = append(set, "last_hash")
+		}
+		if mask&(1<<12) != 0 {
+			set = append(set, "purged_at")
+		}
+		if mask&(1<<13) != 0 {
+			set = append(set, "purged_why")
+		}
+		if mask&(1<<14) != 0 {
+			set = append(set, "seal")
+		}
 	}
 	return set
 }
@@ -2888,6 +3030,16 @@ func (n *Ins) OnConflictID() *Ins {
 // entirely.
 func (n *Ins) OnConflictAssignmentID() *Ins {
 	n.conflict = 4
+	return n
+}
+
+// OnConflictTenantIDID upserts on the unique index over (tenant_id, id).
+//
+// The row that already exists keeps every column this insert did
+// not assign. Follow with DoNothing() to leave it untouched
+// entirely.
+func (n *Ins) OnConflictTenantIDID() *Ins {
+	n.conflict = 6
 	return n
 }
 
@@ -2956,6 +3108,7 @@ var assignFor = map[string]string{
 	"last_hash":     "\"last_hash\" = EXCLUDED.\"last_hash\"",
 	"purged_at":     "\"purged_at\" = EXCLUDED.\"purged_at\"",
 	"purged_why":    "\"purged_why\" = EXCLUDED.\"purged_why\"",
+	"seal":          "\"seal\" = EXCLUDED.\"seal\"",
 }
 
 func assignExcluded(c string) string { return assignFor[c] }
@@ -3034,6 +3187,8 @@ func (n *Ins) Insert(ctx context.Context, ex runtime.Executor) (Row, error) {
 			args = append(args, n.row.PurgedAt.Arg())
 		case 13:
 			args = append(args, n.row.PurgedWhy.Arg())
+		case 14:
+			args = append(args, n.row.Seal)
 		}
 	}
 	var out Row
@@ -3071,7 +3226,7 @@ func Inserts() int { return insCache.Masks() }
 // not treat a zero as 'unset': that guess is why other ORMs cannot insert
 // a false, a 0 or an empty string into a column with a default.
 func Insert(ctx context.Context, ex runtime.Executor, r *Row) error {
-	args := make([]any, 0, 14)
+	args := make([]any, 0, 15)
 	args = append(args, r.ID)
 	args = append(args, r.TenantID)
 	args = append(args, r.AssignmentID)
@@ -3086,6 +3241,7 @@ func Insert(ctx context.Context, ex runtime.Executor, r *Row) error {
 	args = append(args, r.LastHash)
 	args = append(args, r.PurgedAt.Arg())
 	args = append(args, r.PurgedWhy.Arg())
+	args = append(args, r.Seal)
 	rows, err := ex.Query(ctx, insertSQL, args)
 	if err != nil {
 		return err
@@ -3126,13 +3282,14 @@ var copyCols = []string{
 	"last_hash",
 	"purged_at",
 	"purged_why",
+	"seal",
 }
 
 // rowSource walks a []Row for CopyFrom without copying any of it.
 type rowSource struct {
 	rows []Row
 	i    int
-	buf  [14]any
+	buf  [15]any
 }
 
 func (s *rowSource) Next() bool {
@@ -3164,6 +3321,7 @@ func (s *rowSource) Values() []any {
 	s.buf[11] = &r.LastHash
 	s.buf[12] = r.PurgedAt.Ptr()
 	s.buf[13] = r.PurgedWhy.Ptr()
+	s.buf[14] = &r.Seal
 	return s.buf[:]
 }
 
@@ -3208,8 +3366,9 @@ func InsertOp(r Row) runtime.BatchOp {
 	mask |= 1 << 11
 	mask |= 1 << 12
 	mask |= 1 << 13
+	mask |= 1 << 14
 	st := stmtForInsertNoReturn(mask, 0, 0)
-	args := make([]any, 0, 14)
+	args := make([]any, 0, 15)
 	args = append(args, r.ID)
 	args = append(args, r.TenantID)
 	args = append(args, r.AssignmentID)
@@ -3224,6 +3383,7 @@ func InsertOp(r Row) runtime.BatchOp {
 	args = append(args, r.LastHash)
 	args = append(args, r.PurgedAt.Arg())
 	args = append(args, r.PurgedWhy.Arg())
+	args = append(args, r.Seal)
 	return runtime.BatchOp{SQL: st.SQL, Args: args}
 }
 
@@ -3285,6 +3445,8 @@ func (n *Ins) Op() (runtime.BatchOp, error) {
 			args = append(args, n.row.PurgedAt.Arg())
 		case 13:
 			args = append(args, n.row.PurgedWhy.Arg())
+		case 14:
+			args = append(args, n.row.Seal)
 		}
 	}
 	return runtime.BatchOp{SQL: st.SQL, Args: args}, nil
@@ -3366,6 +3528,8 @@ func (m *Mut) UpdateOp() (runtime.BatchOp, bool) {
 			args = append(args, m.row.PurgedAt.Arg())
 		case 12:
 			args = append(args, m.row.PurgedWhy.Arg())
+		case 13:
+			args = append(args, m.row.Seal)
 		}
 	}
 	args = append(args, m.row.ID)
@@ -3474,6 +3638,8 @@ func (m *Mut) Update(ctx context.Context, ex runtime.Executor) error {
 			args = append(args, m.row.PurgedAt.Arg())
 		case 12:
 			args = append(args, m.row.PurgedWhy.Arg())
+		case 13:
+			args = append(args, m.row.Seal)
 		}
 	}
 	args = append(args, m.row.ID)
@@ -3648,6 +3814,8 @@ func (q Query) UpdateAll(ctx context.Context, ex runtime.Executor, m Mut) (int64
 			args = append(args, m.row.PurgedAt.Arg())
 		case 12:
 			args = append(args, m.row.PurgedWhy.Arg())
+		case 13:
+			args = append(args, m.row.Seal)
 		}
 	}
 	args = append(args, q.bindPreds(b)...)

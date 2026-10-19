@@ -44,7 +44,10 @@ var trips = map[string]func() (events []*v1.AttemptEvent, intact bool){
 		return []*v1.AttemptEvent{ev(KindFacesMultiple, "", 9_000, 2)}, true
 	},
 	FlagCameraStopped: func() ([]*v1.AttemptEvent, bool) {
-		return []*v1.AttemptEvent{{Kind: KindVisionStopped, Detail: "camera unplugged"}}, true
+		return []*v1.AttemptEvent{{Kind: KindVisionStopped, Detail: "camera_ended"}}, true
+	},
+	FlagWithdrawn: func() ([]*v1.AttemptEvent, bool) {
+		return []*v1.AttemptEvent{{Kind: KindAttemptStarted, ServerTime: 1_000}, {Kind: "consent.camera.withdrawn", ServerTime: 726_000}}, true
 	},
 }
 
@@ -112,5 +115,52 @@ func TestEverySignalNeedsAConsent(t *testing.T) {
 	}
 	if !ServerOnly[KindConsentPrefix+PurposeCamera] {
 		t.Error("a client must not be able to write its own consent")
+	}
+}
+
+// A long stretch the runner reports in pieces is one stretch in the reason.
+func TestFaceMissingStretchReportedInPiecesIsOneStretch(t *testing.T) {
+	piece := func(endAt, ms int64) *v1.AttemptEvent {
+		e := ev(KindFaceMissing, "", ms)
+		e.ClientTime = endAt
+		return e
+	}
+	// Three minutes with no face, reported each minute.
+	events := []*v1.AttemptEvent{piece(160_000, 60_000), piece(220_000, 60_000), piece(280_000, 60_000)}
+	fs := Flags(events, func(string) int { return 1 }, true, 0)
+	if len(fs) != 1 || !regexp.MustCompile(`longest stretch was 3 min\.`).MatchString(fs[0].Reason) {
+		t.Fatalf("want one stretch of 3 min, got %+v", fs)
+	}
+}
+
+// Leaving with no return recorded (a tab killed on a phone) is said as such,
+// never as zero seconds away.
+func TestFocusLostWithNoReturnIsSaid(t *testing.T) {
+	events := []*v1.AttemptEvent{ev(KindFocusLost, ""), ev(KindFocusLost, ""), ev(KindFocusLost, "")}
+	fs := Flags(events, func(string) int { return 1 }, true, 0)
+	if len(fs) != 1 || !regexp.MustCompile(`For 3 of these no return`).MatchString(fs[0].Reason) ||
+		!regexp.MustCompile(`Untuk 3 di antaranya`).MatchString(fs[0].ReasonID) {
+		t.Fatalf("got %+v", fs)
+	}
+}
+
+// The camera reason is the server's sentence for the runner's code; free text
+// from a client never reaches a reason.
+func TestCameraReasonIsNeverClientText(t *testing.T) {
+	fs := Flags([]*v1.AttemptEvent{{Kind: KindVisionStopped, Detail: "you cheated, says the proctor"}}, func(string) int { return 1 }, true, 0)
+	if len(fs) != 1 || regexp.MustCompile(`cheated`).MatchString(fs[0].Reason+fs[0].ReasonID) {
+		t.Fatalf("got %+v", fs)
+	}
+	fs = Flags([]*v1.AttemptEvent{{Kind: KindVisionStopped, Detail: "permission_refused"}}, func(string) int { return 1 }, true, 0)
+	if !regexp.MustCompile(`izin kamera ditolak`).MatchString(fs[0].ReasonID) {
+		t.Fatalf("got %q", fs[0].ReasonID)
+	}
+}
+
+// A paste into a question the version does not have is not "question 0".
+func TestPasteIntoUnknownQuestion(t *testing.T) {
+	fs := Flags([]*v1.AttemptEvent{ev(KindPasted, "gone", 300)}, func(string) int { return 0 }, true, 0)
+	if len(fs) != 1 || regexp.MustCompile(`question 0|nomor 0`).MatchString(fs[0].Reason+fs[0].ReasonID) {
+		t.Fatalf("got %+v", fs)
 	}
 }

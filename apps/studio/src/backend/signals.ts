@@ -123,7 +123,9 @@ async function device(): Promise<{ hash: string; kind: string } | null> {
     navigator.userAgent,
     navigator.language,
     Intl.DateTimeFormat().resolvedOptions().timeZone,
-    `${screen.width}x${screen.height}@${devicePixelRatio}`,
+    // The screen's size and pixel ratio are left out on purpose: zoom, a
+    // second monitor or turning a phone changes them on the same device.
+    kind,
     String(navigator.hardwareConcurrency ?? ''),
   ].join('|')
   try {

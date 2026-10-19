@@ -45,6 +45,8 @@ type Staff struct {
 
 func (s *Staff) Schema(t *storm.Table) {
 	t.PrimaryKey(&s.ID)
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("staff_tenant_id_key", &s.Tenant, &s.ID)
 	t.Name("staff")
 	t.Col(&s.ID).Default("gen_random_uuid()")
 	t.Col(&s.Tenant).ConstraintName("staff_tenant_id_fkey")

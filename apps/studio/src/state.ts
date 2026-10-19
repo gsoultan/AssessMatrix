@@ -175,6 +175,8 @@ type AppState = {
   beginAttempt: (exam: Exam, assignment?: Assignment, consents?: Purpose[]) => Promise<void>
   /** Record an integrity signal (already filtered by tier; see backend/signals.ts). */
   signal: (s: Signal) => void
+  /** Take a consent back mid-attempt ("camera"): recorded, and nothing more is collected under it. */
+  withdraw: (purpose: string) => void
   resumeAttempt: (exam: Exam, assignmentId?: string) => boolean
   discardAttempt: (examId: string, assignmentId?: string) => void
   setChoice: (item: Item, choiceId: string, n: number) => void
@@ -295,10 +297,15 @@ export const useApp = create<AppState>((set, get) => {
     }
   })
 
-  // Back online: send what is waiting now rather than at the next retry.
-  window.addEventListener('online', () => {
+  // Back online: send what is waiting now rather than at the next retry. The
+  // service worker says so too, when a background sync finds this tab open.
+  const now = () => {
     const id = get().attempt?.id
     if (id && !get().attempt?.submittedAt) void drain(id)
+  }
+  window.addEventListener('online', now)
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    if (e.data === 'am-flush') now()
   })
 
   return {
@@ -688,6 +695,19 @@ export const useApp = create<AppState>((set, get) => {
       commit({ ...a, events: append(a, sig.kind, sig.detail ?? sig.values?.join(' ')) })
     },
 
+    withdraw: (purpose) => {
+      const a = get().attempt
+      if (!a || a.submittedAt || a.withdrawn?.includes(purpose)) return
+      const kind = `consent.${purpose}.withdrawn`
+      record(a, { kind, detail: 'withdrawn by the candidate during the attempt' })
+      commit({
+        ...a,
+        withdrawn: [...(a.withdrawn ?? []), purpose],
+        queued: queuedFor(a),
+        events: append(a, kind, undefined),
+      })
+    },
+
     toggleFlag: (item, n) => {
       const a = get().attempt
       if (!a || a.submittedAt) return
@@ -750,7 +770,7 @@ export const useApp = create<AppState>((set, get) => {
         ...a,
         secondsLeft: force ? 0 : a.secondsLeft,
         submittedAt: Date.now(),
-        score: survey ? undefined : { raw: s.raw, max: s.max, pct: s.pct, passed: s.passed },
+        score: survey ? undefined : { raw: s.raw, max: s.max, pct: s.pct, passed: s.passed, pendingHuman: s.pendingHuman },
         queued: 0,
         events: append(a, force ? 'attempt.expired' : 'attempt.submitted', survey ? 'response recorded' : `${s.pct}%`),
       }
@@ -767,7 +787,8 @@ export const useApp = create<AppState>((set, get) => {
           status: 'submitted',
           submittedAt: Date.now(),
           scorePct: next.score?.pct,
-          passed: next.score?.passed,
+          // No verdict while essays wait for a person.
+          passed: next.score?.pendingHuman ? undefined : next.score?.passed,
         })
         set({ assignments: listAssignments() })
       }

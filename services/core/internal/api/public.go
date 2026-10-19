@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 func (s *Server) PublicHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /credentials/{id}", s.publicCredential)
+	mux.HandleFunc("GET /credentials/{id}/status", s.publicCredentialStatus)
 	mux.HandleFunc("GET /issuers/{id}", s.publicIssuer)
 	mux.HandleFunc("GET /issuers/{id}/jwks", s.publicIssuer)
 	return mux
@@ -60,6 +62,48 @@ func (s *Server) publicCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	// Short: a revocation must reach verifiers soon.
 	publicJSON(w, time.Minute, out)
+}
+
+// publicCredentialStatus is the revocation list a credential's
+// credentialStatus points at, so a wallet or another verifier holding only
+// the signed credential can learn it was revoked. One credential per list:
+// nothing about an issuer's other credentials is disclosed.
+func (s *Server) publicCredentialStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validUUID(id) {
+		http.NotFound(w, r)
+		return
+	}
+	c, ok, err := queries.PublicCredential.One(r.Context(), s.DB.Executor(), key(id))
+	if err != nil {
+		s.Log.ErrorContext(r.Context(), "public credential status", "err", err)
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	jwt := c.Jwt
+	var claims struct {
+		Iss string `json:"iss"`
+	}
+	if parts := strings.Split(jwt, "."); len(parts) == 3 {
+		if body, err := base64.RawURLEncoding.DecodeString(parts[1]); err == nil {
+			_ = json.Unmarshal(body, &claims)
+		}
+	}
+	revokedList := []map[string]any{}
+	if c.RevokedAt.Valid {
+		entry := map[string]any{"id": "urn:uuid:" + id}
+		if why, ok := c.RevokedWhy.Get(); ok {
+			entry["revocationReason"] = why
+		}
+		revokedList = append(revokedList, entry)
+	}
+	publicJSON(w, time.Minute, map[string]any{
+		"id": s.CredentialStatusURL(id), "issuer": claims.Iss, "revokedCredentials": revokedList,
+	})
 }
 
 func (s *Server) publicIssuer(w http.ResponseWriter, r *http.Request) {

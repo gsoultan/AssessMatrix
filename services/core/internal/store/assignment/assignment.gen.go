@@ -4152,6 +4152,7 @@ var conflictSpecs = []string{
 	" ON CONFLICT (\"id\")",
 	" ON CONFLICT (\"session_hash\")",
 	" ON CONFLICT (\"exam_id\", \"person_id\", \"sitting\")",
+	" ON CONFLICT (\"tenant_id\", \"id\")",
 	" ON CONFLICT (\"token_hash\")",
 }
 
@@ -4367,6 +4368,76 @@ func assignable(i uint8, mask uint64) []string {
 			set = append(set, "self_serves")
 		}
 	case 3:
+		if mask&(1<<2) != 0 {
+			set = append(set, "exam_id")
+		}
+		if mask&(1<<3) != 0 {
+			set = append(set, "exam_version")
+		}
+		if mask&(1<<4) != 0 {
+			set = append(set, "person_id")
+		}
+		if mask&(1<<5) != 0 {
+			set = append(set, "assigned_at")
+		}
+		if mask&(1<<6) != 0 {
+			set = append(set, "due_at")
+		}
+		if mask&(1<<7) != 0 {
+			set = append(set, "status")
+		}
+		if mask&(1<<8) != 0 {
+			set = append(set, "started_at")
+		}
+		if mask&(1<<9) != 0 {
+			set = append(set, "submitted_at")
+		}
+		if mask&(1<<10) != 0 {
+			set = append(set, "score_pct")
+		}
+		if mask&(1<<11) != 0 {
+			set = append(set, "passed")
+		}
+		if mask&(1<<12) != 0 {
+			set = append(set, "token_hash")
+		}
+		if mask&(1<<13) != 0 {
+			set = append(set, "sent_at")
+		}
+		if mask&(1<<14) != 0 {
+			set = append(set, "expires_at")
+		}
+		if mask&(1<<15) != 0 {
+			set = append(set, "redeemed_at")
+		}
+		if mask&(1<<16) != 0 {
+			set = append(set, "revoked_at")
+		}
+		if mask&(1<<17) != 0 {
+			set = append(set, "session_hash")
+		}
+		if mask&(1<<18) != 0 {
+			set = append(set, "otp_hash")
+		}
+		if mask&(1<<19) != 0 {
+			set = append(set, "otp_expires_at")
+		}
+		if mask&(1<<20) != 0 {
+			set = append(set, "otp_tries")
+		}
+		if mask&(1<<21) != 0 {
+			set = append(set, "otp_sent_at")
+		}
+		if mask&(1<<22) != 0 {
+			set = append(set, "otp_sends")
+		}
+		if mask&(1<<23) != 0 {
+			set = append(set, "self_serves")
+		}
+		if mask&(1<<24) != 0 {
+			set = append(set, "sitting")
+		}
+	case 4:
 		if mask&(1<<1) != 0 {
 			set = append(set, "tenant_id")
 		}
@@ -4470,13 +4541,23 @@ func (n *Ins) OnConflictExamIDPersonIDSitting() *Ins {
 	return n
 }
 
+// OnConflictTenantIDID upserts on the unique index over (tenant_id, id).
+//
+// The row that already exists keeps every column this insert did
+// not assign. Follow with DoNothing() to leave it untouched
+// entirely.
+func (n *Ins) OnConflictTenantIDID() *Ins {
+	n.conflict = 8
+	return n
+}
+
 // OnConflictTokenHash upserts on the unique index over (token_hash).
 //
 // The row that already exists keeps every column this insert did
 // not assign. Follow with DoNothing() to leave it untouched
 // entirely.
 func (n *Ins) OnConflictTokenHash() *Ins {
-	n.conflict = 8
+	n.conflict = 10
 	return n
 }
 

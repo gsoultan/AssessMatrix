@@ -70,9 +70,14 @@ func (s *Server) purgeAttempt(ctx context.Context, tx *db.Tx, a *attemptRow, why
 		return 0, err
 	}
 	events := purged.N
+	// Milliseconds, the seal's resolution, so the stored time re-seals exactly.
+	now := s.now().Truncate(time.Millisecond)
+	a.PurgedAt = &now
+	a.Seal = s.seal(a)
 	m := attempt.MutateKey(key(a.ID))
-	m.SetPurgedAt(s.now())
+	m.SetPurgedAt(now)
 	m.SetPurgedWhy(why)
+	m.SetSeal(a.Seal)
 	if err := m.Update(ctx, tx); err != nil {
 		return 0, err
 	}

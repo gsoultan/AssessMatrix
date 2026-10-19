@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/result.proto.
  */
 export const file_assessmatrix_v1_result: GenFile = /*@__PURE__*/
-  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcmVzdWx0LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEioQIKCFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSFQoNYXNzaWdubWVudF9pZBgCIAEoCRIRCglwZXJzb25faWQYAyABKAkSFAoMZXhhbV92ZXJzaW9uGAQgASgFEhQKDHN1Ym1pdHRlZF9hdBgFIAEoAxI3CgdhbnN3ZXJzGAYgAygLMiYuYXNzZXNzbWF0cml4LnYxLlJlc3BvbnNlLkFuc3dlcnNFbnRyeRIlCgVzY29yZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIicKFExpc3RSZXNwb25zZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiRQoVTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEiwKCXJlc3BvbnNlcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5SZXNwb25zZSIqChRHZXRBdHRlbXB0TG9nUmVxdWVzdBISCgphdHRlbXB0X2lkGAEgASgJIqwBChVHZXRBdHRlbXB0TG9nUmVzcG9uc2USLQoGZXZlbnRzGAEgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudBIUCgxjaGFpbl9pbnRhY3QYAiABKAgSFQoNYnJva2VuX2F0X3NlcRgDIAEoAxIkCgVmbGFncxgEIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnEhEKCXB1cmdlZF9hdBgFIAEoAyJaCgRGbGFnEgwKBHR5cGUYASABKAkSEAoIc2V2ZXJpdHkYAiABKAkSDgoGcmVhc29uGAMgASgJEhEKCXJlYXNvbl9pZBgEIAEoCRIPCgdpdGVtX2lkGAUgASgJIjsKEkxpc3RSZXZpZXdzUmVxdWVzdBIPCgdleGFtX2lkGAEgASgJEhQKDGluY2x1ZGVfZG9uZRgCIAEoCCLnAQoKUmV2aWV3VGFzaxISCgphdHRlbXB0X2lkGAEgASgJEg0KBWxhYmVsGAIgASgJEg8KB2l0ZW1faWQYAyABKAkSDgoGbnVtYmVyGAQgASgFEgwKBHN0ZW0YBSABKAkSDAoEdGV4dBgGIAEoCRIkCgRmaWxlGAcgASgLMhYuYXNzZXNzbWF0cml4LnYxLk1lZGlhEg4KBnBvaW50cxgIIAEoBRIQCghyZXZpZXdlZBgJIAEoCBINCgVnaXZlbhgKIAEoBRIMCgRub3RlGAsgASgJEhQKDHN1Ym1pdHRlZF9hdBgMIAEoAyJBChNMaXN0UmV2aWV3c1Jlc3BvbnNlEioKBXRhc2tzGAEgAygLMhsuYXNzZXNzbWF0cml4LnYxLlJldmlld1Rhc2siVwoSU2NvcmVBbnN3ZXJSZXF1ZXN0EhIKCmF0dGVtcHRfaWQYASABKAkSDwoHaXRlbV9pZBgCIAEoCRIOCgZwb2ludHMYAyABKAUSDAoEbm90ZRgEIAEoCSJUChNTY29yZUFuc3dlclJlc3BvbnNlEiUKBXNjb3JlGAEgASgLMhYuYXNzZXNzbWF0cml4LnYxLlNjb3JlEhYKDmNyZWRlbnRpYWxfdXJsGAIgASgJIj8KFkdldEl0ZW1BbmFseXNpc1JlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCRIUCgxleGFtX3ZlcnNpb24YAiABKAUiqQEKF0dldEl0ZW1BbmFseXNpc1Jlc3BvbnNlEhQKDGV4YW1fdmVyc2lvbhgBIAEoBRIJCgFuGAIgASgFEhMKC2NvbXB1dGVkX2F0GAMgASgDEigKBWl0ZW1zGAQgAygLMhkuYXNzZXNzbWF0cml4LnYxLkl0ZW1TdGF0EgwKBGtyMjAYBSABKAESDwoHdG9vX2ZldxgGIAEoCBIPCgdwZW5kaW5nGAcgASgIIpwBCghJdGVtU3RhdBIPCgdpdGVtX2lkGAEgASgJEg4KBm51bWJlchgCIAEoBRIJCgFuGAMgASgFEg8KB3BfdmFsdWUYBCABKAESFgoOcG9pbnRfYmlzZXJpYWwYBSABKAESLAoHY2hvaWNlcxgGIAMoCzIbLmFzc2Vzc21hdHJpeC52MS5DaG9pY2VTdGF0Eg0KBW5vdGVzGAcgAygJImkKCkNob2ljZVN0YXQSEQoJY2hvaWNlX2lkGAEgASgJEg8KB2NvcnJlY3QYAiABKAgSDQoFc2hhcmUYAyABKAESEwoLc2hhcmVfdXBwZXIYBCABKAESEwoLc2hhcmVfbG93ZXIYBSABKAEy6QMKDVJlc3VsdFNlcnZpY2USXgoNTGlzdFJlc3BvbnNlcxIlLmFzc2Vzc21hdHJpeC52MS5MaXN0UmVzcG9uc2VzUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5MaXN0UmVzcG9uc2VzUmVzcG9uc2USXgoNR2V0QXR0ZW1wdExvZxIlLmFzc2Vzc21hdHJpeC52MS5HZXRBdHRlbXB0TG9nUmVxdWVzdBomLmFzc2Vzc21hdHJpeC52MS5HZXRBdHRlbXB0TG9nUmVzcG9uc2USWAoLTGlzdFJldmlld3MSIy5hc3Nlc3NtYXRyaXgudjEuTGlzdFJldmlld3NSZXF1ZXN0GiQuYXNzZXNzbWF0cml4LnYxLkxpc3RSZXZpZXdzUmVzcG9uc2USWAoLU2NvcmVBbnN3ZXISIy5hc3Nlc3NtYXRyaXgudjEuU2NvcmVBbnN3ZXJSZXF1ZXN0GiQuYXNzZXNzbWF0cml4LnYxLlNjb3JlQW5zd2VyUmVzcG9uc2USZAoPR2V0SXRlbUFuYWx5c2lzEicuYXNzZXNzbWF0cml4LnYxLkdldEl0ZW1BbmFseXNpc1JlcXVlc3QaKC5hc3Nlc3NtYXRyaXgudjEuR2V0SXRlbUFuYWx5c2lzUmVzcG9uc2VC0gEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCC1Jlc3VsdFByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw", [file_assessmatrix_v1_candidate, file_assessmatrix_v1_exam]);
+  fileDesc("Chxhc3Nlc3NtYXRyaXgvdjEvcmVzdWx0LnByb3RvEg9hc3Nlc3NtYXRyaXgudjEioQIKCFJlc3BvbnNlEhIKCmF0dGVtcHRfaWQYASABKAkSFQoNYXNzaWdubWVudF9pZBgCIAEoCRIRCglwZXJzb25faWQYAyABKAkSFAoMZXhhbV92ZXJzaW9uGAQgASgFEhQKDHN1Ym1pdHRlZF9hdBgFIAEoAxI3CgdhbnN3ZXJzGAYgAygLMiYuYXNzZXNzbWF0cml4LnYxLlJlc3BvbnNlLkFuc3dlcnNFbnRyeRIlCgVzY29yZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRpLCgxBbnN3ZXJzRW50cnkSCwoDa2V5GAEgASgJEioKBXZhbHVlGAIgASgLMhsuYXNzZXNzbWF0cml4LnYxLkl0ZW1BbnN3ZXI6AjgBIicKFExpc3RSZXNwb25zZXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkiRQoVTGlzdFJlc3BvbnNlc1Jlc3BvbnNlEiwKCXJlc3BvbnNlcxgBIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5SZXNwb25zZSIqChRHZXRBdHRlbXB0TG9nUmVxdWVzdBISCgphdHRlbXB0X2lkGAEgASgJIqwBChVHZXRBdHRlbXB0TG9nUmVzcG9uc2USLQoGZXZlbnRzGAEgAygLMh0uYXNzZXNzbWF0cml4LnYxLkF0dGVtcHRFdmVudBIUCgxjaGFpbl9pbnRhY3QYAiABKAgSFQoNYnJva2VuX2F0X3NlcRgDIAEoAxIkCgVmbGFncxgEIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnEhEKCXB1cmdlZF9hdBgFIAEoAyJaCgRGbGFnEgwKBHR5cGUYASABKAkSEAoIc2V2ZXJpdHkYAiABKAkSDgoGcmVhc29uGAMgASgJEhEKCXJlYXNvbl9pZBgEIAEoCRIPCgdpdGVtX2lkGAUgASgJIjsKEkxpc3RSZXZpZXdzUmVxdWVzdBIPCgdleGFtX2lkGAEgASgJEhQKDGluY2x1ZGVfZG9uZRgCIAEoCCKWAgoKUmV2aWV3VGFzaxIWCgphdHRlbXB0X2lkGAEgASgJQgIYARINCgVsYWJlbBgCIAEoCRIPCgdpdGVtX2lkGAMgASgJEg4KBm51bWJlchgEIAEoBRIMCgRzdGVtGAUgASgJEgwKBHRleHQYBiABKAkSJAoEZmlsZRgHIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5NZWRpYRIOCgZwb2ludHMYCCABKAUSEAoIcmV2aWV3ZWQYCSABKAgSDQoFZ2l2ZW4YCiABKAUSDAoEbm90ZRgLIAEoCRIYCgxzdWJtaXR0ZWRfYXQYDCABKANCAhgBEgwKBHRhc2sYDSABKAkSFwoPc2NvcmVkX2J5X290aGVyGA4gASgIIkEKE0xpc3RSZXZpZXdzUmVzcG9uc2USKgoFdGFza3MYASADKAsyGy5hc3Nlc3NtYXRyaXgudjEuUmV2aWV3VGFzayJlChJTY29yZUFuc3dlclJlcXVlc3QSEgoKYXR0ZW1wdF9pZBgBIAEoCRIPCgdpdGVtX2lkGAIgASgJEg4KBnBvaW50cxgDIAEoBRIMCgRub3RlGAQgASgJEgwKBHRhc2sYBSABKAkiVAoTU2NvcmVBbnN3ZXJSZXNwb25zZRIlCgVzY29yZRgBIAEoCzIWLmFzc2Vzc21hdHJpeC52MS5TY29yZRIWCg5jcmVkZW50aWFsX3VybBgCIAEoCSI/ChZHZXRJdGVtQW5hbHlzaXNSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkSFAoMZXhhbV92ZXJzaW9uGAIgASgFIqkBChdHZXRJdGVtQW5hbHlzaXNSZXNwb25zZRIUCgxleGFtX3ZlcnNpb24YASABKAUSCQoBbhgCIAEoBRITCgtjb21wdXRlZF9hdBgDIAEoAxIoCgVpdGVtcxgEIAMoCzIZLmFzc2Vzc21hdHJpeC52MS5JdGVtU3RhdBIMCgRrcjIwGAUgASgBEg8KB3Rvb19mZXcYBiABKAgSDwoHcGVuZGluZxgHIAEoCCKvAQoISXRlbVN0YXQSDwoHaXRlbV9pZBgBIAEoCRIOCgZudW1iZXIYAiABKAUSCQoBbhgDIAEoBRIPCgdwX3ZhbHVlGAQgASgBEhYKDnBvaW50X2Jpc2VyaWFsGAUgASgBEiwKB2Nob2ljZXMYBiADKAsyGy5hc3Nlc3NtYXRyaXgudjEuQ2hvaWNlU3RhdBINCgVub3RlcxgHIAMoCRIRCglub19zcHJlYWQYCCABKAgiaQoKQ2hvaWNlU3RhdBIRCgljaG9pY2VfaWQYASABKAkSDwoHY29ycmVjdBgCIAEoCBINCgVzaGFyZRgDIAEoARITCgtzaGFyZV91cHBlchgEIAEoARITCgtzaGFyZV9sb3dlchgFIAEoATLpAwoNUmVzdWx0U2VydmljZRJeCg1MaXN0UmVzcG9uc2VzEiUuYXNzZXNzbWF0cml4LnYxLkxpc3RSZXNwb25zZXNSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLkxpc3RSZXNwb25zZXNSZXNwb25zZRJeCg1HZXRBdHRlbXB0TG9nEiUuYXNzZXNzbWF0cml4LnYxLkdldEF0dGVtcHRMb2dSZXF1ZXN0GiYuYXNzZXNzbWF0cml4LnYxLkdldEF0dGVtcHRMb2dSZXNwb25zZRJYCgtMaXN0UmV2aWV3cxIjLmFzc2Vzc21hdHJpeC52MS5MaXN0UmV2aWV3c1JlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuTGlzdFJldmlld3NSZXNwb25zZRJYCgtTY29yZUFuc3dlchIjLmFzc2Vzc21hdHJpeC52MS5TY29yZUFuc3dlclJlcXVlc3QaJC5hc3Nlc3NtYXRyaXgudjEuU2NvcmVBbnN3ZXJSZXNwb25zZRJkCg9HZXRJdGVtQW5hbHlzaXMSJy5hc3Nlc3NtYXRyaXgudjEuR2V0SXRlbUFuYWx5c2lzUmVxdWVzdBooLmFzc2Vzc21hdHJpeC52MS5HZXRJdGVtQW5hbHlzaXNSZXNwb25zZULSAQoTY29tLmFzc2Vzc21hdHJpeC52MUILUmVzdWx0UHJvdG9QAVpRZ2l0aHViLmNvbS9nc291bHRhbi9hc3Nlc3NtYXRyaXgvc2VydmljZXMvY29yZS9nZW4vYXNzZXNzbWF0cml4L3YxO2Fzc2Vzc21hdHJpeHYxogIDQVhYqgIPQXNzZXNzbWF0cml4LlYxygIPQXNzZXNzbWF0cml4XFYx4gIbQXNzZXNzbWF0cml4XFYxXEdQQk1ldGFkYXRh6gIQQXNzZXNzbWF0cml4OjpWMWIGcHJvdG8z", [file_assessmatrix_v1_candidate, file_assessmatrix_v1_exam]);
 
 /**
  * @generated from message assessmatrix.v1.Response
@@ -243,12 +243,17 @@ export const ListReviewsRequestSchema: GenMessage<ListReviewsRequest> = /*@__PUR
  */
 export type ReviewTask = Message<"assessmatrix.v1.ReviewTask"> & {
   /**
-   * @generated from field: string attempt_id = 1;
+   * Not set: the attempt would lead back to the candidate. See task.
+   *
+   * @generated from field: string attempt_id = 1 [deprecated = true];
+   * @deprecated
    */
   attemptId: string;
 
   /**
-   * "Response 7": the order of hand-in, so marking is blind to who wrote it.
+   * "Answer 7": numbered per question in an order derived from a server
+   * secret, not hand-in order, so answers to different questions by the
+   * same candidate cannot be linked, nor any answer matched to a hand-in.
    *
    * @generated from field: string label = 2;
    */
@@ -294,6 +299,9 @@ export type ReviewTask = Message<"assessmatrix.v1.ReviewTask"> & {
   reviewed: boolean;
 
   /**
+   * The score and note, when the caller gave them. Another reviewer's are
+   * not shown, so a second look is independent of the first.
+   *
    * @generated from field: int32 given = 10;
    */
   given: number;
@@ -304,9 +312,27 @@ export type ReviewTask = Message<"assessmatrix.v1.ReviewTask"> & {
   note: string;
 
   /**
-   * @generated from field: int64 submitted_at = 12;
+   * Not set, for the same reason as attempt_id.
+   *
+   * @generated from field: int64 submitted_at = 12 [deprecated = true];
+   * @deprecated
    */
   submittedAt: bigint;
+
+  /**
+   * Opaque, sealed under the server secret: what ScoreAnswer takes to score
+   * this answer.
+   *
+   * @generated from field: string task = 13;
+   */
+  task: string;
+
+  /**
+   * Scored by a reviewer other than the caller.
+   *
+   * @generated from field: bool scored_by_other = 14;
+   */
+  scoredByOther: boolean;
 };
 
 /**
@@ -338,6 +364,8 @@ export const ListReviewsResponseSchema: GenMessage<ListReviewsResponse> = /*@__P
  */
 export type ScoreAnswerRequest = Message<"assessmatrix.v1.ScoreAnswerRequest"> & {
   /**
+   * Either task, from the review queue, or attempt_id and item_id.
+   *
    * @generated from field: string attempt_id = 1;
    */
   attemptId: string;
@@ -358,6 +386,11 @@ export type ScoreAnswerRequest = Message<"assessmatrix.v1.ScoreAnswerRequest"> &
    * @generated from field: string note = 4;
    */
   note: string;
+
+  /**
+   * @generated from field: string task = 5;
+   */
+  task: string;
 };
 
 /**
@@ -520,6 +553,13 @@ export type ItemStat = Message<"assessmatrix.v1.ItemStat"> & {
    * @generated from field: repeated string notes = 7;
    */
   notes: string[];
+
+  /**
+   * Everyone scored the same, so point_biserial is undefined (sent as 0).
+   *
+   * @generated from field: bool no_spread = 8;
+   */
+  noSpread: boolean;
 };
 
 /**
@@ -593,7 +633,8 @@ export const ResultService: GenService<{
     output: typeof GetAttemptLogResponseSchema;
   },
   /**
-   * Essays waiting for a person, blind: the reviewer sees "Response 7", not a name.
+   * Essays waiting for a person, blind: the reviewer sees "Answer 7 to
+   * question 3", not a name, an attempt or a hand-in time.
    *
    * @generated from rpc assessmatrix.v1.ResultService.ListReviews
    */

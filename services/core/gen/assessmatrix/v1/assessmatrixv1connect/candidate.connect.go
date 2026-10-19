@@ -60,6 +60,9 @@ const (
 	// CandidateServiceEndSessionProcedure is the fully-qualified name of the CandidateService's
 	// EndSession RPC.
 	CandidateServiceEndSessionProcedure = "/assessmatrix.v1.CandidateService/EndSession"
+	// CandidateServiceGetRecordProcedure is the fully-qualified name of the CandidateService's
+	// GetRecord RPC.
+	CandidateServiceGetRecordProcedure = "/assessmatrix.v1.CandidateService/GetRecord"
 )
 
 // CandidateServiceClient is a client for the assessmatrix.v1.CandidateService service.
@@ -78,6 +81,10 @@ type CandidateServiceClient interface {
 	AppendEvents(context.Context, *connect.Request[v1.AppendEventsRequest]) (*connect.Response[v1.AppendEventsResponse], error)
 	SubmitAttempt(context.Context, *connect.Request[v1.SubmitAttemptRequest]) (*connect.Response[v1.SubmitAttemptResponse], error)
 	EndSession(context.Context, *connect.Request[v1.EndSessionRequest]) (*connect.Response[v1.EndSessionResponse], error)
+	// Everything recorded about the candidate's attempt: every event, the
+	// check of its seal and, once handed in, the reason for each flag. Their
+	// own copy of their record, to read or download (UU PDP No. 27/2022).
+	GetRecord(context.Context, *connect.Request[v1.GetRecordRequest]) (*connect.Response[v1.GetRecordResponse], error)
 }
 
 // NewCandidateServiceClient constructs a client for the assessmatrix.v1.CandidateService service.
@@ -145,6 +152,12 @@ func NewCandidateServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(candidateServiceMethods.ByName("EndSession")),
 			connect.WithClientOptions(opts...),
 		),
+		getRecord: connect.NewClient[v1.GetRecordRequest, v1.GetRecordResponse](
+			httpClient,
+			baseURL+CandidateServiceGetRecordProcedure,
+			connect.WithSchema(candidateServiceMethods.ByName("GetRecord")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -159,6 +172,7 @@ type candidateServiceClient struct {
 	appendEvents   *connect.Client[v1.AppendEventsRequest, v1.AppendEventsResponse]
 	submitAttempt  *connect.Client[v1.SubmitAttemptRequest, v1.SubmitAttemptResponse]
 	endSession     *connect.Client[v1.EndSessionRequest, v1.EndSessionResponse]
+	getRecord      *connect.Client[v1.GetRecordRequest, v1.GetRecordResponse]
 }
 
 // OpenLink calls assessmatrix.v1.CandidateService.OpenLink.
@@ -206,6 +220,11 @@ func (c *candidateServiceClient) EndSession(ctx context.Context, req *connect.Re
 	return c.endSession.CallUnary(ctx, req)
 }
 
+// GetRecord calls assessmatrix.v1.CandidateService.GetRecord.
+func (c *candidateServiceClient) GetRecord(ctx context.Context, req *connect.Request[v1.GetRecordRequest]) (*connect.Response[v1.GetRecordResponse], error) {
+	return c.getRecord.CallUnary(ctx, req)
+}
+
 // CandidateServiceHandler is an implementation of the assessmatrix.v1.CandidateService service.
 type CandidateServiceHandler interface {
 	OpenLink(context.Context, *connect.Request[v1.OpenLinkRequest]) (*connect.Response[v1.OpenLinkResponse], error)
@@ -222,6 +241,10 @@ type CandidateServiceHandler interface {
 	AppendEvents(context.Context, *connect.Request[v1.AppendEventsRequest]) (*connect.Response[v1.AppendEventsResponse], error)
 	SubmitAttempt(context.Context, *connect.Request[v1.SubmitAttemptRequest]) (*connect.Response[v1.SubmitAttemptResponse], error)
 	EndSession(context.Context, *connect.Request[v1.EndSessionRequest]) (*connect.Response[v1.EndSessionResponse], error)
+	// Everything recorded about the candidate's attempt: every event, the
+	// check of its seal and, once handed in, the reason for each flag. Their
+	// own copy of their record, to read or download (UU PDP No. 27/2022).
+	GetRecord(context.Context, *connect.Request[v1.GetRecordRequest]) (*connect.Response[v1.GetRecordResponse], error)
 }
 
 // NewCandidateServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -285,6 +308,12 @@ func NewCandidateServiceHandler(svc CandidateServiceHandler, opts ...connect.Han
 		connect.WithSchema(candidateServiceMethods.ByName("EndSession")),
 		connect.WithHandlerOptions(opts...),
 	)
+	candidateServiceGetRecordHandler := connect.NewUnaryHandler(
+		CandidateServiceGetRecordProcedure,
+		svc.GetRecord,
+		connect.WithSchema(candidateServiceMethods.ByName("GetRecord")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/assessmatrix.v1.CandidateService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CandidateServiceOpenLinkProcedure:
@@ -305,6 +334,8 @@ func NewCandidateServiceHandler(svc CandidateServiceHandler, opts ...connect.Han
 			candidateServiceSubmitAttemptHandler.ServeHTTP(w, r)
 		case CandidateServiceEndSessionProcedure:
 			candidateServiceEndSessionHandler.ServeHTTP(w, r)
+		case CandidateServiceGetRecordProcedure:
+			candidateServiceGetRecordHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -348,4 +379,8 @@ func (UnimplementedCandidateServiceHandler) SubmitAttempt(context.Context, *conn
 
 func (UnimplementedCandidateServiceHandler) EndSession(context.Context, *connect.Request[v1.EndSessionRequest]) (*connect.Response[v1.EndSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.CandidateService.EndSession is not implemented"))
+}
+
+func (UnimplementedCandidateServiceHandler) GetRecord(context.Context, *connect.Request[v1.GetRecordRequest]) (*connect.Response[v1.GetRecordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.CandidateService.GetRecord is not implemented"))
 }

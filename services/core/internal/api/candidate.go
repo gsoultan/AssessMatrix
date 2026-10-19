@@ -400,11 +400,11 @@ func (s *candidateService) GetSession(ctx context.Context, _ *connect.Request[v1
 		if err != nil {
 			return err
 		}
-		events, _, _, err := s.loadEvents(ctx, tx, att)
-		if err != nil {
+		if out.Attempt, err = s.candidateAttempt(ctx, tx, att, e); err != nil {
 			return err
 		}
-		out.Attempt, err = s.attemptProto(att, events, false)
+		// A credential can arrive after hand-in (an essay reviewed later).
+		out.CredentialUrl, err = s.liveCredentialURL(ctx, tx, att.ID)
 		return err
 	})
 	if err != nil {
@@ -537,6 +537,8 @@ func validateEvent(ev *v1.AttemptEvent) error {
 		return errors.New("event kind is missing or too long")
 	case domain.ServerOnly[k]:
 		return fmt.Errorf("event kind %q is written by the server only", k)
+	case strings.HasPrefix(k, domain.KindConsentPrefix) && domain.WithdrawalOf(k) == "":
+		return fmt.Errorf("event kind %q is not a consent a candidate can withdraw", k)
 	case len(ev.GetItemId()) > domain.MaxIDLen:
 		return errors.New("item id too long")
 	case len(ev.GetValues()) > MaxValuesPerEvent:
@@ -633,11 +635,13 @@ func (s *candidateService) AppendEvents(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(out), nil
 }
 
-// consented decides which events of a batch may be stored: a signal collected
-// under a purpose the candidate did not agree to (or that the tier does not
-// collect) is dropped, never stored. It is dropped rather than refused because
-// the batch also carries answers, and a refused batch would block them in the
-// candidate's queue for good. Only a batch with signals costs the lookup.
+// consented decides, in order, which events of a batch may be stored: a
+// signal collected under a purpose the candidate did not agree to (or that
+// the tier does not collect), or withdrew, is dropped, never stored. It is
+// dropped rather than refused because the batch also carries answers, and a
+// refused batch would block them in the candidate's queue for good. A
+// withdrawal is kept once, for a purpose still in force. Only a batch with
+// signals costs the lookup.
 func (s *candidateService) consented(ctx context.Context, tx *db.Tx, attemptID string, evs []*v1.AttemptEvent) (func(*v1.AttemptEvent) bool, error) {
 	all := func(*v1.AttemptEvent) bool { return true }
 	if !slices.ContainsFunc(evs, func(ev *v1.AttemptEvent) bool { return domain.PurposeOf(ev.GetKind()) != "" }) {
@@ -655,9 +659,26 @@ func (s *candidateService) consented(ctx context.Context, tx *db.Tx, attemptID s
 			kinds = append(kinds, r.Kind)
 		}
 	}
+	inForce := map[string]bool{}
+	for _, k := range kinds {
+		if p, ok := strings.CutPrefix(k, domain.KindConsentPrefix); ok && domain.WithdrawalOf(k) == "" {
+			inForce[p] = true
+		}
+	}
+	for _, k := range kinds {
+		delete(inForce, domain.WithdrawalOf(k))
+	}
+	// Called once per event, in the batch's order.
 	return func(ev *v1.AttemptEvent) bool {
+		if p := domain.WithdrawalOf(ev.GetKind()); p != "" {
+			if !inForce[p] {
+				return false
+			}
+			delete(inForce, p)
+			return true
+		}
 		p := domain.PurposeOf(ev.GetKind())
-		return p == "" || slices.Contains(kinds, domain.KindConsentPrefix+p)
+		return p == "" || inForce[p]
 	}, nil
 }
 
@@ -671,21 +692,16 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		if err != nil {
 			return err
 		}
-		events, _, _, err := s.loadEvents(ctx, tx, att)
+		events, intact, _, err := s.loadEvents(ctx, tx, att)
 		if err != nil {
 			return err
 		}
 		if att.SubmittedAt != nil { // idempotent: a retried submit sees the result
 			out.Ok = true
-			cred, ok, err := credential.New().
-				Where(credential.AttemptID.Eq(key(att.ID)), credential.RevokedAt.IsNull()).One(ctx, tx)
-			if err != nil {
+			if out.CredentialUrl, err = s.liveCredentialURL(ctx, tx, att.ID); err != nil {
 				return err
 			}
-			if ok {
-				out.CredentialUrl = s.CredentialURL(idText(cred.ID))
-			}
-			out.Attempt, err = s.attemptProto(att, events, false)
+			out.Attempt, err = s.candidateAttempt(ctx, tx, att, nil)
 			return err
 		}
 		e, err := examAt(ctx, tx, att.ExamID, att.ExamVersion)
@@ -742,7 +758,7 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 			if err := storeScore(ctx, tx, att, e, answers, reviews, score); err != nil {
 				return err
 			}
-			cred, err := s.settleCredential(ctx, tx, att, e, score)
+			cred, err := s.settleCredential(ctx, tx, att, e, score, intact)
 			if err != nil {
 				return err
 			}
@@ -751,12 +767,8 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 			}
 		}
 		att.SubmittedAt = &now
-		events, _, _, err = s.loadEvents(ctx, tx, att)
-		if err != nil {
-			return err
-		}
 		out.Ok = true
-		out.Attempt, err = s.attemptProto(att, events, false)
+		out.Attempt, err = s.candidateAttempt(ctx, tx, att, e)
 		return err
 	})
 	if err != nil {
@@ -775,4 +787,77 @@ func personEmail(ctx context.Context, tx *db.Tx, id string) (string, error) {
 		return "", notFound("person")
 	}
 	return p.Email, nil
+}
+
+// liveCredentialURL is the address of the attempt's credential, or "" while
+// it has none that stands.
+func (s *candidateService) liveCredentialURL(ctx context.Context, tx *db.Tx, attemptID string) (string, error) {
+	cred, ok, err := credential.New().
+		Where(credential.AttemptID.Eq(key(attemptID)), credential.RevokedAt.IsNull()).One(ctx, tx)
+	if err != nil || !ok {
+		return "", err
+	}
+	return s.CredentialURL(idText(cred.ID)), nil
+}
+
+// candidateAttempt is the attempt as its candidate sees it: once handed in,
+// with the reason for every flag on it, so nothing is held against them that
+// they cannot read. e is the attempt's version, or nil to load it.
+func (s *candidateService) candidateAttempt(ctx context.Context, tx *db.Tx, att *attemptRow, e *v1.Exam) (*v1.Attempt, error) {
+	events, intact, brokenAt, err := s.loadEvents(ctx, tx, att)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.attemptProto(att, events, false)
+	if err != nil || att.SubmittedAt == nil {
+		return out, err
+	}
+	if e == nil || e.GetVersion() != att.ExamVersion {
+		if e, err = examAt(ctx, tx, att.ExamID, att.ExamVersion); err != nil {
+			return nil, err
+		}
+	}
+	for _, f := range domain.Flags(events, questionNumbers(e), intact, brokenAt) {
+		out.FlagReasons = append(out.FlagReasons, f.ReasonID)
+	}
+	reviews := domain.Reviews(events)
+	for _, it := range domain.AllItems(e) {
+		if r, ok := reviews[it.GetId()]; ok {
+			out.Reviews = append(out.Reviews, &v1.ItemReview{ItemId: it.GetId(), Points: min(max(r.Points, 0), it.GetPoints()),
+				MaxPoints: it.GetPoints(), Note: r.Note})
+		}
+	}
+	return out, nil
+}
+
+// GetRecord is the candidate's own copy of their attempt's record: every
+// event, whether it still checks against its seal and, once handed in, the
+// reason for each flag and every person's score. Only who scored an essay is
+// held back.
+func (s *candidateService) GetRecord(ctx context.Context, _ *connect.Request[v1.GetRecordRequest]) (*connect.Response[v1.GetRecordResponse], error) {
+	out := &v1.GetRecordResponse{}
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		att, err := attemptBy(ctx, tx, "assignment_id", auth.From(ctx).AssignmentID, false)
+		if err != nil {
+			return err
+		}
+		if out.Attempt, err = s.candidateAttempt(ctx, tx, att, nil); err != nil {
+			return err
+		}
+		events, intact, brokenAt, err := s.loadEvents(ctx, tx, att)
+		if err != nil {
+			return err
+		}
+		for _, ev := range events {
+			if ev.GetKind() == domain.KindReviewScored {
+				ev.Text = ""
+			}
+		}
+		out.Attempt.Events, out.ChainIntact, out.BrokenAtSeq = events, intact, brokenAt
+		return nil
+	})
+	if err != nil {
+		return nil, s.internal(ctx, "GetRecord", err)
+	}
+	return connect.NewResponse(out), nil
 }

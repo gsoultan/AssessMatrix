@@ -37,6 +37,8 @@ type Exam struct {
 }
 
 func (e *Exam) Schema(t *storm.Table) {
+	// What a child's (tenant_id, …_id) key points at (migration 0008_tenant_keys).
+	t.UniqueNamed("exams_tenant_id_key", &e.Tenant, &e.ID)
 	t.Col(&e.Tenant).ConstraintName("exams_tenant_id_fkey")
 	t.Col(&e.Version).Default("1")
 	t.Col(&e.PublishedVersion).Default("0")

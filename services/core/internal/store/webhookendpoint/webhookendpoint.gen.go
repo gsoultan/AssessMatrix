@@ -2123,6 +2123,7 @@ func upsertTail(conflict uint8, mask uint64) string {
 // row that collides, which a test inserting distinct rows never sees.
 var conflictSpecs = []string{
 	" ON CONFLICT (\"id\")",
+	" ON CONFLICT (\"tenant_id\", \"id\")",
 }
 
 // assignable is the columns target i may overwrite, given the mask.
@@ -2154,6 +2155,28 @@ func assignable(i uint8, mask uint64) []string {
 		if mask&(1<<9) != 0 {
 			set = append(set, "secret_hint")
 		}
+	case 1:
+		if mask&(1<<2) != 0 {
+			set = append(set, "updated_at")
+		}
+		if mask&(1<<4) != 0 {
+			set = append(set, "url")
+		}
+		if mask&(1<<5) != 0 {
+			set = append(set, "description")
+		}
+		if mask&(1<<6) != 0 {
+			set = append(set, "events")
+		}
+		if mask&(1<<7) != 0 {
+			set = append(set, "active")
+		}
+		if mask&(1<<8) != 0 {
+			set = append(set, "secret")
+		}
+		if mask&(1<<9) != 0 {
+			set = append(set, "secret_hint")
+		}
 	}
 	return set
 }
@@ -2165,6 +2188,16 @@ func assignable(i uint8, mask uint64) []string {
 // entirely.
 func (n *Ins) OnConflictID() *Ins {
 	n.conflict = 2
+	return n
+}
+
+// OnConflictTenantIDID upserts on the unique index over (tenant_id, id).
+//
+// The row that already exists keeps every column this insert did
+// not assign. Follow with DoNothing() to leave it untouched
+// entirely.
+func (n *Ins) OnConflictTenantIDID() *Ins {
+	n.conflict = 4
 	return n
 }
 

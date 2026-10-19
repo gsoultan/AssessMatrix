@@ -3323,6 +3323,7 @@ func upsertTail(conflict uint8, mask uint64, add uint64) string {
 // row that collides, which a test inserting distinct rows never sees.
 var conflictSpecs = []string{
 	" ON CONFLICT (\"id\")",
+	" ON CONFLICT (\"tenant_id\", \"id\")",
 	" ON CONFLICT (\"tenant_id\", \"source_exam_id\") WHERE source_exam_id IS NOT NULL",
 }
 
@@ -3422,6 +3423,55 @@ func assignable(i uint8, mask uint64) []string {
 		if mask&(1<<15) != 0 {
 			set = append(set, "sections")
 		}
+		if mask&(1<<16) != 0 {
+			set = append(set, "source_exam_id")
+		}
+		if mask&(1<<17) != 0 {
+			set = append(set, "source_version")
+		}
+		if mask&(1<<18) != 0 {
+			set = append(set, "source_tenant_name")
+		}
+	case 2:
+		if mask&(1<<2) != 0 {
+			set = append(set, "updated_at")
+		}
+		if mask&(1<<4) != 0 {
+			set = append(set, "kind")
+		}
+		if mask&(1<<5) != 0 {
+			set = append(set, "status")
+		}
+		if mask&(1<<6) != 0 {
+			set = append(set, "version")
+		}
+		if mask&(1<<7) != 0 {
+			set = append(set, "published_version")
+		}
+		if mask&(1<<8) != 0 {
+			set = append(set, "title")
+		}
+		if mask&(1<<9) != 0 {
+			set = append(set, "issuer")
+		}
+		if mask&(1<<10) != 0 {
+			set = append(set, "tier")
+		}
+		if mask&(1<<11) != 0 {
+			set = append(set, "pass_pct")
+		}
+		if mask&(1<<12) != 0 {
+			set = append(set, "shuffle")
+		}
+		if mask&(1<<13) != 0 {
+			set = append(set, "timed")
+		}
+		if mask&(1<<14) != 0 {
+			set = append(set, "anonymous")
+		}
+		if mask&(1<<15) != 0 {
+			set = append(set, "sections")
+		}
 		if mask&(1<<17) != 0 {
 			set = append(set, "source_version")
 		}
@@ -3442,13 +3492,23 @@ func (n *Ins) OnConflictID() *Ins {
 	return n
 }
 
+// OnConflictTenantIDID upserts on the unique index over (tenant_id, id).
+//
+// The row that already exists keeps every column this insert did
+// not assign. Follow with DoNothing() to leave it untouched
+// entirely.
+func (n *Ins) OnConflictTenantIDID() *Ins {
+	n.conflict = 4
+	return n
+}
+
 // OnConflictTenantIDSourceExamID upserts on the unique index over (tenant_id, source_exam_id, where source_exam_id IS NOT NULL).
 //
 // The row that already exists keeps every column this insert did
 // not assign. Follow with DoNothing() to leave it untouched
 // entirely.
 func (n *Ins) OnConflictTenantIDSourceExamID() *Ins {
-	n.conflict = 4
+	n.conflict = 6
 	return n
 }
 

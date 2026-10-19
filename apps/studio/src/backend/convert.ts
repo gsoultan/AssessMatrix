@@ -256,7 +256,7 @@ function answersIn(answers: Answers) {
 }
 
 const scoreIn = (s: ca.Score | undefined) =>
-  s ? { raw: s.raw, max: s.max, pct: s.pct, passed: s.passed } : undefined
+  s ? { raw: s.raw, max: s.max, pct: s.pct, passed: s.passed, pendingHuman: s.pendingHuman } : undefined
 
 /**
  * A server attempt as the candidate screens hold one. `secondsLeft` is worked
@@ -276,6 +276,11 @@ export function attemptIn(a: ca.Attempt, serverNow: number): Attempt {
     secondsLeft: deadlineAt ? Math.max(0, Math.ceil((deadlineAt - serverNow) / 1000)) : 0,
     submittedAt: opt(a.submittedAt),
     score: scoreIn(a.score),
+    flagReasons: a.flagReasons.length ? [...a.flagReasons] : undefined,
+    withdrawn: a.withdrawn.length ? [...a.withdrawn] : undefined,
+    reviews: a.reviews.length
+      ? a.reviews.map((r) => ({ itemId: r.itemId, points: r.points, maxPoints: r.maxPoints, note: r.note }))
+      : undefined,
     events: a.events.map((e) => ({ seq: n(e.seq), t: n(e.serverTime), kind: e.kind, detail: e.detail || undefined })),
     queued: 0,
   }
