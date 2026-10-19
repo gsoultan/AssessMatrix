@@ -121,6 +121,8 @@ func newHarness(t *testing.T) *harness {
 
 // client is one browser: its own cookie jar.
 type client struct {
+	// email is the staff address this browser signed in with, if any.
+	email     string
 	http      *http.Client
 	base      string
 	auth      assessmatrixv1connect.AuthServiceClient
@@ -132,6 +134,7 @@ type client struct {
 	proctor   assessmatrixv1connect.ProctorServiceClient
 	hooks     assessmatrixv1connect.WebhookServiceClient
 	tenants   assessmatrixv1connect.TenantServiceClient
+	setup     assessmatrixv1connect.SetupServiceClient
 }
 
 func (h *harness) browser() *client {
@@ -150,14 +153,22 @@ func (h *harness) browser() *client {
 		proctor:   assessmatrixv1connect.NewProctorServiceClient(hc, u),
 		hooks:     assessmatrixv1connect.NewWebhookServiceClient(hc, u),
 		tenants:   assessmatrixv1connect.NewTenantServiceClient(hc, u),
+		setup:     assessmatrixv1connect.NewSetupServiceClient(hc, u),
 	}
 }
 
 // tenant creates a tenant and a signed-in staff browser for it.
 func (h *harness) tenant(name string) *client {
 	h.t.Helper()
-	ctx := context.Background()
 	email := strings.ReplaceAll(strings.ToLower(name), " ", "-") + "-" + secure.Token()[:8] + "@example.test"
+	h.newTenant(name, email)
+	return h.signIn(email)
+}
+
+// newTenant creates a tenant with email as its administrator, signing nobody in.
+func (h *harness) newTenant(name, email string) string {
+	h.t.Helper()
+	ctx := context.Background()
 	var tenant string
 	if err := h.owner.QueryRow(ctx, `INSERT INTO tenants (name) VALUES ($1) RETURNING id`, name).Scan(&tenant); err != nil {
 		h.t.Fatal(err)
@@ -166,7 +177,7 @@ func (h *harness) tenant(name string) *client {
 		h.t.Fatal(err)
 	}
 	h.lastTenant = tenant
-	return h.signIn(email)
+	return tenant
 }
 
 // signIn signs an address in, in a fresh browser, the way the studio does.
@@ -180,6 +191,7 @@ func (h *harness) signIn(email string) *client {
 	if !res.Msg.GetOk() {
 		h.t.Fatal("staff sign-in failed")
 	}
+	c.email = email
 	return c
 }
 
@@ -209,6 +221,16 @@ func (h *harness) lastCode(to string) string {
 		h.t.Fatalf("no code mailed to %s: %v", to, err)
 	}
 	return codeRe.FindStringSubmatch(body)[1]
+}
+
+// mailCount is how many messages have been queued for an address.
+func (h *harness) mailCount(to string) int {
+	h.t.Helper()
+	var n int
+	if err := h.owner.QueryRow(context.Background(), `SELECT count(*) FROM outbox WHERE to_addr = $1`, to).Scan(&n); err != nil {
+		h.t.Fatal(err)
+	}
+	return n
 }
 
 func (h *harness) lastLink(to string) string {
