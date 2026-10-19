@@ -60,6 +60,7 @@ class Analyze(unittest.TestCase):
         q1 = r["items"][0]
         self.assertEqual(q1["pValue"], 1.0)
         self.assertTrue(any("Everyone scored the same" in n for n in q1["notes"]))
+        self.assertTrue(q1["noSpread"], "an undefined point-biserial must not read as a weak 0")
         self.assertTrue(any("almost never chosen" in n for n in q1["notes"]))
         self.assertEqual(r["kr20"], 0.0)
 

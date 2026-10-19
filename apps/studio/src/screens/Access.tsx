@@ -12,6 +12,8 @@ const ROLES: { value: StaffRole; label: string }[] = [
   { value: 'member', label: 'Member' },
   { value: 'admin', label: 'Administrator' },
 ]
+/** An administrator gives users access as members; only a super administrator makes administrators. */
+const MEMBER_ONLY = ROLES.slice(0, 1)
 
 /** Rows drawn at once; search narrows the rest. Keeps a large organisation responsive. */
 const SHOWN = 100
@@ -23,7 +25,9 @@ const matches = (q: string, ...fields: string[]) => {
 }
 
 /**
- * Which studio users (staff, never test takers) may work in which tenant. One
+ * Which studio users (staff, never test takers) may work in which tenant. A
+ * super administrator sees every tenant, creates them and decides who
+ * administers each; an administrator adds members to their own tenants. One
  * tenant, or one user, at a time: with dozens of tenants a user-by-tenant grid
  * stops fitting, so each view lists
  * only what has access and adds the rest from a search.
@@ -80,7 +84,7 @@ export function Access({ isDesktop }: { isDesktop: boolean }) {
     return n
   }, [staff])
 
-  const ctx = { tenants, staff: staff ?? [], counts, busy, change, isDesktop }
+  const ctx = { tenants, staff: staff ?? [], counts, busy, change, isDesktop, superAdmin: !!me?.superAdmin }
 
   return (
     <div className="p-4 sm:p-6">
@@ -88,17 +92,20 @@ export function Access({ isDesktop }: { isDesktop: boolean }) {
         <div>
           <h1 className="text-[15px] font-semibold tracking-tight">Access</h1>
           <p className="mt-0.5 max-w-[70ch] text-[12.5px] leading-snug text-ink-muted">
-            Which studio users can work in each tenant you administer. Members build, invite and score in the
-            tenants given to them and nowhere else; administrators also manage access and share instruments between
-            tenants. Test takers are not users: they are in People and only ever see the tests they are invited to.
+            {me?.superAdmin
+              ? 'Every tenant in this installation and the studio users who work in it. You create tenants and choose their administrators; administrators add members to their own tenants.'
+              : 'Which studio users can work in each tenant you administer. Members build, invite and score in the tenants given to them and nowhere else. Administrators are chosen by a super administrator.'}{' '}
+            Test takers are not users: they are in People and only ever see the tests they are invited to.
           </p>
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="hair inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[12.5px] font-medium text-ink-2"
-        >
-          <IconPlus size={14} stroke={1.9} /> New tenant
-        </button>
+        {me?.superAdmin && (
+          <button
+            onClick={() => setCreating(true)}
+            className="hair inline-flex items-center gap-1.5 rounded-lg bg-surface px-3 py-2 text-[12.5px] font-medium text-ink-2"
+          >
+            <IconPlus size={14} stroke={1.9} /> New tenant
+          </button>
+        )}
       </header>
       <NewTenant
         opened={creating}
@@ -147,6 +154,7 @@ type Ctx = {
   busy: boolean
   change: (who: string, tenant: Tenant, grant: Grant, name?: string) => Promise<boolean>
   isDesktop: boolean
+  superAdmin: boolean
 }
 
 /** A searchable list on the left, the chosen item on the right; a picker above it on a phone. */
@@ -212,6 +220,7 @@ function More({ total }: { total: number }) {
 }
 
 const tenantSub = (t: Tenant, n: number) => `${n} ${n === 1 ? 'user' : 'users'}${t.current ? ' · you are here' : ''}`
+const superMark = (s: StaffAccess) => (s.superAdmin ? ' · super administrator' : '')
 
 function ByTenant({
   tenants,
@@ -220,6 +229,7 @@ function ByTenant({
   busy,
   change,
   isDesktop,
+  superAdmin,
   selected,
   onSelect,
   onPerson,
@@ -242,7 +252,7 @@ function ByTenant({
     const e = email.trim().toLowerCase()
     if (!e.includes('@')) return setErr('Enter the email address they sign in with.')
     setErr('')
-    if (tenant && (await change(e, tenant, role, name.trim()))) {
+    if (tenant && (await change(e, tenant, superAdmin ? role : 'member', name.trim()))) {
       setEmail('')
       setName('')
     }
@@ -305,7 +315,9 @@ function ByTenant({
             >
               <TextInput size="xs" label="Email" type="email" className="w-full sm:w-auto sm:min-w-[200px] sm:flex-1" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
               <TextInput size="xs" label="Name" className="w-full sm:w-[160px]" value={name} onChange={(e) => setName(e.currentTarget.value)} />
-              <NativeSelect size="xs" label="Role" className="w-full sm:w-[140px]" data={ROLES} value={role} onChange={(e) => setRole(e.currentTarget.value as StaffRole)} />
+              {superAdmin && (
+                <NativeSelect size="xs" label="Role" className="w-full sm:w-[140px]" data={ROLES} value={role} onChange={(e) => setRole(e.currentTarget.value as StaffRole)} />
+              )}
               <SubmitButton busy={busy} icon={<IconUserPlus size={14} stroke={2} />} label="Give access" />
               {err && <p role="alert" className="w-full text-[12px] text-ink">{err}</p>}
             </form>
@@ -317,11 +329,12 @@ function ByTenant({
                   <AccessRow
                     key={s.email}
                     title={s.name || s.email}
-                    sub={s.name ? s.email : ''}
+                    sub={(s.name ? s.email : '') + superMark(s)}
                     onTitle={() => onPerson(s.email)}
                     role={s.grants[tenant.id]}
                     label={`${s.email} in ${tenant.name}`}
                     busy={busy}
+                    superAdmin={superAdmin}
                     onRole={(r) => void change(s.email, tenant, r)}
                     onRemove={() => void change(s.email, tenant, 'none')}
                   />
@@ -336,7 +349,7 @@ function ByTenant({
   )
 }
 
-function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect }: Ctx & { selected: string; onSelect: (email: string) => void }) {
+function ByPerson({ tenants, staff, busy, change, isDesktop, superAdmin, selected, onSelect }: Ctx & { selected: string; onSelect: (email: string) => void }) {
   const [q, setQ] = useState('')
   const [addTo, setAddTo] = useState<string | null>(null)
   const [role, setRole] = useState<StaffRole>('member')
@@ -351,7 +364,7 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
 
   const sub = (s: StaffAccess) => {
     const n = Object.keys(s.grants).length
-    return `${s.name ? s.email + ' · ' : ''}${n} ${n === 1 ? 'tenant' : 'tenants'}`
+    return `${s.name ? s.email + ' · ' : ''}${n} ${n === 1 ? 'tenant' : 'tenants'}${superMark(s)}`
   }
   const list = (
     <>
@@ -386,7 +399,7 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
         <Panel
           pad={false}
           title={person.name || person.email}
-          hint={`${person.name ? person.email + ' · ' : ''}${all.length} of ${tenants.length} tenants`}
+          hint={`${person.name ? person.email + ' · ' : ''}${all.length} of ${tenants.length} tenants${superMark(person)}`}
           actions={
             all.length > 8 && (
               <TextInput
@@ -406,13 +419,13 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
             onSubmit={async (ev) => {
               ev.preventDefault()
               const t = tenants.find((x) => x.id === addTo)
-              if (t && (await change(person.email, t, role))) setAddTo(null)
+              if (t && (await change(person.email, t, superAdmin ? role : 'member'))) setAddTo(null)
             }}
           >
             <Select
               size="xs"
               label="Add to a tenant"
-              placeholder={rest.length ? 'Find a tenant' : 'Already in every tenant you administer'}
+              placeholder={rest.length ? 'Find a tenant' : superAdmin ? 'Already in every tenant' : 'Already in every tenant you administer'}
               disabled={rest.length === 0}
               searchable
               nothingFoundMessage="No tenant matches"
@@ -421,7 +434,9 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
               value={addTo}
               onChange={setAddTo}
             />
-            <NativeSelect size="xs" label="Role" className="w-full sm:w-[150px]" data={ROLES} value={role} onChange={(e) => setRole(e.currentTarget.value as StaffRole)} />
+            {superAdmin && (
+              <NativeSelect size="xs" label="Role" className="w-full sm:w-[150px]" data={ROLES} value={role} onChange={(e) => setRole(e.currentTarget.value as StaffRole)} />
+            )}
             <SubmitButton busy={busy || !addTo} icon={<IconPlus size={14} stroke={2} />} label="Add" />
           </form>
           {held.length === 0 && <p className="px-4 py-3 text-[12.5px] text-ink-muted sm:px-5">No tenant matches.</p>}
@@ -434,6 +449,7 @@ function ByPerson({ tenants, staff, busy, change, isDesktop, selected, onSelect 
                 role={person.grants[t.id]}
                 label={`${person.email} in ${t.name}`}
                 busy={busy}
+                superAdmin={superAdmin}
                 onRole={(r) => void change(person.email, t, r)}
                 onRemove={() => void change(person.email, t, 'none')}
               />
@@ -452,6 +468,7 @@ function AccessRow({
   role,
   label,
   busy,
+  superAdmin,
   onRole,
   onRemove,
 }: {
@@ -461,9 +478,12 @@ function AccessRow({
   role: StaffRole
   label: string
   busy: boolean
+  /** Without it an administrator's row is read-only: only a super administrator changes administrators. */
+  superAdmin: boolean
   onRole: (r: StaffRole) => void
   onRemove: () => void
 }) {
+  const locked = role === 'admin' && !superAdmin
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hair/60 px-4 py-2.5 last:border-0 sm:px-5">
       <div className="min-w-0 flex-1">
@@ -480,14 +500,15 @@ function AccessRow({
         size="xs"
         aria-label={`Role of ${label}`}
         className="w-[150px]"
-        data={ROLES}
+        data={superAdmin || locked ? ROLES : MEMBER_ONLY}
         value={role}
-        disabled={busy}
+        disabled={busy || locked}
+        title={locked ? 'Only a super administrator changes administrators' : undefined}
         onChange={(e) => onRole(e.currentTarget.value as StaffRole)}
       />
       <button
         onClick={onRemove}
-        disabled={busy}
+        disabled={busy || locked}
         aria-label={`Remove ${label}`}
         title={`Remove ${roleName(role).toLowerCase()} access`}
         className="rounded-md p-1.5 text-ink-muted hover:bg-ink/[0.05] hover:text-ink disabled:opacity-50"

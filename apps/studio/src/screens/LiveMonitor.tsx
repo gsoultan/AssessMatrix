@@ -279,11 +279,20 @@ function AttemptRecord({ sitting }: { sitting: Sitting }) {
 const dot = (e: AttemptEvent) =>
   e.kind.startsWith('vision.') || e.kind === 'answer.pasted' || e.kind === 'session.second_tab'
     ? 'var(--color-serious)'
-    : e.kind.startsWith('focus.') || e.kind === 'fullscreen.exited'
+    : e.kind.startsWith('focus.') || e.kind === 'fullscreen.exited' || e.kind.endsWith('.withdrawn')
       ? 'var(--color-warn)'
       : e.kind.startsWith('attempt.') || e.kind.startsWith('consent.')
         ? 'var(--color-good)'
         : 'var(--color-ink-muted)'
+
+/** The runner's codes for why the camera stopped (services/core domain.CameraStopped). */
+const CAMERA_STOPPED: Record<string, string> = {
+  permission_refused: 'camera permission was refused',
+  no_camera: 'no camera could be opened',
+  camera_ended: 'the camera was turned off or disconnected',
+  check_failed: 'the face check failed on this device',
+  check_unavailable: 'the face check could not load on this device',
+}
 
 const secs = (v?: string) => `${Math.round(Number(v ?? 0) / 1000)} s`
 
@@ -310,12 +319,14 @@ function say(e: AttemptEvent): string {
     case 'vision.faces_multiple':
       return `${v[1] ?? 'Several'} faces in view for ${secs(v[0])}`
     case 'vision.stopped':
-      return `Camera check stopped: ${e.detail}`
+      return `Camera check stopped: ${CAMERA_STOPPED[e.detail ?? ''] ?? 'no recognised reason'}`
     case 'response.changed':
       return `Answered ${e.itemId}`
     case 'response.typed':
       return `Typed an answer to ${e.itemId}`
     default:
+      if (e.kind.startsWith('consent.') && e.kind.endsWith('.withdrawn'))
+        return `Withdrew consent: ${e.kind.slice('consent.'.length, -'.withdrawn'.length)}`
       if (e.kind.startsWith('consent.')) return `Agreed to: ${e.kind.slice('consent.'.length)}`
       return e.detail ? `${e.kind} · ${e.detail}` : e.kind
   }

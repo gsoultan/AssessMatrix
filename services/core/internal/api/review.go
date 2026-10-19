@@ -1,9 +1,13 @@
 package api
 
 import (
+	"bytes"
+	"cmp"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -35,8 +39,17 @@ func (s *resultService) ListReviews(ctx context.Context, req *connect.Request[v1
 		if err != nil {
 			return err
 		}
+		// Every essay for the exam, done or not, so an answer's number does
+		// not change when the reviewer shows or hides scored ones.
+		type entry struct {
+			task   *v1.ReviewTask
+			number int
+			order  []byte
+		}
+		var all []entry
+		me := "staff:" + auth.From(ctx).StaffID
 		versions := map[int32]*v1.Exam{}
-		for i, a := range atts {
+		for _, a := range atts {
 			e, ok := versions[a.ExamVersion]
 			if !ok {
 				if e, err = examAt(ctx, tx, a.ExamID, a.ExamVersion); err != nil {
@@ -56,16 +69,40 @@ func (s *resultService) ListReviews(ctx context.Context, req *connect.Request[v1
 			reviews := domain.Reviews(events)
 			number := questionNumbers(e)
 			for _, it := range essays {
-				r, done := reviews[it.GetId()]
-				if done && !req.Msg.GetIncludeDone() {
-					continue
+				task, err := s.reviewTask(a.ID, it.GetId())
+				if err != nil {
+					return err
 				}
+				r, done := reviews[it.GetId()]
 				ans := answers[it.GetId()]
-				out.Tasks = append(out.Tasks, &v1.ReviewTask{
-					AttemptId: a.ID, Label: "Response " + strconv.Itoa(i+1), ItemId: it.GetId(), Number: int32(number(it.GetId())),
-					Stem: it.GetStem(), Text: ans.GetText(), File: ans.GetFile(), Points: it.GetPoints(),
-					Reviewed: done, Given: r.Points, Note: r.Note, SubmittedAt: a.SubmittedAt.UnixMilli(),
-				})
+				t := &v1.ReviewTask{Task: task, ItemId: it.GetId(), Number: int32(number(it.GetId())),
+					Stem: it.GetStem(), Text: ans.GetText(), File: ans.GetFile(), Points: it.GetPoints(), Reviewed: done}
+				if done && r.By == me {
+					t.Given, t.Note = r.Points, r.Note
+				} else if done {
+					t.ScoredByOther = true
+				}
+				all = append(all, entry{t, number(it.GetId()), s.Keys.ReviewOrder(it.GetId(), a.ID)})
+			}
+		}
+		slices.SortFunc(all, func(x, y entry) int {
+			if c := cmp.Compare(x.number, y.number); c != 0 {
+				return c
+			}
+			if c := strings.Compare(x.task.GetItemId(), y.task.GetItemId()); c != 0 {
+				return c
+			}
+			return bytes.Compare(x.order, y.order)
+		})
+		n := 0
+		for i, en := range all {
+			if i == 0 || en.task.GetItemId() != all[i-1].task.GetItemId() {
+				n = 0
+			}
+			n++
+			en.task.Label = "Answer " + strconv.Itoa(n)
+			if !en.task.GetReviewed() || req.Msg.GetIncludeDone() {
+				out.Tasks = append(out.Tasks, en.task)
 			}
 		}
 		return nil
@@ -74,6 +111,33 @@ func (s *resultService) ListReviews(ctx context.Context, req *connect.Request[v1
 		return nil, s.internal(ctx, "ListReviews", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// reviewLabel is the associated data a review task is sealed under.
+const reviewLabel = "review-task"
+
+// reviewTask is the opaque handle the queue gives for one answer: the
+// attempt and the question, sealed, so the reviewer holds nothing that leads
+// back to the candidate.
+func (s *Server) reviewTask(attemptID, itemID string) (string, error) {
+	b, err := s.Keys.Seal(reviewLabel, []byte(attemptID+"\n"+itemID))
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// openReviewTask reverses reviewTask.
+func (s *Server) openReviewTask(task string) (attemptID, itemID string, err error) {
+	b, err := base64.RawURLEncoding.DecodeString(task)
+	if err == nil {
+		b, err = s.Keys.Open(reviewLabel, b)
+	}
+	if err != nil {
+		return "", "", invalidArg(errors.New("this review task is not one the queue gave out"))
+	}
+	attemptID, itemID, _ = strings.Cut(string(b), "\n")
+	return attemptID, itemID, nil
 }
 
 func essaysOf(e *v1.Exam) []*v1.Item {
@@ -88,13 +152,20 @@ func essaysOf(e *v1.Exam) []*v1.Item {
 
 func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1.ScoreAnswerRequest]) (*connect.Response[v1.ScoreAnswerResponse], error) {
 	m := req.Msg
+	attemptID, itemID := m.GetAttemptId(), m.GetItemId()
+	if m.GetTask() != "" {
+		var err error
+		if attemptID, itemID, err = s.openReviewTask(m.GetTask()); err != nil {
+			return nil, err
+		}
+	}
 	note := strings.TrimSpace(m.GetNote())
 	if utf8.RuneCountInString(note) > MaxReviewNote {
 		return nil, invalidArg(fmt.Errorf("the note is longer than %d characters", MaxReviewNote))
 	}
 	out := &v1.ScoreAnswerResponse{}
 	err := s.tx(ctx, func(tx pgx.Tx) error {
-		att, err := attemptBy(ctx, tx, "id", m.GetAttemptId(), true)
+		att, err := attemptBy(ctx, tx, "id", attemptID, true)
 		if err != nil {
 			return err
 		}
@@ -110,7 +181,7 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		}
 		var item *v1.Item
 		for _, it := range essaysOf(e) {
-			if it.GetId() == m.GetItemId() {
+			if it.GetId() == itemID {
 				item = it
 			}
 		}
@@ -130,12 +201,13 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		}}); err != nil {
 			return err
 		}
-		events, _, _, err := s.loadEvents(ctx, tx, att)
+		events, intact, _, err := s.loadEvents(ctx, tx, att)
 		if err != nil {
 			return err
 		}
 		answers, _ := domain.Fold(events, att.deadline())
 		reviews := domain.Reviews(events)
+		before := storedScore(att.Score)
 		out.Score = domain.Score(e, answers, reviews)
 		if err := storeScore(ctx, tx, att, e, answers, reviews, out.Score); err != nil {
 			return err
@@ -143,12 +215,22 @@ func (s *resultService) ScoreAnswer(ctx context.Context, req *connect.Request[v1
 		if err := s.emit(ctx, tx, EventAttemptScored, att.PersonID, attemptData(att, out.Score)); err != nil {
 			return err
 		}
-		cred, err := s.settleCredential(ctx, tx, att, e, out.Score)
+		cred, err := s.settleCredential(ctx, tx, att, e, out.Score, intact)
 		if err != nil {
 			return err
 		}
 		if cred != "" {
 			out.CredentialUrl = s.CredentialURL(cred)
+		}
+		// A review that decides or changes the final result tells the
+		// candidate. A pass is told by the credential's own mail; anything
+		// else (a fail, or a pass taken back) is told here.
+		final := out.Score.GetPendingHuman() == 0
+		changed := before == nil || before.GetPendingHuman() > 0 || before.GetPct() != out.Score.GetPct() || before.GetPassed() != out.Score.GetPassed()
+		if final && changed && cred == "" {
+			if err := s.mailResult(ctx, tx, att, e, out.Score); err != nil {
+				return err
+			}
 		}
 		return audit(ctx, tx, "attempt.reviewed", att.ID, map[string]any{"item": item.GetId(), "points": m.GetPoints()})
 	})
@@ -197,4 +279,31 @@ func (s *resultService) GetItemAnalysis(ctx context.Context, req *connect.Reques
 		return nil, s.internal(ctx, "GetItemAnalysis", err)
 	}
 	return connect.NewResponse(out), nil
+}
+
+// storedScore is the score as last stored, or nil.
+func storedScore(stored []byte) *v1.Score {
+	var sc v1.Score
+	if stored == nil || protojson.Unmarshal(stored, &sc) != nil {
+		return nil
+	}
+	return &sc
+}
+
+// mailResult tells the candidate their final result once nothing is left to
+// score, for a result that earned no credential.
+func (s *Server) mailResult(ctx context.Context, tx pgx.Tx, att *attemptRow, e *v1.Exam, sc *v1.Score) error {
+	var tenantName, email string
+	if err := tx.QueryRow(ctx, `SELECT t.name, p.email FROM tenants t, assignments a JOIN people p ON p.id = a.person_id
+		WHERE t.id = am_tenant() AND a.id = $1`, att.AssignmentID).Scan(&tenantName, &email); err != nil {
+		return err
+	}
+	verdict := "belum mencapai ambang lulus"
+	if sc.GetPassed() {
+		verdict = "lulus"
+	}
+	body := fmt.Sprintf("Penilaian %s sudah selesai.\n\nSkor akhir Anda %d%% (%d dari %d poin); ambang lulus %d%%. Hasil: %s.\n\n"+
+		"Jika ada yang ingin Anda tanyakan tentang penilaian ini, hubungi penyelenggara.\n\n— %s",
+		e.GetTitle(), sc.GetPct(), sc.GetRaw(), sc.GetMax(), e.GetPassPct(), verdict, tenantName)
+	return s.queueMail(ctx, tx, "result", email, "Hasil Anda: "+e.GetTitle(), body)
 }

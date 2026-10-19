@@ -78,6 +78,8 @@ export type CompleteSetupRequest = Message<"assessmatrix.v1.CompleteSetupRequest
   setupCode: string;
 
   /**
+   * The default tenant's name. Empty means "Default".
+   *
    * @generated from field: string organization_name = 2;
    */
   organizationName: string;
@@ -128,7 +130,8 @@ export const CompleteSetupResponseSchema: GenMessage<CompleteSetupResponse> = /*
   messageDesc(file_assessmatrix_v1_setup, 3);
 
 /**
- * First-run setup. Open only while the database holds no organisation; the
+ * First-run setup: the super administrator and the default tenant, whose
+ * administrator they also are. Open only while the database holds no tenant; the
  * database itself refuses a second one (am_setup_first_tenant). Completing it
  * needs the setup code the core prints to its log at startup, so whoever
  * reaches a fresh install first over the network cannot claim it.

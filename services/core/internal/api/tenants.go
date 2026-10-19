@@ -24,6 +24,10 @@ import (
 // tenantService is tenancy as staff see it: which tenants they work in, who
 // else does, and instruments shared between them.
 //
+// A super administrator creates tenants and decides who administers each. An
+// administrator gives users access to the tenants they administer, as
+// members, and shares instruments between them.
+//
 // Nothing here reads two tenants in one transaction. A request that touches
 // several runs one transaction per tenant, each scoped by row-level security
 // as usual, and each only after am_staff_tenants has shown the caller holds
@@ -35,6 +39,10 @@ const (
 	maxShareTargets  = 50
 	maxStaffInTenant = 2000
 )
+
+// errAdminsBySuper refuses an administrator a change to who administers.
+var errAdminsBySuper = connect.NewError(connect.CodePermissionDenied,
+	errors.New("only a super administrator can make someone an administrator or change an administrator's access"))
 
 var (
 	regionShape = regexp.MustCompile(`^[a-z]{2}(-[a-z0-9]+)?$`)
@@ -51,9 +59,15 @@ type membership struct {
 }
 
 // in returns ctx as the caller would be if signed in to m's tenant, so the
-// audit log there names their staff row there.
+// audit log there names their staff row there. A super administrator who
+// does not work in it is named by their own staff row.
 func (m *membership) in(ctx context.Context) context.Context {
-	return auth.With(ctx, &auth.Principal{Tenant: m.tenant, StaffID: m.staffID, Role: m.role})
+	p := *auth.From(ctx)
+	p.Tenant, p.Role = m.tenant, m.role
+	if m.staffID != "" {
+		p.StaffID = m.staffID
+	}
+	return auth.With(ctx, &p)
 }
 
 // memberships is every tenant the signed-in staff member belongs to, found by
@@ -106,6 +120,41 @@ func adminIn(ms []membership, id string) (*membership, error) {
 		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("you are not an administrator of %s", m.name))
 	}
 	return m, nil
+}
+
+// managed is the tenants whose access the caller manages: the ones they
+// administer, or every tenant for a super administrator. A tenant a super
+// administrator does not work in has no staff id and no role.
+func (s *Server) managed(ctx context.Context, ms []membership) ([]membership, error) {
+	if !auth.From(ctx).Super {
+		var out []membership
+		for _, m := range ms {
+			if m.role == auth.RoleAdmin {
+				out = append(out, m)
+			}
+		}
+		return out, nil
+	}
+	var out []membership
+	err := s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT tenant_id, tenant_name, region FROM am_all_tenants()`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var m membership
+			if err := rows.Scan(&m.tenant, &m.name, &m.region); err != nil {
+				return err
+			}
+			if mine, err := find(ms, string(m.tenant)); err == nil {
+				m = *mine
+			}
+			out = append(out, m)
+		}
+		return rows.Err()
+	})
+	return out, err
 }
 
 func roleIn(r v1.Role) string {
@@ -184,6 +233,8 @@ func (s *tenantService) SwitchTenant(ctx context.Context, req *connect.Request[v
 	return res, nil
 }
 
+// CreateTenant makes a tenant and its first administrator: the person named,
+// or the caller. Only a super administrator gets here.
 func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v1.CreateTenantRequest]) (*connect.Response[v1.CreateTenantResponse], error) {
 	name := strings.TrimSpace(req.Msg.GetName())
 	if name == "" || len(name) > 200 {
@@ -192,6 +243,14 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 	region := strings.TrimSpace(req.Msg.GetRegion())
 	if region != "" && !regionShape.MatchString(region) {
 		return nil, invalidArg(errors.New("region must be a two-letter code such as id or sg"))
+	}
+	adminEmail := strings.ToLower(strings.TrimSpace(req.Msg.GetAdminEmail()))
+	if adminEmail != "" && (len(adminEmail) > 320 || !emailShape.MatchString(adminEmail)) {
+		return nil, invalidArg(errors.New("the administrator needs a valid email address"))
+	}
+	adminName := strings.TrimSpace(req.Msg.GetAdminName())
+	if len(adminName) > 200 {
+		return nil, invalidArg(errors.New("a name is at most 200 characters"))
 	}
 	p := auth.From(ctx)
 	var email, staffName, here string
@@ -205,22 +264,38 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 	if region == "" {
 		region = here
 	}
-	m := membership{tenant: db.TenantID(uuid.NewString()), name: name, region: region, role: auth.RoleAdmin}
+	mine := adminEmail == "" || adminEmail == strings.ToLower(email)
+	if mine {
+		adminEmail, adminName = email, staffName
+	}
+	m := membership{tenant: db.TenantID(uuid.NewString()), name: name, region: region}
 	// Row-level security lets a transaction insert only its own tenant's
 	// rows, the new tenant included: it is scoped to the new id first.
 	err = s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `INSERT INTO tenants (id, name, region) VALUES (am_tenant(), $1, $2)`, name, region); err != nil {
 			return err
 		}
+		var adminID string
 		if err := tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email, name, role) VALUES (am_tenant(), $1, $2, 'admin')
-			RETURNING id`, email, staffName).Scan(&m.staffID); err != nil {
+			RETURNING id`, adminEmail, adminName).Scan(&adminID); err != nil {
 			return err
 		}
-		return audit(m.in(ctx), tx, "tenant.created", string(m.tenant), map[string]any{"name": name, "region": region, "from": string(p.Tenant)})
+		if mine {
+			m.staffID, m.role = adminID, auth.RoleAdmin
+		}
+		if err := audit(m.in(ctx), tx, "tenant.created", string(m.tenant), map[string]any{
+			"name": name, "region": region, "from": string(p.Tenant), "admin": adminEmail,
+		}); err != nil {
+			return err
+		}
+		if mine {
+			return nil
+		}
+		return s.accessMail(ctx, tx, adminEmail, name)
 	})
 	if err == nil {
 		err = s.tx(ctx, func(tx pgx.Tx) error {
-			return audit(ctx, tx, "tenant.created", string(m.tenant), map[string]any{"name": name, "region": region})
+			return audit(ctx, tx, "tenant.created", string(m.tenant), map[string]any{"name": name, "region": region, "admin": adminEmail})
 		})
 	}
 	if err != nil {
@@ -229,18 +304,31 @@ func (s *tenantService) CreateTenant(ctx context.Context, req *connect.Request[v
 	return connect.NewResponse(&v1.CreateTenantResponse{Tenant: m.proto(p.Tenant)}), nil
 }
 
+// accessMail tells someone they can now work in a tenant.
+func (s *Server) accessMail(ctx context.Context, tx pgx.Tx, email, tenant string) error {
+	return s.queueMail(ctx, tx, "staff-access", email, "Anda mendapat akses ke "+tenant+" di AssessMatrix",
+		"Anda sekarang dapat bekerja di "+tenant+" di AssessMatrix.\n\nMasuk dengan alamat email ini di "+
+			strings.TrimRight(s.PublicURL, "/")+"/ ; kode masuk akan dikirim ke email ini.")
+}
+
+// staffRow is one active staff member of a tenant.
+type staffRow struct {
+	email, name, role string
+	super             bool
+}
+
 // staffIn lists the active staff of one tenant, by address.
-func staffIn(ctx context.Context, tx pgx.Tx) ([][3]string, error) {
-	rows, err := tx.Query(ctx, `SELECT lower(email), name, role FROM staff WHERE disabled_at IS NULL
+func staffIn(ctx context.Context, tx pgx.Tx) ([]staffRow, error) {
+	rows, err := tx.Query(ctx, `SELECT lower(email), name, role, am_super_admin(email) FROM staff WHERE disabled_at IS NULL
 		ORDER BY lower(email) LIMIT $1`, maxStaffInTenant)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out [][3]string
+	var out []staffRow
 	for rows.Next() {
-		var r [3]string
-		if err := rows.Scan(&r[0], &r[1], &r[2]); err != nil {
+		var r staffRow
+		if err := rows.Scan(&r.email, &r.name, &r.role, &r.super); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -248,17 +336,15 @@ func staffIn(ctx context.Context, tx pgx.Tx) ([][3]string, error) {
 	return out, rows.Err()
 }
 
-// access is ListAccess's table, optionally for one address.
-func (s *Server) access(ctx context.Context, ms []membership, only string) (*v1.ListAccessResponse, error) {
+// access is ListAccess's table over the tenants the caller manages,
+// optionally for one address.
+func (s *Server) access(ctx context.Context, managed []membership, only string) (*v1.ListAccessResponse, error) {
 	out := &v1.ListAccessResponse{}
 	byEmail := map[string]*v1.StaffAccess{}
-	for i := range ms {
-		m := &ms[i]
-		if m.role != auth.RoleAdmin {
-			continue
-		}
+	for i := range managed {
+		m := &managed[i]
 		out.Tenants = append(out.Tenants, m.proto(auth.From(ctx).Tenant))
-		var rows [][3]string
+		var rows []staffRow
 		err := s.DB.InTenant(ctx, m.tenant, func(tx pgx.Tx) (err error) {
 			rows, err = staffIn(ctx, tx)
 			return err
@@ -267,19 +353,19 @@ func (s *Server) access(ctx context.Context, ms []membership, only string) (*v1.
 			return nil, err
 		}
 		for _, r := range rows {
-			if only != "" && r[0] != only {
+			if only != "" && r.email != only {
 				continue
 			}
-			sa := byEmail[r[0]]
+			sa := byEmail[r.email]
 			if sa == nil {
-				sa = &v1.StaffAccess{Email: r[0]}
-				byEmail[r[0]] = sa
+				sa = &v1.StaffAccess{Email: r.email, SuperAdmin: r.super}
+				byEmail[r.email] = sa
 				out.Staff = append(out.Staff, sa)
 			}
 			if sa.Name == "" {
-				sa.Name = r[1]
+				sa.Name = r.name
 			}
-			sa.Grants = append(sa.Grants, &v1.AccessGrant{TenantId: string(m.tenant), Role: roleProto(r[2])})
+			sa.Grants = append(sa.Grants, &v1.AccessGrant{TenantId: string(m.tenant), Role: roleProto(r.role)})
 		}
 	}
 	slices.SortFunc(out.Staff, func(a, b *v1.StaffAccess) int { return strings.Compare(a.GetEmail(), b.GetEmail()) })
@@ -291,7 +377,11 @@ func (s *tenantService) ListAccess(ctx context.Context, _ *connect.Request[v1.Li
 	if err != nil {
 		return nil, s.internal(ctx, "ListAccess", err)
 	}
-	out, err := s.access(ctx, ms, "")
+	managed, err := s.managed(ctx, ms)
+	if err != nil {
+		return nil, s.internal(ctx, "ListAccess", err)
+	}
+	out, err := s.access(ctx, managed, "")
 	if err != nil {
 		return nil, s.internal(ctx, "ListAccess", err)
 	}
@@ -301,6 +391,10 @@ func (s *tenantService) ListAccess(ctx context.Context, _ *connect.Request[v1.Li
 // SetAccess grants, changes or withdraws one person's access to one tenant.
 // Withdrawing ends their sessions there at once. A tenant always keeps at
 // least one administrator, so nobody can lock everyone out of it.
+//
+// An administrator manages members of the tenants they administer. Making
+// someone an administrator, or changing an administrator's access, is for a
+// super administrator, who may do it in any tenant.
 func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.SetAccessRequest]) (*connect.Response[v1.SetAccessResponse], error) {
 	email := strings.ToLower(strings.TrimSpace(req.Msg.GetEmail()))
 	if len(email) > 320 || !emailShape.MatchString(email) {
@@ -314,11 +408,24 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 	if req.Msg.GetRole() != v1.Role_ROLE_UNSPECIFIED && role == "" {
 		return nil, invalidArg(errors.New("unknown role"))
 	}
-	_, ms, err := s.memberships(ctx)
+	super := auth.From(ctx).Super
+	if role == auth.RoleAdmin && !super {
+		return nil, errAdminsBySuper
+	}
+	by, ms, err := s.memberships(ctx)
 	if err != nil {
 		return nil, s.internal(ctx, "SetAccess", err)
 	}
-	m, err := adminIn(ms, req.Msg.GetTenantId())
+	managed, err := s.managed(ctx, ms)
+	if err != nil {
+		return nil, s.internal(ctx, "SetAccess", err)
+	}
+	var m *membership
+	if super {
+		m, err = find(managed, req.Msg.GetTenantId())
+	} else {
+		m, err = adminIn(ms, req.Msg.GetTenantId())
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -341,6 +448,9 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 			current = false
 		} else if err != nil {
 			return err
+		}
+		if current && active && was == auth.RoleAdmin && !super {
+			return errAdminsBySuper
 		}
 		if current && active && was == auth.RoleAdmin && role != auth.RoleAdmin {
 			var others int
@@ -365,7 +475,7 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 			if _, err := tx.Exec(ctx, `DELETE FROM staff_codes WHERE staff_id = $1`, id); err != nil {
 				return err
 			}
-			return audit(m.in(ctx), tx, "staff.access", id, map[string]any{"email": email, "role": "none", "was": was})
+			return audit(m.in(ctx), tx, "staff.access", id, map[string]any{"email": email, "role": "none", "was": was, "by": by})
 		}
 		if err := tx.QueryRow(ctx, `INSERT INTO staff (tenant_id, email, name, role) VALUES (am_tenant(), $1, $2, $3)
 			ON CONFLICT (tenant_id, lower(email)) DO UPDATE SET role = excluded.role, disabled_at = NULL,
@@ -376,20 +486,33 @@ func (s *tenantService) SetAccess(ctx context.Context, req *connect.Request[v1.S
 		if !current || !active {
 			was, added = "none", true
 		}
-		if err := audit(m.in(ctx), tx, "staff.access", id, map[string]any{"email": email, "role": role, "was": was}); err != nil {
+		if err := audit(m.in(ctx), tx, "staff.access", id, map[string]any{"email": email, "role": role, "was": was, "by": by}); err != nil {
 			return err
 		}
 		if !added {
 			return nil
 		}
-		return s.queueMail(ctx, tx, "staff-access", email, "Anda mendapat akses ke "+m.name+" di AssessMatrix",
-			"Anda sekarang dapat bekerja di "+m.name+" di AssessMatrix.\n\nMasuk dengan alamat email ini di "+
-				strings.TrimRight(s.PublicURL, "/")+"/ ; kode masuk akan dikirim ke email ini.")
+		return s.accessMail(ctx, tx, email, m.name)
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "SetAccess", err)
 	}
-	out, err := s.access(ctx, ms, email)
+	// Their grants only: read just the managed tenants they are in, not
+	// every tenant a super administrator could see.
+	var theirs []string
+	err = s.DB.Unscoped(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT tenant_id::text FROM am_staff_tenants($1)`, email)
+		if err != nil {
+			return err
+		}
+		theirs, err = pgx.CollectRows(rows, pgx.RowTo[string])
+		return err
+	})
+	if err != nil {
+		return nil, s.internal(ctx, "SetAccess", err)
+	}
+	managed = slices.DeleteFunc(managed, func(x membership) bool { return !slices.Contains(theirs, string(x.tenant)) })
+	out, err := s.access(ctx, managed, email)
 	if err != nil {
 		return nil, s.internal(ctx, "SetAccess", err)
 	}

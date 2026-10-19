@@ -132,11 +132,12 @@ func (x *GetSetupStatusResponse) GetRegion() string {
 }
 
 type CompleteSetupRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	SetupCode        string                 `protobuf:"bytes,1,opt,name=setup_code,json=setupCode,proto3" json:"setup_code,omitempty"`
-	OrganizationName string                 `protobuf:"bytes,2,opt,name=organization_name,json=organizationName,proto3" json:"organization_name,omitempty"`
-	AdminEmail       string                 `protobuf:"bytes,3,opt,name=admin_email,json=adminEmail,proto3" json:"admin_email,omitempty"`
-	AdminName        string                 `protobuf:"bytes,4,opt,name=admin_name,json=adminName,proto3" json:"admin_name,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SetupCode string                 `protobuf:"bytes,1,opt,name=setup_code,json=setupCode,proto3" json:"setup_code,omitempty"`
+	// The default tenant's name. Empty means "Default".
+	OrganizationName string `protobuf:"bytes,2,opt,name=organization_name,json=organizationName,proto3" json:"organization_name,omitempty"`
+	AdminEmail       string `protobuf:"bytes,3,opt,name=admin_email,json=adminEmail,proto3" json:"admin_email,omitempty"`
+	AdminName        string `protobuf:"bytes,4,opt,name=admin_name,json=adminName,proto3" json:"admin_name,omitempty"`
 	// Empty means the server's region.
 	Region        string `protobuf:"bytes,5,opt,name=region,proto3" json:"region,omitempty"`
 	unknownFields protoimpl.UnknownFields

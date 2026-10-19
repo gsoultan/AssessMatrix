@@ -60,8 +60,8 @@ func TestAuthorInviteSitScore(t *testing.T) {
 
 	sub := get(cand.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: att.GetId()})))
 	sc := sub.Msg.GetAttempt().GetScore()
-	if !sub.Msg.GetOk() || sc.GetRaw() != 4 || sc.GetMax() != 4 || sc.GetPct() != 100 || !sc.GetPassed() || sc.GetPendingHuman() != 5 {
-		t.Fatalf("score = %+v, want 4/4 100%% passed with 5 points pending review", sc)
+	if !sub.Msg.GetOk() || sc.GetRaw() != 4 || sc.GetMax() != 4 || sc.GetPct() != 100 || sc.GetPassed() || sc.GetPendingHuman() != 5 {
+		t.Fatalf("score = %+v, want 4/4 100%% with 5 points pending review and no verdict yet", sc)
 	}
 	resub := get(cand.candidate.SubmitAttempt(ctx, connect.NewRequest(&v1.SubmitAttemptRequest{AttemptId: att.GetId()})))
 	if resub.Msg.GetAttempt().GetSubmittedAt() != sub.Msg.GetAttempt().GetSubmittedAt() {
@@ -75,8 +75,8 @@ func TestAuthorInviteSitScore(t *testing.T) {
 
 	list := get(staff.assign.ListAssignments(ctx, connect.NewRequest(&v1.ListAssignmentsRequest{ExamId: f.exam.GetId()})))
 	a := list.Msg.GetAssignments()[0]
-	if a.GetStatus() != v1.AssignStatus_ASSIGN_STATUS_SUBMITTED || a.GetScorePct() != 100 || !a.GetPassed() {
-		t.Fatalf("the score must land back on the assignment, got %+v", a)
+	if a.GetStatus() != v1.AssignStatus_ASSIGN_STATUS_SUBMITTED || a.GetScorePct() != 100 || a.Passed != nil {
+		t.Fatalf("the score must land back on the assignment, with no verdict while the essay waits, got %+v", a)
 	}
 	resp := get(staff.results.ListResponses(ctx, connect.NewRequest(&v1.ListResponsesRequest{ExamId: f.exam.GetId()})))
 	if len(resp.Msg.GetResponses()) != 1 {

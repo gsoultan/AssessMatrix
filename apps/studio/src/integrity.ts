@@ -53,7 +53,8 @@ export const PURPOSES: Record<Purpose, { title: string; what: string; keep: stri
     title: 'Pemeriksaan wajah oleh perangkat',
     what:
       'Kamera depan diperiksa di perangkat Anda sendiri, sekitar sekali per detik: apakah ada wajah, dan apakah ada lebih dari satu. ' +
-      'Video dan foto tidak pernah dikirim atau disimpan.',
+      'Video dan foto tidak pernah dikirim atau disimpan. Anda dapat mematikan kamera kapan saja selama ujian; ' +
+      'itu dicatat dan ditinjau penyelenggara.',
     keep: 'Hanya peristiwanya yang dikirim, misalnya "tidak ada wajah selama 40 detik", dan disimpan paling lama 1 tahun setelah ujian.',
   },
 }

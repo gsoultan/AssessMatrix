@@ -187,7 +187,14 @@ export type Attempt = {
   deadlineAt?: number
   secondsLeft: number
   submittedAt?: number
-  score?: { raw: number; max: number; pct: number; passed: boolean }
+  /** `passed` is false while `pendingHuman` points wait for a person: there is no verdict yet. */
+  score?: { raw: number; max: number; pct: number; passed: boolean; pendingHuman?: number }
+  /** After hand-in (core only): what a person gave each answer they scored, with their note. */
+  reviews?: { itemId: string; points: number; maxPoints: number; note: string }[]
+  /** After hand-in (core only): why each integrity flag on the attempt was raised, in Indonesian. */
+  flagReasons?: string[]
+  /** Consents the candidate took back during the attempt ("camera"); nothing is collected under them after. */
+  withdrawn?: string[]
   events: AttemptEvent[]
   queued: number
   /** Pinned at start. A mid-attempt edit must not change what is being sat. */
@@ -911,7 +918,8 @@ export function score(exam: Exam, a: Attempt) {
   let pendingHuman = 0
 
   for (const it of allItems(exam)) {
-    if (it.type === 'essay' || isScale(it.type)) {
+    if (isScale(it.type)) continue
+    if (it.type === 'essay') {
       pendingHuman += it.points
       continue
     }
@@ -928,5 +936,5 @@ export function score(exam: Exam, a: Attempt) {
   }
 
   const pct = max === 0 ? 0 : Math.round((raw / max) * 100)
-  return { raw, max, pct, passed: pct >= exam.passPct, pendingHuman }
+  return { raw, max, pct, passed: pendingHuman === 0 && pct >= exam.passPct, pendingHuman }
 }

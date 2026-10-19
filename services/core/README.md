@@ -8,9 +8,13 @@ invitations, candidate sessions, attempts and results. It implements the
 
 | Guarantee | Where it is enforced | Proven by |
 | :--- | :--- | :--- |
-| Tenant A cannot read or write tenant B's rows | Row-level security on every table, keyed on a transaction-local setting taken from the authenticated principal; the server refuses to start as a role that could bypass it | `TestTenantIsolationAcrossEveryEndpoint`, which fails if any RPC lacks a case, and `TestNoTenantSeesNothing` |
+| Tenant A cannot read or write tenant B's rows | Row-level security on every table, keyed on a transaction-local setting taken from the authenticated principal; the server refuses to start as a role that could bypass it. Every foreign key between tenant tables includes `tenant_id`, so a row cannot name another tenant's row even if a handler forgets to check | `TestTenantIsolationAcrossEveryEndpoint`, which calls every RPC (public ones too) from another tenant, as its administrator and as someone who works in both, and fails if any RPC lacks a case; `TestEveryTableIsTenantScoped`, `TestForeignKeysStayInsideATenant` and `TestSecurityDefinerFunctionsAreReviewed`, which read the schema, so a new table, key or RLS-bypassing function fails the build until it is scoped or reviewed; `TestNoTenantSeesNothing` |
 | Every RPC has an access rule | `api.Policy()`; the interceptor refuses unknown procedures | `TestEveryProcedureHasAPolicy` |
-| An attempt is tamper-evident | Append-only `attempt_events` (trigger and grants) holding a keyed HMAC hash chain | `TestTamperedAttemptIsDetected` |
+| An attempt is tamper-evident | Append-only `attempt_events` (trigger and grants) holding a keyed HMAC hash chain, and a keyed seal on the attempt row over the chain's head and purge time, so cut-off events and a hand-made purge show too | `TestTamperedAttemptIsDetected`, `TestEveryKindOfTamperingIsDetected` |
+| An altered record earns no credential | `settleCredential` requires an intact record and revokes on a break | `TestAlteredRecordEarnsNoCredential` |
+| A withdrawn consent stops collection under it, and the attempt goes on | `candidateService.consented` drops every signal under a purpose after `consent.<purpose>.withdrawn`, in batch order | `TestCameraConsentCanBeWithdrawnMidExam`, `TestOnlyAGivenConsentCanBeWithdrawn` |
+| A candidate can read their whole record | `CandidateService.GetRecord`, scoped to the session's invitation; only the reviewer's identity is held back | `TestCandidateReadsTheirWholeRecord`, `TestTenantIsolationAcrossEveryEndpoint` |
+| Essay review is blind | The queue hands out a sealed task, no attempt id or hand-in time, numbered per question in a keyed order; a reviewer sees only their own marks | `TestReviewQueueIsBlind` |
 | Candidates never receive answer keys | `domain.ForCandidate` on everything served to them | `TestAuthorInviteSitScore` |
 | The server clock ends an exam, and offline work done in time is kept | `domain.Counts` | `TestDeadlineIsServerTime`, `TestCountsLateAnswers` |
 | Invitation rules from `docs/08` | `internal/api/candidate.go`, `invite.go`; per-row counters in the transaction, then per-address and per-tenant limits | `invite_test.go`, including the revoked-link, 25-wrong-guesses and per-tenant limit tests |
@@ -30,9 +34,11 @@ psql -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
 
 export AM_MIGRATE_DATABASE_URL=postgres://am_owner:owner@localhost/assessmatrix
 go run ./cmd/core migrate
-# Either create the first organisation and its administrator here, or skip
-# this and use /setup (below). More tenants, and who works in which, are
-# managed from the studio (Access, and the tenant menu).
+# Either create the first tenant and its administrator here, or skip this and
+# use /setup (below). The first person made either way is also the super
+# administrator, who creates more tenants and picks their administrators
+# from the studio (Access); administrators add members to their tenants.
+# `core super-admin <email>` adds another super administrator.
 go run ./cmd/core tenant "Your Org" you@example.id
 
 AM_DATABASE_URL=postgres://am_app:app@localhost/assessmatrix \
@@ -47,10 +53,11 @@ With `AM_DEV=1 AM_MAILER=mailbox`, mail is kept in memory and readable at
 
 ## First run: /setup
 
-On a database with no organisation, `serve` logs a warning with the setup URL and a
+On a database with no tenant, `serve` logs a warning with the setup URL and a
 `setup_code`. Open `<AM_PUBLIC_URL>/setup` (the sign-in page sends you there too), enter the
-code, and name the organisation and its first administrator; you are signed in as that
-administrator straight away. `core setup-code` prints the same code; it is derived from
+code, and give your name and email; that makes you the super administrator and the
+administrator of the default tenant (named "Default" unless you change it), and signs you in
+straight away. `core setup-code` prints the same code; it is derived from
 `AM_SECRET`, so every replica agrees on it.
 
 Setup works once. The database makes that so: `am_setup_first_tenant` locks `tenants` and

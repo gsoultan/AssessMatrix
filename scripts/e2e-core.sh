@@ -59,7 +59,7 @@ curl -sf "$URL/readyz" -o /dev/null || { cat "$WORK/core.log"; die "the core did
 ok "core ready on $URL"
 
 set +e
-(cd "$APP" && URL="$URL" RUNNER_PORT="$RUNNER_PORT" OUTAGE_SECONDS="$OUTAGE_SECONDS" STAFF_EMAIL="$STAFF" bun e2e-core.mjs)
+(cd "$APP" && URL="$URL" RUNNER_PORT="$RUNNER_PORT" METRICS_PORT="$METRICS_PORT" OUTAGE_SECONDS="$OUTAGE_SECONDS" STAFF_EMAIL="$STAFF" bun e2e-core.mjs)
 rc=$?
 set -e
 # The candidate's answers must show on the dashboard's numbers too.

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 func (s *Server) PublicHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /credentials/{id}", s.publicCredential)
+	mux.HandleFunc("GET /credentials/{id}/status", s.publicCredentialStatus)
 	mux.HandleFunc("GET /issuers/{id}", s.publicIssuer)
 	mux.HandleFunc("GET /issuers/{id}/jwks", s.publicIssuer)
 	return mux
@@ -63,6 +65,50 @@ func (s *Server) publicCredential(w http.ResponseWriter, r *http.Request) {
 	}
 	// Short: a revocation must reach verifiers soon.
 	publicJSON(w, time.Minute, out)
+}
+
+// publicCredentialStatus is the revocation list a credential's
+// credentialStatus points at, so a wallet or another verifier holding only
+// the signed credential can learn it was revoked. One credential per list:
+// nothing about an issuer's other credentials is disclosed.
+func (s *Server) publicCredentialStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !validUUID(id) {
+		http.NotFound(w, r)
+		return
+	}
+	var jwt string
+	var revoked *time.Time
+	var why *string
+	err := s.DB.Pool.QueryRow(r.Context(), `SELECT jwt, revoked_at, revoked_why FROM am_public_credential($1)`, id).Scan(&jwt, &revoked, &why)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		s.Log.ErrorContext(r.Context(), "public credential status", "err", err)
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var claims struct {
+		Iss string `json:"iss"`
+	}
+	if parts := strings.Split(jwt, "."); len(parts) == 3 {
+		if body, err := base64.RawURLEncoding.DecodeString(parts[1]); err == nil {
+			_ = json.Unmarshal(body, &claims)
+		}
+	}
+	revokedList := []map[string]any{}
+	if revoked != nil {
+		entry := map[string]any{"id": "urn:uuid:" + id}
+		if why != nil {
+			entry["revocationReason"] = *why
+		}
+		revokedList = append(revokedList, entry)
+	}
+	publicJSON(w, time.Minute, map[string]any{
+		"id": s.CredentialStatusURL(id), "issuer": claims.Iss, "revokedCredentials": revokedList,
+	})
 }
 
 func (s *Server) publicIssuer(w http.ResponseWriter, r *http.Request) {

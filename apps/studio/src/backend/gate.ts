@@ -119,7 +119,7 @@ const core: Gate = {
     }
     const serverNow = Number(r.serverNow)
     const exam = examIn(r.exam!)
-    const attempt = r.attempt ? attemptIn(r.attempt, serverNow) : null
+    const attempt = r.attempt ? { ...attemptIn(r.attempt, serverNow), credentialUrl: r.credentialUrl || undefined } : null
     // This device's unsent answers are read before the seat is handed over.
     if (attempt?.id && !attempt.submittedAt) await openQueue(attempt.id)
     const inv = r.invitation
