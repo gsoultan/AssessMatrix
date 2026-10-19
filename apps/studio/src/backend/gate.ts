@@ -28,7 +28,7 @@ export type Seat = {
   skew: number
 }
 
-export type Opened = { ok: true; email: string; stub?: string } | { ok: false; why: Refusal; email?: string }
+export type Opened = { ok: true; email: string } | { ok: false; why: Refusal; email?: string }
 export type CodeSent = { ok: true; retryAt: number; left: number } | { ok: false; why: Refusal | 'cooldown'; retryAt?: number }
 export type Verified = { ok: true } | { ok: false; why: Refusal | 'wrong' | 'stale'; triesLeft?: number }
 export type Reissued = { ok: true } | { ok: false; why: Refusal | 'cooldown' | 'limit'; retryAt?: number }
@@ -53,7 +53,7 @@ let localHash: string | null = null
 const local: Gate = {
   async openLink(token) {
     const r = await invite.openLink(token)
-    return r.ok ? { ok: true, email: r.email, stub: r.assignment.id } : r
+    return r.ok ? { ok: true, email: r.email } : r
   },
   requestCode: invite.requestCode,
   async verifyCode(token, code) {

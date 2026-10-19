@@ -101,6 +101,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	// Tests open many links from one address; the limiter has its own test.
 	srv.ipLimit, srv.emailLimit = limit.New(1_000_000, time.Minute, 1000), limit.New(1_000_000, time.Minute, 100_000)
+	srv.tenantLimit = limit.New(1_000_000, time.Minute, 1000)
 	srv.Media = media.Regional{Store: media.FS{Dir: t.TempDir()}, Region: "id"}
 	// Mounted as cmd/core mounts them: RPCs by prefix, images on their own paths.
 	rpc, images, public := srv.Handler(), srv.MediaHandler(), srv.PublicHandler()

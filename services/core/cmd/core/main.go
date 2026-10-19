@@ -259,7 +259,8 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
-		Media: media.Regional{Store: store, Region: cfg.Media.Region}, WebhookPolicy: hooks}
+		Media: media.Regional{Store: store, Region: cfg.Media.Region}, WebhookPolicy: hooks,
+		PerIPPerMinute: cfg.PerIP, PerTenantPerMinute: cfg.PerTenant}
 	retention.Server = srv
 	if err := jobs.Start(ctx); err != nil {
 		return err

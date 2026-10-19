@@ -244,6 +244,11 @@ try {
     await page.getByRole('tab', { name: new RegExp(`^${name}`) }).click()
     await page.waitForTimeout(250)
   }
+  // A local build's mail is read where an inbox would be (storage), never from
+  // a screen in the studio: links and codes are not shown to staff anywhere.
+  const inbox = () => page.evaluate(() => JSON.parse(localStorage.getItem('am.outbox.v1') ?? '[]'))
+  const linkFor = async (to) => (await inbox()).find((m) => m.kind === 'invite' && m.to === to)?.link
+  const codeFor = async (to) => (await inbox()).find((m) => m.kind === 'code' && m.to === to)?.code
   const inviteMore = async () => {
     await page.getByRole('button', { name: /^Invite people$/ }).first().click()
     await page.waitForTimeout(400)
@@ -258,15 +263,16 @@ try {
   ;(await page.getByRole('dialog', { name: /Invite people/ }).count()) === 0
     ? ok('the invite panel closes once the invitation is sent')
     : bad('the invite panel stayed open after inviting')
-  await tab('Outbox')
-  const budiLink = page.getByRole('link', { name: 'Open the link emailed to budi.santoso@example.id' })
-  ;(await budiLink.count())
+  const budiHref = await linkFor('budi.santoso@example.id')
+  budiHref
     ? ok('inviting a person emails them their own link')
-    : bad('no invitation email in the outbox')
+    : bad('no invitation email was sent')
+  ;(await page.getByRole('tab', { name: /^Outbox/ }).count()) === 0 && (await page.getByRole('link', { name: /emailed to/ }).count()) === 0
+    ? ok('the studio shows no outbox: a link is readable only in the recipient\'s inbox')
+    : bad('the studio still shows mail that was sent')
   ;(await page.getByRole('button', { name: /Copy invitation/ }).count()) === 0
     ? ok('there is no way to copy a link back out of an assignment')
     : bad('a link can still be copied from the assignment')
-  const budiHref = await budiLink.first().getAttribute('href')
   await tab('People')
   ;(await page.getByText(/^v2$/).count())
     ? ok('an invitation pins the version it was issued against')
@@ -310,9 +316,7 @@ try {
     : bad('CSV preview did not count new and rejected rows')
   await page.getByRole('button', { name: /^Invite 2 people$/ }).click()
   await page.waitForTimeout(600)
-  await tab('Outbox')
-  ;(await page.getByText(/Invited 2, 2 added to the roster/).count()) &&
-  (await page.getByRole('link', { name: 'Open the link emailed to eko.prasetyo@example.id' }).count())
+  ;(await page.getByText(/Invited 2, 2 added to the roster/).count()) && (await linkFor('eko.prasetyo@example.id'))
     ? ok('a CSV invites everyone usable in it, and each gets an email')
     : bad('CSV import did not invite and email')
   ;(await page.evaluate(() => JSON.stringify(localStorage))).includes('3174000000000001')
@@ -332,8 +336,7 @@ try {
   await page.waitForTimeout(400)
   await page.getByRole('button', { name: /^Invite 1 person$/ }).last().click()
   await page.waitForTimeout(600)
-  await tab('Outbox')
-  ;(await page.getByRole('link', { name: 'Open the link emailed to rina.kusuma@example.id' }).count())
+  ;(await linkFor('rina.kusuma@example.id'))
     ? ok('an .xlsx roster is read and its people invited')
     : bad('.xlsx import did not invite')
 
@@ -350,7 +353,7 @@ try {
     : bad('a made-up link was not refused')
 
   // revoke, then resend
-  const agusHref = await page.getByRole('link', { name: 'Open the link emailed to agus.wibowo@example.id' }).getAttribute('href')
+  const agusHref = await linkFor('agus.wibowo@example.id')
   await tab('People')
   await page.getByRole('button', { name: 'Revoke invitation for Agus Wibowo' }).click()
   await page.waitForTimeout(400)
@@ -364,8 +367,7 @@ try {
     : bad('the previous link survived a resend')
 
   /* ---------------- sit it through the invitation ---------------- */
-  await tab('Outbox')
-  await budiLink.first().click()
+  await page.goto(budiHref)
   await page.waitForTimeout(700)
   const gateText = await page.locator('main').innerText()
   gateText.includes('Pastikan ini memang Anda') && gateText.includes('b•••@example.id') && !gateText.includes('budi.santoso')
@@ -377,7 +379,10 @@ try {
 
   await page.getByRole('button', { name: /Kirim kode/ }).click()
   await page.waitForTimeout(500)
-  const code = await page.getByTestId('stub-code').innerText()
+  const code = await codeFor('budi.santoso@example.id')
+  ;(await page.getByText(/Stub inbox/).count()) === 0
+    ? ok('the candidate screen shows no stand-in code: it arrives by email only')
+    : bad('the candidate screen still shows the code that was sent')
   await page.getByLabel('Kode verifikasi').fill(code === '000000' ? '111111' : '000000')
   await page.getByRole('button', { name: /^Verifikasi/ }).click()
   await page.waitForTimeout(400)
