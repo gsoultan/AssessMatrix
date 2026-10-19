@@ -5,7 +5,7 @@ go 1.27.2
 require (
 	connectrpc.com/connect v1.21.0
 	github.com/google/uuid v1.6.0
-	github.com/gsoultan/storm v1.2.1-0.20261019054847-b741d4b82879
+	github.com/gsoultan/storm v1.3.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/prometheus/client_golang v1.25.0
