@@ -49,6 +49,10 @@ const Queue = "webhooks"
 // MaxTries spans about four hours with the backoff below (attempt⁴ seconds).
 const MaxTries = 10
 
+// OrderWait is how long a delivery waits before checking again whether the
+// earlier events about its attempt have been sent.
+const OrderWait = 30 * time.Second
+
 // Timeout is how long a receiver has to answer one request.
 const Timeout = 10 * time.Second
 
@@ -283,8 +287,28 @@ func Deliver(ctx context.Context, d *db.DB, keys *secure.Keys, client *http.Clie
 	if !r.active {
 		return record(ctx, d, tenant, id, StateFailed, 0, "the endpoint is paused", false)
 	}
+	if f.SubjectID.Valid {
+		// One attempt's events reach an endpoint in the order they
+		// happened: wait while an earlier one is still to be sent. One that
+		// ran out of tries does not hold the rest back.
+		var earlier queries.CountRow
+		err = d.InTenant(ctx, db.TenantID(tenant), func(tx *db.Tx) (err error) {
+			earlier, _, err = queries.WebhookEarlierPending.One(ctx, tx, f.EndpointID, f.SubjectID.V, f.Seq)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+		if earlier.N > 0 {
+			return river.JobSnooze(OrderWait)
+		}
+	}
 	secret, err := keys.Open(SecretLabel(r.endpointID), r.sealed)
 	if err != nil {
+		// Marked failed, not left pending, so it holds nothing back.
+		if err := record(ctx, d, tenant, id, StateFailed, 0, "the endpoint's secret cannot be read; rotate it", false); err != nil {
+			return err
+		}
 		return river.JobCancel(fmt.Errorf("open webhook secret for %s: %w", r.endpointID, err))
 	}
 

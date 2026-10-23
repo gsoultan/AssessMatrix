@@ -196,6 +196,7 @@ function Endpoint({
 }) {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [replaying, setReplaying] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
@@ -244,6 +245,9 @@ function Endpoint({
         <button className={quiet} disabled={busy || !e.active} onClick={() => run(() => api.webhooks.pingWebhook({ id: e.id }), 'Test event queued; see Deliveries.')}>
           Send test event
         </button>
+        <button className={quiet} disabled={busy || !e.active} onClick={() => setReplaying((r) => !r)} aria-expanded={replaying}>
+          Replay events
+        </button>
         <button className={quiet} disabled={busy} onClick={() => setEditing(true)}>
           Edit
         </button>
@@ -272,6 +276,16 @@ function Endpoint({
           </button>
         )}
       </div>
+      {replaying && (
+        <Replay
+          endpointId={e.id}
+          onDone={(text) => {
+            setReplaying(false)
+            setNote(text)
+            onChanged()
+          }}
+        />
+      )}
       {note && (
         <p role="status" className="mt-2 text-[12.5px] text-ink-2">
           {note}
@@ -279,6 +293,75 @@ function Endpoint({
       )}
       <Problem text={error} />
     </li>
+  )
+}
+
+// datetime-local has no zone: it is the browser's local time.
+const localInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+
+/** Sends one attempt's events, or a window's, to this endpoint again. */
+function Replay({ endpointId, onDone }: { endpointId: string; onDone: (note: string) => void }) {
+  const [by, setBy] = useState<'attempt' | 'window'>('attempt')
+  const [attemptId, setAttemptId] = useState('')
+  const [from, setFrom] = useState(() => localInput(new Date(Date.now() - 24 * 3600_000)))
+  const [to, setTo] = useState(() => localInput(new Date()))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const replay = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const r = await api.webhooks.replayEvents(
+        by === 'attempt'
+          ? { endpointId, attemptId: attemptId.trim() }
+          : { endpointId, from: BigInt(new Date(from).getTime()), to: BigInt(new Date(to).getTime()) },
+      )
+      const pending = r.alreadyPending ? ` ${r.alreadyPending} already waiting to send.` : ''
+      onDone(r.queued || r.alreadyPending ? `${r.queued} event${r.queued === 1 ? '' : 's'} queued to send again.${pending}` : 'No logged events matched.')
+    } catch (err) {
+      setError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form
+      className="mt-3 rounded-lg border border-hair p-3"
+      onSubmit={(ev) => {
+        ev.preventDefault()
+        void replay()
+      }}
+    >
+      <p className="text-[12px] text-ink-muted">
+        Sends logged events again, in order, with their original ids and bodies. Only event types this webhook takes; the log
+        keeps 30 days.
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <Select
+          label="Which events"
+          data={[
+            { value: 'attempt', label: 'One attempt' },
+            { value: 'window', label: 'A time window' },
+          ]}
+          value={by}
+          onChange={(v) => setBy(v === 'window' ? 'window' : 'attempt')}
+          allowDeselect={false}
+          className="w-[160px]"
+        />
+        {by === 'attempt' ? (
+          <TextInput label="Attempt id" required value={attemptId} onChange={(ev) => setAttemptId(ev.currentTarget.value)} className="min-w-[300px] flex-1" />
+        ) : (
+          <>
+            <TextInput label="From" required type="datetime-local" value={from} onChange={(ev) => setFrom(ev.currentTarget.value)} />
+            <TextInput label="To" required type="datetime-local" value={to} onChange={(ev) => setTo(ev.currentTarget.value)} />
+          </>
+        )}
+        <button type="submit" disabled={busy} className={primary} style={{ background: 'var(--color-s1)' }}>
+          Replay
+        </button>
+      </div>
+      <Problem text={error} />
+    </form>
   )
 }
 

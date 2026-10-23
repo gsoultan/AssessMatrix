@@ -24,6 +24,8 @@ type Row struct {
 	TenantID  [16]byte
 	Type      string
 	PersonID  runtime.Null[[16]byte]
+	SubjectID runtime.Null[[16]byte]
+	Seq       int64
 	Body      string
 	CreatedAt time.Time
 }
@@ -64,7 +66,7 @@ const (
 	opNotExists runtime.Op = 27
 )
 
-const nCols = 6
+const nCols = 8
 
 // Query is a value type: composing one allocates nothing. Predicates
 // are a postfix token stream, so disjunction and negation are
@@ -74,14 +76,16 @@ type Query struct {
 	nt   uint8
 	top  uint8 // top-level conjuncts, ANDed at compile time
 
-	strs        [6]string
-	raws        [4][16]byte
-	tims        [4]time.Time
-	ns, nr, ntm uint8
+	strs            [6]string
+	nums            [6]int64
+	raws            [4][16]byte
+	tims            [4]time.Time
+	ns, nn, nr, ntm uint8
 
-	anyRaw   [3][][16]byte
-	anyStr   [3][]string
-	nar, nas uint8
+	anyRaw          [3][][16]byte
+	anyStr          [3][]string
+	anyI64          [3][]int64
+	nar, nas, nai64 uint8
 
 	// Order terms live in their own buffer and are appended to the stream
 	// after the predicate tree. Sharing one buffer would let a Where after
@@ -205,13 +209,27 @@ func (q *Query) cursor(col uint32, r Row) {
 		q.raws[q.nr] = r.PersonID.V
 		q.nr++
 	case 4:
+		if int(q.nr) >= len(q.raws) {
+			q.over = true
+			return
+		}
+		q.raws[q.nr] = r.SubjectID.V
+		q.nr++
+	case 5:
+		if int(q.nn) >= len(q.nums) {
+			q.over = true
+			return
+		}
+		q.nums[q.nn] = int64(r.Seq)
+		q.nn++
+	case 6:
 		if int(q.ns) >= len(q.strs) {
 			q.over = true
 			return
 		}
 		q.strs[q.ns] = r.Body
 		q.ns++
-	case 5:
+	case 7:
 		if int(q.ntm) >= len(q.tims) {
 			q.over = true
 			return
@@ -365,11 +383,13 @@ func (q Query) stream(buf *[21]runtime.Tok) []runtime.Tok {
 type Pred struct {
 	col    uint8
 	op     runtime.Op
+	num    int64
 	str    string
 	raw    [16]byte
 	tim    time.Time
 	anyRaw [][16]byte
 	anyStr []string
+	anyI64 []int64
 }
 
 // Typed column handles. The type of the handle is what makes
@@ -379,8 +399,10 @@ var (
 	TenantID  = UUIDCol{1}
 	Type      = TextCol{2}
 	PersonID  = NullUUIDCol{3}
-	Body      = TextCol{4}
-	CreatedAt = TimeCol{5}
+	SubjectID = NullUUIDCol{4}
+	Seq       = Int64Col{5}
+	Body      = TextCol{6}
+	CreatedAt = TimeCol{7}
 )
 
 // UUIDCol addresses a uuid column.
@@ -454,6 +476,31 @@ func (h NullUUIDCol) In(v ...[16]byte) Pred { return Pred{col: h.c, op: opIn, an
 func (h NullUUIDCol) NotIn(v ...[16]byte) Pred { return Pred{col: h.c, op: opNotIn, anyRaw: v} }
 func (h NullUUIDCol) IsNull() Pred             { return Pred{col: h.c, op: opIsNull} }
 func (h NullUUIDCol) IsNotNull() Pred          { return Pred{col: h.c, op: opIsNotNull} }
+
+// Int64Col addresses a int8 column.
+type Int64Col struct{ c uint8 }
+
+func (h Int64Col) Asc() Sort  { return Sort(runtime.MakeOrder(runtime.Asc, uint32(h.c))) }
+func (h Int64Col) Desc() Sort { return Sort(runtime.MakeOrder(runtime.Desc, uint32(h.c))) }
+func (h Int64Col) AscNullsFirst() Sort {
+	return Sort(runtime.MakeOrder(runtime.AscNullsFirst, uint32(h.c)))
+}
+func (h Int64Col) DescNullsLast() Sort {
+	return Sort(runtime.MakeOrder(runtime.DescNullsLast, uint32(h.c)))
+}
+
+func (h Int64Col) Eq(v int64) Pred    { return Pred{col: h.c, op: opEq, num: int64(v)} }
+func (h Int64Col) NotEq(v int64) Pred { return Pred{col: h.c, op: opNotEq, num: int64(v)} }
+func (h Int64Col) Gt(v int64) Pred    { return Pred{col: h.c, op: opGt, num: int64(v)} }
+func (h Int64Col) Gte(v int64) Pred   { return Pred{col: h.c, op: opGte, num: int64(v)} }
+func (h Int64Col) Lt(v int64) Pred    { return Pred{col: h.c, op: opLt, num: int64(v)} }
+func (h Int64Col) Lte(v int64) Pred   { return Pred{col: h.c, op: opLte, num: int64(v)} }
+func (h Int64Col) In(v ...int64) Pred { return Pred{col: h.c, op: opIn, anyI64: v} }
+
+// NotIn is `<> ALL($1)`. A NULL anywhere in v makes the
+// comparison NULL for every row and the result empty —
+// PostgreSQL's rule for NOT IN, not storm's.
+func (h Int64Col) NotIn(v ...int64) Pred { return Pred{col: h.c, op: opNotIn, anyI64: v} }
 
 // TimeCol addresses a timestamptz column.
 type TimeCol struct{ c uint8 }
@@ -644,6 +691,20 @@ func (q *Query) leaf(p Pred) {
 			q.anyRaw[q.nar] = p.anyRaw
 			q.nar++
 		case 4:
+			if int(q.nar) >= 3 {
+				q.over = true
+				return
+			}
+			q.anyRaw[q.nar] = p.anyRaw
+			q.nar++
+		case 5:
+			if int(q.nai64) >= 3 {
+				q.over = true
+				return
+			}
+			q.anyI64[q.nai64] = p.anyI64
+			q.nai64++
+		case 6:
 			if int(q.nas) >= 3 {
 				q.over = true
 				return
@@ -688,13 +749,27 @@ func (q *Query) leaf(p Pred) {
 		q.raws[q.nr] = p.raw
 		q.nr++
 	case 4:
+		if int(q.nr) >= 4 {
+			q.over = true
+			return
+		}
+		q.raws[q.nr] = p.raw
+		q.nr++
+	case 5:
+		if int(q.nn) >= 6 {
+			q.over = true
+			return
+		}
+		q.nums[q.nn] = p.num
+		q.nn++
+	case 6:
 		if int(q.ns) >= 6 {
 			q.over = true
 			return
 		}
 		q.strs[q.ns] = p.str
 		q.ns++
-	case 5:
+	case 7:
 		if int(q.ntm) >= 4 {
 			q.over = true
 			return
@@ -709,54 +784,68 @@ func (q *Query) leaf(p Pred) {
 // least one related row; HasNoPosts() matches the rest. Both compose
 // under Where/Any/Not like any predicate, because both lower to constant
 // fragments: no bound value, one compiled statement per structure.
-func HasDeliveries() Pred   { return Pred{col: 6, op: opExists} }
-func HasNoDeliveries() Pred { return Pred{col: 6, op: opNotExists} }
+func HasDeliveries() Pred   { return Pred{col: 8, op: opExists} }
+func HasNoDeliveries() Pred { return Pred{col: 8, op: opNotExists} }
 
 // Chained predicate sugar. Identical to Where(Col.Op(v)).
-func (q Query) IDEq(v [16]byte) Query             { return q.Where(ID.Eq(v)) }
-func (q Query) IDNotEq(v [16]byte) Query          { return q.Where(ID.NotEq(v)) }
-func (q Query) IDIn(v ...[16]byte) Query          { return q.Where(ID.In(v...)) }
-func (q Query) IDNotIn(v ...[16]byte) Query       { return q.Where(ID.NotIn(v...)) }
-func (q Query) TenantIDEq(v [16]byte) Query       { return q.Where(TenantID.Eq(v)) }
-func (q Query) TenantIDNotEq(v [16]byte) Query    { return q.Where(TenantID.NotEq(v)) }
-func (q Query) TenantIDIn(v ...[16]byte) Query    { return q.Where(TenantID.In(v...)) }
-func (q Query) TenantIDNotIn(v ...[16]byte) Query { return q.Where(TenantID.NotIn(v...)) }
-func (q Query) TypeEq(v string) Query             { return q.Where(Type.Eq(v)) }
-func (q Query) TypeNotEq(v string) Query          { return q.Where(Type.NotEq(v)) }
-func (q Query) TypeGt(v string) Query             { return q.Where(Type.Gt(v)) }
-func (q Query) TypeGte(v string) Query            { return q.Where(Type.Gte(v)) }
-func (q Query) TypeLt(v string) Query             { return q.Where(Type.Lt(v)) }
-func (q Query) TypeLte(v string) Query            { return q.Where(Type.Lte(v)) }
-func (q Query) TypeEqLower(v string) Query        { return q.Where(Type.EqLower(v)) }
-func (q Query) TypeLike(v string) Query           { return q.Where(Type.Like(v)) }
-func (q Query) TypeILike(v string) Query          { return q.Where(Type.ILike(v)) }
-func (q Query) TypeIn(v ...string) Query          { return q.Where(Type.In(v...)) }
-func (q Query) TypeNotIn(v ...string) Query       { return q.Where(Type.NotIn(v...)) }
-func (q Query) PersonIDEq(v [16]byte) Query       { return q.Where(PersonID.Eq(v)) }
-func (q Query) PersonIDNotEq(v [16]byte) Query    { return q.Where(PersonID.NotEq(v)) }
-func (q Query) PersonIDIn(v ...[16]byte) Query    { return q.Where(PersonID.In(v...)) }
-func (q Query) PersonIDNotIn(v ...[16]byte) Query { return q.Where(PersonID.NotIn(v...)) }
-func (q Query) PersonIDIsNull() Query             { return q.Where(PersonID.IsNull()) }
-func (q Query) PersonIDIsNotNull() Query          { return q.Where(PersonID.IsNotNull()) }
-func (q Query) BodyEq(v string) Query             { return q.Where(Body.Eq(v)) }
-func (q Query) BodyNotEq(v string) Query          { return q.Where(Body.NotEq(v)) }
-func (q Query) BodyGt(v string) Query             { return q.Where(Body.Gt(v)) }
-func (q Query) BodyGte(v string) Query            { return q.Where(Body.Gte(v)) }
-func (q Query) BodyLt(v string) Query             { return q.Where(Body.Lt(v)) }
-func (q Query) BodyLte(v string) Query            { return q.Where(Body.Lte(v)) }
-func (q Query) BodyEqLower(v string) Query        { return q.Where(Body.EqLower(v)) }
-func (q Query) BodyLike(v string) Query           { return q.Where(Body.Like(v)) }
-func (q Query) BodyILike(v string) Query          { return q.Where(Body.ILike(v)) }
-func (q Query) BodyIn(v ...string) Query          { return q.Where(Body.In(v...)) }
-func (q Query) BodyNotIn(v ...string) Query       { return q.Where(Body.NotIn(v...)) }
-func (q Query) CreatedAtEq(v time.Time) Query     { return q.Where(CreatedAt.Eq(v)) }
-func (q Query) CreatedAtNotEq(v time.Time) Query  { return q.Where(CreatedAt.NotEq(v)) }
-func (q Query) CreatedAtGt(v time.Time) Query     { return q.Where(CreatedAt.Gt(v)) }
-func (q Query) CreatedAtGte(v time.Time) Query    { return q.Where(CreatedAt.Gte(v)) }
-func (q Query) CreatedAtLt(v time.Time) Query     { return q.Where(CreatedAt.Lt(v)) }
-func (q Query) CreatedAtLte(v time.Time) Query    { return q.Where(CreatedAt.Lte(v)) }
+func (q Query) IDEq(v [16]byte) Query              { return q.Where(ID.Eq(v)) }
+func (q Query) IDNotEq(v [16]byte) Query           { return q.Where(ID.NotEq(v)) }
+func (q Query) IDIn(v ...[16]byte) Query           { return q.Where(ID.In(v...)) }
+func (q Query) IDNotIn(v ...[16]byte) Query        { return q.Where(ID.NotIn(v...)) }
+func (q Query) TenantIDEq(v [16]byte) Query        { return q.Where(TenantID.Eq(v)) }
+func (q Query) TenantIDNotEq(v [16]byte) Query     { return q.Where(TenantID.NotEq(v)) }
+func (q Query) TenantIDIn(v ...[16]byte) Query     { return q.Where(TenantID.In(v...)) }
+func (q Query) TenantIDNotIn(v ...[16]byte) Query  { return q.Where(TenantID.NotIn(v...)) }
+func (q Query) TypeEq(v string) Query              { return q.Where(Type.Eq(v)) }
+func (q Query) TypeNotEq(v string) Query           { return q.Where(Type.NotEq(v)) }
+func (q Query) TypeGt(v string) Query              { return q.Where(Type.Gt(v)) }
+func (q Query) TypeGte(v string) Query             { return q.Where(Type.Gte(v)) }
+func (q Query) TypeLt(v string) Query              { return q.Where(Type.Lt(v)) }
+func (q Query) TypeLte(v string) Query             { return q.Where(Type.Lte(v)) }
+func (q Query) TypeEqLower(v string) Query         { return q.Where(Type.EqLower(v)) }
+func (q Query) TypeLike(v string) Query            { return q.Where(Type.Like(v)) }
+func (q Query) TypeILike(v string) Query           { return q.Where(Type.ILike(v)) }
+func (q Query) TypeIn(v ...string) Query           { return q.Where(Type.In(v...)) }
+func (q Query) TypeNotIn(v ...string) Query        { return q.Where(Type.NotIn(v...)) }
+func (q Query) PersonIDEq(v [16]byte) Query        { return q.Where(PersonID.Eq(v)) }
+func (q Query) PersonIDNotEq(v [16]byte) Query     { return q.Where(PersonID.NotEq(v)) }
+func (q Query) PersonIDIn(v ...[16]byte) Query     { return q.Where(PersonID.In(v...)) }
+func (q Query) PersonIDNotIn(v ...[16]byte) Query  { return q.Where(PersonID.NotIn(v...)) }
+func (q Query) PersonIDIsNull() Query              { return q.Where(PersonID.IsNull()) }
+func (q Query) PersonIDIsNotNull() Query           { return q.Where(PersonID.IsNotNull()) }
+func (q Query) SubjectIDEq(v [16]byte) Query       { return q.Where(SubjectID.Eq(v)) }
+func (q Query) SubjectIDNotEq(v [16]byte) Query    { return q.Where(SubjectID.NotEq(v)) }
+func (q Query) SubjectIDIn(v ...[16]byte) Query    { return q.Where(SubjectID.In(v...)) }
+func (q Query) SubjectIDNotIn(v ...[16]byte) Query { return q.Where(SubjectID.NotIn(v...)) }
+func (q Query) SubjectIDIsNull() Query             { return q.Where(SubjectID.IsNull()) }
+func (q Query) SubjectIDIsNotNull() Query          { return q.Where(SubjectID.IsNotNull()) }
+func (q Query) SeqEq(v int64) Query                { return q.Where(Seq.Eq(v)) }
+func (q Query) SeqNotEq(v int64) Query             { return q.Where(Seq.NotEq(v)) }
+func (q Query) SeqGt(v int64) Query                { return q.Where(Seq.Gt(v)) }
+func (q Query) SeqGte(v int64) Query               { return q.Where(Seq.Gte(v)) }
+func (q Query) SeqLt(v int64) Query                { return q.Where(Seq.Lt(v)) }
+func (q Query) SeqLte(v int64) Query               { return q.Where(Seq.Lte(v)) }
+func (q Query) SeqIn(v ...int64) Query             { return q.Where(Seq.In(v...)) }
+func (q Query) SeqNotIn(v ...int64) Query          { return q.Where(Seq.NotIn(v...)) }
+func (q Query) BodyEq(v string) Query              { return q.Where(Body.Eq(v)) }
+func (q Query) BodyNotEq(v string) Query           { return q.Where(Body.NotEq(v)) }
+func (q Query) BodyGt(v string) Query              { return q.Where(Body.Gt(v)) }
+func (q Query) BodyGte(v string) Query             { return q.Where(Body.Gte(v)) }
+func (q Query) BodyLt(v string) Query              { return q.Where(Body.Lt(v)) }
+func (q Query) BodyLte(v string) Query             { return q.Where(Body.Lte(v)) }
+func (q Query) BodyEqLower(v string) Query         { return q.Where(Body.EqLower(v)) }
+func (q Query) BodyLike(v string) Query            { return q.Where(Body.Like(v)) }
+func (q Query) BodyILike(v string) Query           { return q.Where(Body.ILike(v)) }
+func (q Query) BodyIn(v ...string) Query           { return q.Where(Body.In(v...)) }
+func (q Query) BodyNotIn(v ...string) Query        { return q.Where(Body.NotIn(v...)) }
+func (q Query) CreatedAtEq(v time.Time) Query      { return q.Where(CreatedAt.Eq(v)) }
+func (q Query) CreatedAtNotEq(v time.Time) Query   { return q.Where(CreatedAt.NotEq(v)) }
+func (q Query) CreatedAtGt(v time.Time) Query      { return q.Where(CreatedAt.Gt(v)) }
+func (q Query) CreatedAtGte(v time.Time) Query     { return q.Where(CreatedAt.Gte(v)) }
+func (q Query) CreatedAtLt(v time.Time) Query      { return q.Where(CreatedAt.Lt(v)) }
+func (q Query) CreatedAtLte(v time.Time) Query     { return q.Where(CreatedAt.Lte(v)) }
 
-const selectPrefix = `SELECT "id", "tenant_id", "type", "person_id", "body", "created_at" FROM "webhook_events"`
+const selectPrefix = `SELECT "id", "tenant_id", "type", "person_id", "subject_id", "seq", "body", "created_at" FROM "webhook_events"`
 const countPrefix = `SELECT count(*) FROM "webhook_events"`
 const existsPrefix = `SELECT 1 FROM "webhook_events"`
 const existsSuffix = ` LIMIT 1`
@@ -817,6 +906,18 @@ var orderTable = [nCols][4]string{
 		"\"person_id\" ASC NULLS FIRST",
 		"\"person_id\" DESC NULLS LAST",
 	},
+	{ // subject_id
+		"\"subject_id\"",
+		"\"subject_id\" DESC",
+		"\"subject_id\" ASC NULLS FIRST",
+		"\"subject_id\" DESC NULLS LAST",
+	},
+	{ // seq
+		"\"seq\"",
+		"\"seq\" DESC",
+		"\"seq\" ASC NULLS FIRST",
+		"\"seq\" DESC NULLS LAST",
+	},
 	{ // body
 		"\"body\"",
 		"\"body\" DESC",
@@ -838,6 +939,8 @@ var identTable = [nCols]string{
 	"\"tenant_id\"",
 	"\"type\"",
 	"\"person_id\"",
+	"\"subject_id\"",
+	"\"seq\"",
 	"\"body\"",
 	"\"created_at\"",
 }
@@ -872,7 +975,7 @@ func orderOf(dir, col uint32) string {
 
 // fragTable is every predicate this table can produce, lowered at build
 // time. Runtime splices; it never formats.
-var fragTable = [7][28]runtime.Frag{
+var fragTable = [9][28]runtime.Frag{
 	{ // id
 		{}, // opNone
 		{A: "\"id\" = $", B: ""},
@@ -990,6 +1093,66 @@ var fragTable = [7][28]runtime.Frag{
 		{},
 		{A: "\"person_id\" IS NULL", B: ""},
 		{A: "\"person_id\" IS NOT NULL", B: ""},
+		{},
+		{},
+	},
+	{ // subject_id
+		{}, // opNone
+		{A: "\"subject_id\" = $", B: ""},
+		{A: "\"subject_id\" <> $", B: ""},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{A: "\"subject_id\" = ANY($", B: ")"},
+		{A: "\"subject_id\" <> ALL($", B: ")"},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{A: "\"subject_id\" IS NULL", B: ""},
+		{A: "\"subject_id\" IS NOT NULL", B: ""},
+		{},
+		{},
+	},
+	{ // seq
+		{}, // opNone
+		{A: "\"seq\" = $", B: ""},
+		{A: "\"seq\" <> $", B: ""},
+		{A: "\"seq\" > $", B: ""},
+		{A: "\"seq\" >= $", B: ""},
+		{A: "\"seq\" < $", B: ""},
+		{A: "\"seq\" <= $", B: ""},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{A: "\"seq\" = ANY($", B: ")"},
+		{A: "\"seq\" <> ALL($", B: ")"},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
 		{},
 		{},
 	},
@@ -1243,18 +1406,22 @@ func scan(rv [][]byte, r *Row, sl *runtime.Slab) error {
 	copy(r.TenantID[:], rv[1])
 	r.Type = sl.Str(rv[2])
 	r.PersonID = runtime.Nullable(rv[3], runtime.UUID)
-	r.Body = sl.Str(rv[4])
-	r.CreatedAt = runtime.Timestamptz(rv[5])
+	r.SubjectID = runtime.Nullable(rv[4], runtime.UUID)
+	r.Seq = runtime.Int8(rv[5])
+	r.Body = sl.Str(rv[6])
+	r.CreatedAt = runtime.Timestamptz(rv[7])
 	return nil
 }
 
 type binder struct {
 	vals   []any
 	strs   [6]string
+	nums   [6]int64
 	raws   [4][16]byte
 	tims   [4]time.Time
 	anyRaw [3][][16]byte
 	anyStr [3][]string
+	anyI64 [3][]int64
 	limit  int64
 	offset int64
 }
@@ -1285,6 +1452,9 @@ func putBinder(b *binder) {
 	for i := range b.anyStr {
 		b.anyStr[i] = nil
 	}
+	for i := range b.anyI64 {
+		b.anyI64[i] = nil
+	}
 	binders.Put(b)
 }
 
@@ -1293,7 +1463,7 @@ func putBinder(b *binder) {
 // Count and Exists stop here: their statements carry no LIMIT or OFFSET.
 func (q Query) bindPreds(b *binder) []any {
 	v := b.vals[:0]
-	var ns, nr, ntm, nar, nas uint8
+	var ns, nn, nr, ntm, nar, nas, nai64 uint8
 	for i := uint8(0); i < q.nt; i++ {
 		t := q.toks[i]
 		// KLeaf binds a predicate's value; KCol binds a keyset cursor's.
@@ -1326,6 +1496,14 @@ func (q Query) bindPreds(b *binder) []any {
 				v = append(v, &b.anyRaw[nar])
 				nar++
 			case 4:
+				b.anyRaw[nar] = q.anyRaw[nar]
+				v = append(v, &b.anyRaw[nar])
+				nar++
+			case 5:
+				b.anyI64[nai64] = q.anyI64[nai64]
+				v = append(v, &b.anyI64[nai64])
+				nai64++
+			case 6:
 				b.anyStr[nas] = q.anyStr[nas]
 				v = append(v, &b.anyStr[nas])
 				nas++
@@ -1350,10 +1528,18 @@ func (q Query) bindPreds(b *binder) []any {
 			v = append(v, &b.raws[nr])
 			nr++
 		case 4:
+			b.raws[nr] = q.raws[nr]
+			v = append(v, &b.raws[nr])
+			nr++
+		case 5:
+			b.nums[nn] = q.nums[nn]
+			v = append(v, &b.nums[nn])
+			nn++
+		case 6:
 			b.strs[ns] = q.strs[ns]
 			v = append(v, &b.strs[ns])
 			ns++
-		case 5:
+		case 7:
 			b.tims[ntm] = q.tims[ntm]
 			v = append(v, &b.tims[ntm])
 			ntm++
@@ -1494,7 +1680,7 @@ func (q Query) Prepare(b *Binder) (string, []any) {
 
 // insertSQL does not vary: the column list is fixed by the table, so
 // the placeholders are known at build time and nothing is spliced.
-const insertSQL = `INSERT INTO "webhook_events" ("id", "tenant_id", "type", "person_id", "body", "created_at") VALUES ($1, $2, $3, $4, $5, $6) RETURNING "id", "tenant_id", "type", "person_id", "body", "created_at"`
+const insertSQL = `INSERT INTO "webhook_events" ("id", "tenant_id", "type", "person_id", "subject_id", "seq", "body", "created_at") VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING "id", "tenant_id", "type", "person_id", "subject_id", "seq", "body", "created_at"`
 
 const updatePrefix = `UPDATE "webhook_events" SET `
 const deletePrefix = `DELETE FROM "webhook_events"`
@@ -1505,17 +1691,21 @@ const (
 	dTenantID  uint64 = 1 << 0
 	dType      uint64 = 1 << 1
 	dPersonID  uint64 = 1 << 2
-	dBody      uint64 = 1 << 3
-	dCreatedAt uint64 = 1 << 4
+	dSubjectID uint64 = 1 << 3
+	dSeq       uint64 = 1 << 4
+	dBody      uint64 = 1 << 5
+	dCreatedAt uint64 = 1 << 6
 )
 
-const nUpdatable = 5
+const nUpdatable = 7
 
 // setFrags is every assignment this table can make, lowered at build time.
 var setFrags = [nUpdatable]runtime.Frag{
 	{A: "\"tenant_id\" = $", B: ""},  // tenant_id
 	{A: "\"type\" = $", B: ""},       // type
 	{A: "\"person_id\" = $", B: ""},  // person_id
+	{A: "\"subject_id\" = $", B: ""}, // subject_id
+	{A: "\"seq\" = $", B: ""},        // seq
 	{A: "\"body\" = $", B: ""},       // body
 	{A: "\"created_at\" = $", B: ""}, // created_at
 }
@@ -1527,6 +1717,8 @@ var exprFrags = [nUpdatable]runtime.Frag{
 	{},                                   // tenant_id has no server-side form
 	{},                                   // type has no server-side form
 	{},                                   // person_id has no server-side form
+	{},                                   // subject_id has no server-side form
+	{A: "\"seq\" = \"seq\" + 1", B: ""},  // seq = its own value plus one
 	{},                                   // body has no server-side form
 	{A: "\"created_at\" = now()", B: ""}, // created_at = the database's clock
 }
@@ -1544,11 +1736,13 @@ const (
 	iTenantID  uint64 = 1 << 1
 	iType      uint64 = 1 << 2
 	iPersonID  uint64 = 1 << 3
-	iBody      uint64 = 1 << 4
-	iCreatedAt uint64 = 1 << 5
+	iSubjectID uint64 = 1 << 4
+	iSeq       uint64 = 1 << 5
+	iBody      uint64 = 1 << 6
+	iCreatedAt uint64 = 1 << 7
 )
 
-const nInsertable = 6
+const nInsertable = 8
 
 // insCols is the quoted column name for each insert bit.
 var insCols = [nInsertable]string{
@@ -1556,6 +1750,8 @@ var insCols = [nInsertable]string{
 	"\"tenant_id\"",
 	"\"type\"",
 	"\"person_id\"",
+	"\"subject_id\"",
+	"\"seq\"",
 	"\"body\"",
 	"\"created_at\"",
 }
@@ -1566,7 +1762,7 @@ var insParts = runtime.InsertParts{Open: " (", Sep: ", ", Mid: ") VALUES (", Clo
 var insPlaceholder = runtime.Placeholder{}
 
 const insPrefix = "INSERT INTO \"webhook_events\""
-const insReturning = " RETURNING \"id\", \"tenant_id\", \"type\", \"person_id\", \"body\", \"created_at\""
+const insReturning = " RETURNING \"id\", \"tenant_id\", \"type\", \"person_id\", \"subject_id\", \"seq\", \"body\", \"created_at\""
 
 var insCache = runtime.NewMaskCache()
 
@@ -1585,7 +1781,7 @@ var updOpCache = runtime.NewMaskCache()
 // part of it. Without it m.Row() would hold what the row held BEFORE
 // the statement, so a caller reading back the counter it just
 // incremented would get the old number and never know.
-const updReturning = " RETURNING \"id\", \"tenant_id\", \"type\", \"person_id\", \"body\", \"created_at\""
+const updReturning = " RETURNING \"id\", \"tenant_id\", \"type\", \"person_id\", \"subject_id\", \"seq\", \"body\", \"created_at\""
 
 // Masks reports how many distinct UPDATE shapes have compiled.
 func Masks() int { return updCache.Masks() }
@@ -1659,6 +1855,36 @@ func (m *Mut) SetPersonIDNull() {
 	m.expr &^= dPersonID
 }
 
+func (m *Mut) SetSubjectID(v [16]byte) {
+	m.row.SubjectID = runtime.Null[[16]byte]{V: v, Valid: true}
+	m.dirty |= dSubjectID
+	m.expr &^= dSubjectID
+}
+
+// SetSubjectIDNull writes SQL NULL. It is a separate method because a
+// zero value and an absent value are different facts.
+func (m *Mut) SetSubjectIDNull() {
+	m.row.SubjectID = runtime.Null[[16]byte]{}
+	m.dirty |= dSubjectID
+	m.expr &^= dSubjectID
+}
+
+func (m *Mut) SetSeq(v int64) {
+	m.row.Seq = v
+	m.dirty |= dSeq
+	m.expr &^= dSeq
+}
+
+// IncSeq adds one to the column's OWN value, in the database.
+//
+// Computing it in Go makes it a read-modify-write: two callers
+// who both read N both write N+1, and one increment is lost
+// with nothing to show that it happened.
+func (m *Mut) IncSeq() {
+	m.expr |= dSeq
+	m.dirty &^= dSeq
+}
+
 func (m *Mut) SetBody(v string) {
 	m.row.Body = v
 	m.dirty |= dBody
@@ -1699,6 +1925,10 @@ type Ins struct {
 	// — which is the right default: silently updating a row you meant to
 	// create is a data-loss bug that looks like success.
 	conflict uint8
+
+	// add marks the assigned columns an upsert ACCUMULATES into rather
+	// than overwrites. Part of the statement key, beside the mask.
+	add uint64
 }
 
 // Create stages a new row.
@@ -1734,6 +1964,39 @@ func (n *Ins) SetPersonIDNull() {
 	n.set |= iPersonID
 }
 
+func (n *Ins) SetSubjectID(v [16]byte) {
+	n.row.SubjectID = runtime.Null[[16]byte]{V: v, Valid: true}
+	n.set |= iSubjectID
+}
+
+// SetSubjectIDNull writes SQL NULL explicitly, which is not the same as
+// leaving the column unset and taking its default.
+func (n *Ins) SetSubjectIDNull() {
+	n.row.SubjectID = runtime.Null[[16]byte]{}
+	n.set |= iSubjectID
+}
+
+func (n *Ins) SetSeq(v int64) {
+	n.row.Seq = v
+	n.set |= iSeq
+	n.add &^= iSeq
+}
+
+// AddSeqOnConflict inserts v, or — when the insert conflicts and an
+// OnConflict… target updates the row already there — ADDS v to it:
+//
+//	"seq" = "webhook_events"."seq" + EXCLUDED."seq"
+//
+// The sum is the database's, in the same statement, so two writers
+// counting into one row both land. Reading the row, adding in Go and
+// upserting the total loses one of them, with nothing to show it.
+// Without an OnConflict target, or with DoNothing, it is SetSeq.
+func (n *Ins) AddSeqOnConflict(v int64) {
+	n.row.Seq = v
+	n.set |= iSeq
+	n.add |= iSeq
+}
+
 func (n *Ins) SetBody(v string) {
 	n.row.Body = v
 	n.set |= iBody
@@ -1761,7 +2024,11 @@ const conflictAny = 1
 // columns the caller ASSIGNED. Assigning every column would revert
 // each one the caller left out to its default, on the row that
 // already exists — a silent data loss that reads as an upsert working.
-func upsertTail(conflict uint8, mask uint64) string {
+//
+// add marks the assigned columns that ACCUMULATE instead: the row
+// that already exists keeps its value plus the one this insert
+// carried. See the Add…OnConflict setters.
+func upsertTail(conflict uint8, mask uint64, add uint64) string {
 	if conflict == conflictAny {
 		return " ON CONFLICT DO NOTHING"
 	}
@@ -1775,7 +2042,7 @@ func upsertTail(conflict uint8, mask uint64) string {
 		// SQL, and leaving the row alone is what the caller asked for.
 		return spec + " DO NOTHING"
 	}
-	return spec + " DO UPDATE SET " + joinAssign(set)
+	return spec + " DO UPDATE SET " + joinAssign(set, add)
 }
 
 // conflictSpecs is one inference specification per target, in
@@ -1790,7 +2057,7 @@ var conflictSpecs = []string{
 
 // assignable is the columns target i may overwrite, given the mask.
 func assignable(i uint8, mask uint64) []string {
-	set := make([]string, 0, 5)
+	set := make([]string, 0, 7)
 	switch i {
 	case 0:
 		if mask&(1<<1) != 0 {
@@ -1803,9 +2070,15 @@ func assignable(i uint8, mask uint64) []string {
 			set = append(set, "person_id")
 		}
 		if mask&(1<<4) != 0 {
-			set = append(set, "body")
+			set = append(set, "subject_id")
 		}
 		if mask&(1<<5) != 0 {
+			set = append(set, "seq")
+		}
+		if mask&(1<<6) != 0 {
+			set = append(set, "body")
+		}
+		if mask&(1<<7) != 0 {
 			set = append(set, "created_at")
 		}
 	case 1:
@@ -1816,9 +2089,15 @@ func assignable(i uint8, mask uint64) []string {
 			set = append(set, "person_id")
 		}
 		if mask&(1<<4) != 0 {
-			set = append(set, "body")
+			set = append(set, "subject_id")
 		}
 		if mask&(1<<5) != 0 {
+			set = append(set, "seq")
+		}
+		if mask&(1<<6) != 0 {
+			set = append(set, "body")
+		}
+		if mask&(1<<7) != 0 {
 			set = append(set, "created_at")
 		}
 	}
@@ -1867,32 +2146,57 @@ func (n *Ins) DoNothing() *Ins {
 
 // joinAssign renders the DO UPDATE SET list for the columns the caller
 // assigned. The punctuation comes from the back end, never from here.
-func joinAssign(set []string) string {
+func joinAssign(set []string, add uint64) string {
 	out := ""
 	for i, c := range set {
 		if i > 0 {
 			out += ", "
+		}
+		if a, ok := assignAdded(c, add); ok {
+			out += a
+			continue
 		}
 		out += assignExcluded(c)
 	}
 	return out
 }
 
+// assignAdded is the accumulating assignment for column c, when the
+// caller asked for one: the existing row's value plus the rejected
+// row's, added by the database in the same statement, so two
+// concurrent upserts both land rather than one overwriting the other.
+func assignAdded(c string, add uint64) (string, bool) {
+	switch c {
+	case "seq":
+		return "\"seq\" = \"webhook_events\".\"seq\" + EXCLUDED.\"seq\"", add&iSeq != 0
+	}
+	return "", false
+}
+
 var assignFor = map[string]string{
 	"tenant_id":  "\"tenant_id\" = EXCLUDED.\"tenant_id\"",
 	"type":       "\"type\" = EXCLUDED.\"type\"",
 	"person_id":  "\"person_id\" = EXCLUDED.\"person_id\"",
+	"subject_id": "\"subject_id\" = EXCLUDED.\"subject_id\"",
+	"seq":        "\"seq\" = EXCLUDED.\"seq\"",
 	"body":       "\"body\" = EXCLUDED.\"body\"",
 	"created_at": "\"created_at\" = EXCLUDED.\"created_at\"",
 }
 
 func assignExcluded(c string) string { return assignFor[c] }
 
-func stmtForInsert(mask uint64, conflict uint8) *runtime.Stmt {
+func stmtForInsert(mask uint64, conflict uint8, add uint64) *runtime.Stmt {
 	// The conflict clause is part of the statement, so it must be part of
 	// the key. Packing it above the column bits keeps one cache for both.
 	key := mask | uint64(conflict)<<nInsertable
-	if st := insCache.Get(runtime.MaskKey{Dirty: key}); st != nil {
+	// Accumulating only means something in a DO UPDATE (an even code
+	// from 2): anywhere else it is an ordinary insert of the value, and
+	// keying it apart would compile the same statement twice.
+	if conflict < 2 || conflict%2 == 1 {
+		add = 0
+	}
+	add &= mask
+	if st := insCache.Get(runtime.MaskKey{Dirty: key, Expr: add}); st != nil {
 		return st
 	}
 	cols := make([]string, 0, nInsertable)
@@ -1903,9 +2207,9 @@ func stmtForInsert(mask uint64, conflict uint8) *runtime.Stmt {
 	}
 	suffix := insReturning
 	if conflict > 0 {
-		suffix = upsertTail(conflict, mask) + insReturning
+		suffix = upsertTail(conflict, mask, add) + insReturning
 	}
-	return insCache.Put(runtime.MaskKey{Dirty: key}, runtime.SpliceInsertWith(insPrefix, insParts, cols, insPlaceholder, suffix))
+	return insCache.Put(runtime.MaskKey{Dirty: key, Expr: add}, runtime.SpliceInsertWith(insPrefix, insParts, cols, insPlaceholder, suffix))
 }
 
 // Insert writes the assigned columns and reads every column back, so
@@ -1915,7 +2219,7 @@ func (n *Ins) Insert(ctx context.Context, ex runtime.Executor) (Row, error) {
 	if n.set == 0 {
 		return Row{}, runtime.ErrNothingAssigned
 	}
-	st := stmtForInsert(n.set, n.conflict)
+	st := stmtForInsert(n.set, n.conflict, n.add)
 	if st.Err != nil {
 		// A malformed token stream is a code-generation bug. Executing it
 		// would run a query whose filter is not the one that was asked for.
@@ -1936,8 +2240,12 @@ func (n *Ins) Insert(ctx context.Context, ex runtime.Executor) (Row, error) {
 		case 3:
 			args = append(args, n.row.PersonID.Arg())
 		case 4:
-			args = append(args, n.row.Body)
+			args = append(args, n.row.SubjectID.Arg())
 		case 5:
+			args = append(args, n.row.Seq)
+		case 6:
+			args = append(args, n.row.Body)
+		case 7:
 			args = append(args, n.row.CreatedAt)
 		}
 	}
@@ -1976,11 +2284,13 @@ func Inserts() int { return insCache.Masks() }
 // not treat a zero as 'unset': that guess is why other ORMs cannot insert
 // a false, a 0 or an empty string into a column with a default.
 func Insert(ctx context.Context, ex runtime.Executor, r *Row) error {
-	args := make([]any, 0, 6)
+	args := make([]any, 0, 8)
 	args = append(args, r.ID)
 	args = append(args, r.TenantID)
 	args = append(args, r.Type)
 	args = append(args, r.PersonID.Arg())
+	args = append(args, r.SubjectID.Arg())
+	args = append(args, r.Seq)
 	args = append(args, r.Body)
 	args = append(args, r.CreatedAt)
 	rows, err := ex.Query(ctx, insertSQL, args)
@@ -2013,6 +2323,8 @@ var copyCols = []string{
 	"tenant_id",
 	"type",
 	"person_id",
+	"subject_id",
+	"seq",
 	"body",
 	"created_at",
 }
@@ -2021,7 +2333,7 @@ var copyCols = []string{
 type rowSource struct {
 	rows []Row
 	i    int
-	buf  [6]any
+	buf  [8]any
 }
 
 func (s *rowSource) Next() bool {
@@ -2043,8 +2355,10 @@ func (s *rowSource) Values() []any {
 	s.buf[1] = &r.TenantID
 	s.buf[2] = &r.Type
 	s.buf[3] = r.PersonID.Ptr()
-	s.buf[4] = &r.Body
-	s.buf[5] = &r.CreatedAt
+	s.buf[4] = r.SubjectID.Ptr()
+	s.buf[5] = &r.Seq
+	s.buf[6] = &r.Body
+	s.buf[7] = &r.CreatedAt
 	return s.buf[:]
 }
 
@@ -2081,12 +2395,16 @@ func InsertOp(r Row) runtime.BatchOp {
 	mask |= 1 << 3
 	mask |= 1 << 4
 	mask |= 1 << 5
-	st := stmtForInsertNoReturn(mask, 0)
-	args := make([]any, 0, 6)
+	mask |= 1 << 6
+	mask |= 1 << 7
+	st := stmtForInsertNoReturn(mask, 0, 0)
+	args := make([]any, 0, 8)
 	args = append(args, r.ID)
 	args = append(args, r.TenantID)
 	args = append(args, r.Type)
 	args = append(args, r.PersonID.Arg())
+	args = append(args, r.SubjectID.Arg())
+	args = append(args, r.Seq)
 	args = append(args, r.Body)
 	args = append(args, r.CreatedAt)
 	return runtime.BatchOp{SQL: st.SQL, Args: args}
@@ -2112,7 +2430,7 @@ func (n *Ins) Op() (runtime.BatchOp, error) {
 	if n.set == 0 {
 		return runtime.BatchOp{}, runtime.ErrNothingAssigned
 	}
-	st := stmtForInsertNoReturn(n.set, n.conflict)
+	st := stmtForInsertNoReturn(n.set, n.conflict, n.add)
 	if st.Err != nil {
 		return runtime.BatchOp{}, st.Err
 	}
@@ -2131,8 +2449,12 @@ func (n *Ins) Op() (runtime.BatchOp, error) {
 		case 3:
 			args = append(args, n.row.PersonID.Arg())
 		case 4:
-			args = append(args, n.row.Body)
+			args = append(args, n.row.SubjectID.Arg())
 		case 5:
+			args = append(args, n.row.Seq)
+		case 6:
+			args = append(args, n.row.Body)
+		case 7:
 			args = append(args, n.row.CreatedAt)
 		}
 	}
@@ -2142,9 +2464,18 @@ func (n *Ins) Op() (runtime.BatchOp, error) {
 // stmtForInsertNoReturn is stmtForInsert without RETURNING, for the
 // batch path. Its own cache: the two differ by a suffix, and sharing
 // one would hand a batch the statement that asks for rows back.
-func stmtForInsertNoReturn(mask uint64, conflict uint8) *runtime.Stmt {
+func stmtForInsertNoReturn(mask uint64, conflict uint8, add uint64) *runtime.Stmt {
+	// The conflict clause is part of the statement, so it must be part of
+	// the key. Packing it above the column bits keeps one cache for both.
 	key := mask | uint64(conflict)<<nInsertable
-	if st := insOpCache.Get(runtime.MaskKey{Dirty: key}); st != nil {
+	// Accumulating only means something in a DO UPDATE (an even code
+	// from 2): anywhere else it is an ordinary insert of the value, and
+	// keying it apart would compile the same statement twice.
+	if conflict < 2 || conflict%2 == 1 {
+		add = 0
+	}
+	add &= mask
+	if st := insOpCache.Get(runtime.MaskKey{Dirty: key, Expr: add}); st != nil {
 		return st
 	}
 	cols := make([]string, 0, nInsertable)
@@ -2155,9 +2486,9 @@ func stmtForInsertNoReturn(mask uint64, conflict uint8) *runtime.Stmt {
 	}
 	suffix := ""
 	if conflict > 0 {
-		suffix = upsertTail(conflict, mask)
+		suffix = upsertTail(conflict, mask, add)
 	}
-	return insOpCache.Put(runtime.MaskKey{Dirty: key}, runtime.SpliceInsertWith(insPrefix, insParts, cols, insPlaceholder, suffix))
+	return insOpCache.Put(runtime.MaskKey{Dirty: key, Expr: add}, runtime.SpliceInsertWith(insPrefix, insParts, cols, insPlaceholder, suffix))
 }
 
 // UpdateOp is this Mut's update as a queueable statement.
@@ -2187,8 +2518,12 @@ func (m *Mut) UpdateOp() (runtime.BatchOp, bool) {
 		case 2:
 			args = append(args, m.row.PersonID.Arg())
 		case 3:
-			args = append(args, m.row.Body)
+			args = append(args, m.row.SubjectID.Arg())
 		case 4:
+			args = append(args, m.row.Seq)
+		case 5:
+			args = append(args, m.row.Body)
+		case 6:
 			args = append(args, m.row.CreatedAt)
 		}
 	}
@@ -2279,8 +2614,12 @@ func (m *Mut) Update(ctx context.Context, ex runtime.Executor) error {
 		case 2:
 			args = append(args, m.row.PersonID.Arg())
 		case 3:
-			args = append(args, m.row.Body)
+			args = append(args, m.row.SubjectID.Arg())
 		case 4:
+			args = append(args, m.row.Seq)
+		case 5:
+			args = append(args, m.row.Body)
+		case 6:
 			args = append(args, m.row.CreatedAt)
 		}
 	}
@@ -2437,8 +2776,12 @@ func (q Query) UpdateAll(ctx context.Context, ex runtime.Executor, m Mut) (int64
 		case 2:
 			args = append(args, m.row.PersonID.Arg())
 		case 3:
-			args = append(args, m.row.Body)
+			args = append(args, m.row.SubjectID.Arg())
 		case 4:
+			args = append(args, m.row.Seq)
+		case 5:
+			args = append(args, m.row.Body)
+		case 6:
 			args = append(args, m.row.CreatedAt)
 		}
 	}

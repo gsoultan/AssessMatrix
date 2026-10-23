@@ -169,3 +169,11 @@ type EmailRow struct {
 // SuperAdmins is which of a list of addresses run the installation: one call
 // for a whole staff list, where SuperAdmin would be one per address.
 var SuperAdmins = storm.SQL[EmailRow](`SELECT e AS email FROM unnest($1::text[]) AS e WHERE am_super_admin(e)`)
+
+// WebhookEarlierPending counts (0 or 1) pending deliveries to an endpoint of
+// an earlier event about the same subject: one that must be sent first.
+var WebhookEarlierPending = storm.SQL[CountRow](`
+	SELECT count(*) AS n FROM (
+	  SELECT 1 FROM webhook_deliveries d JOIN webhook_events e ON e.id = d.event_id
+	  WHERE d.endpoint_id = $1 AND d.state = 1 AND e.subject_id = $2 AND e.seq < $3
+	  LIMIT 1) earlier`)
