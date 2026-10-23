@@ -394,6 +394,18 @@ function QuestionCard({
             />
             <span className="text-[12.5px] text-ink-2">Required — the participant cannot submit without answering</span>
           </label>
+          {scored && item.type === 'multiple' && (
+            <label className="mt-2 flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={!!item.partialCredit}
+                onChange={(e) => onPatch({ partialCredit: e.currentTarget.checked })}
+              />
+              <span className="text-[12.5px] text-ink-2">
+                Partial credit — each correct option picked earns its share of the points, each wrong one takes a share back
+              </span>
+            </label>
+          )}
 
           {/* per-question controls, at the bottom where they belong */}
           <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-hair pt-3.5">
@@ -413,8 +425,24 @@ function QuestionCard({
               disabled={!scored}
               min={0}
               value={item.points}
-              onChange={(v) => onPatch({ points: Number(v) || 0 })}
+              onChange={(v) => {
+                const points = Number(v) || 0
+                onPatch(item.penalty && item.penalty > points ? { points, penalty: points } : { points })
+              }}
             />
+            {scored && item.type !== 'essay' && !isScale(item.type) && (
+              <Tooltip label="Taken off the total for a wrong answer. A blank answer costs nothing." withArrow>
+                <NumberInput
+                  size="xs"
+                  label="Penalty"
+                  w={84}
+                  min={0}
+                  max={item.points}
+                  value={item.penalty ?? 0}
+                  onChange={(v) => onPatch({ penalty: Math.min(Math.max(Number(v) || 0, 0), item.points) })}
+                />
+              </Tooltip>
+            )}
             <TextInput
               size="xs"
               label="Skill node"

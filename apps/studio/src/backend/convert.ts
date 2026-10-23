@@ -119,6 +119,8 @@ function itemIn(i: ex.Item): Item {
     points: i.points,
     skill: i.skill,
   }
+  if (i.partialCredit) out.partialCredit = true
+  if (i.penalty) out.penalty = i.penalty
   const image = mediaIn(i.image)
   if (image) out.image = image
   if (i.allowAnswerImage) out.allowAnswerImage = true
@@ -176,6 +178,8 @@ export function examOut(e: Exam): MessageInitShape<typeof ex.ExamSchema> {
         choices: i.choices.map((c) => ({ id: c.id, text: c.text, image: mediaOut(c.image) })),
         correct: i.correct,
         points: i.points,
+        partialCredit: !!i.partialCredit,
+        penalty: i.penalty ?? 0,
         skill: i.skill,
         allowAnswerImage: !!i.allowAnswerImage,
         required: !!i.required,
