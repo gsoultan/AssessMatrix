@@ -1,8 +1,8 @@
 import { IconCheck, IconX, IconUserCheck } from '@tabler/icons-react'
 import { ItemImage } from './ItemImage'
-import { type Attempt, type Exam, type Item, allItems, isScale, isScored } from '../store'
+import { type Attempt, type Exam, type Item, allItems, earned, isScale, isScored, penalty } from '../store'
 
-type Verdict = 'right' | 'wrong' | 'blank' | 'person' | 'none'
+type Verdict = 'right' | 'partial' | 'wrong' | 'blank' | 'person' | 'none'
 
 /** The same rule `score()` applies, one item at a time, so the sheet and the total agree. */
 function verdict(exam: Exam, it: Item, a: Attempt): Verdict {
@@ -10,18 +10,14 @@ function verdict(exam: Exam, it: Item, a: Attempt): Verdict {
   const text = (a.text[it.id] ?? '').trim()
   if (!isScored(exam) || isScale(it.type)) return chosen.length || text ? 'none' : 'blank'
   if (it.type === 'essay') return text ? 'person' : 'blank'
-  if (it.type === 'short') {
-    if (!text) return 'blank'
-    return it.correct.some((k) => k.trim().toLowerCase() === text.toLowerCase()) ? 'right' : 'wrong'
-  }
-  if (chosen.length === 0) return 'blank'
-  const given = [...chosen].sort()
-  const want = [...it.correct].sort()
-  return given.length === want.length && given.every((g, i) => g === want[i]) ? 'right' : 'wrong'
+  if (it.type === 'short' ? !text : chosen.length === 0) return 'blank'
+  const got = earned(it, a)
+  return got >= it.points ? 'right' : got > 0 ? 'partial' : 'wrong'
 }
 
 const LOOK: Record<Verdict, { label: string; color: string; bg: string }> = {
   right: { label: 'Correct', color: 'var(--color-good-text)', bg: 'var(--color-wash-good)' },
+  partial: { label: 'Partly right', color: 'var(--color-serious)', bg: 'var(--color-wash-warn)' },
   wrong: { label: 'Wrong', color: 'var(--color-critical)', bg: 'var(--color-wash-critical)' },
   blank: { label: 'Not answered', color: 'var(--color-ink-muted)', bg: 'var(--color-sunken)' },
   person: { label: 'Marked by a person', color: 'var(--color-serious)', bg: 'var(--color-wash-warn)' },
@@ -44,7 +40,7 @@ export function AnswerSheet({ exam, attempt }: { exam: Exam; attempt: Attempt })
         const chosen = attempt.answers[it.id] ?? []
         const text = attempt.text[it.id]?.trim()
         const file = attempt.files?.[it.id]
-        const scored = v === 'right' || v === 'wrong' || (v === 'blank' && isScored(exam) && !isScale(it.type))
+        const scored = v === 'right' || v === 'partial' || v === 'wrong' || (v === 'blank' && isScored(exam) && !isScale(it.type))
         return (
           <li key={it.id} className="hair rounded-xl bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
@@ -76,7 +72,7 @@ export function AnswerSheet({ exam, attempt }: { exam: Exam; attempt: Attempt })
               {text && <p className="whitespace-pre-wrap rounded-lg p-2.5 text-ink" style={{ background: 'var(--color-sunken)' }}>{text}</p>}
               {file && <ItemImage media={file} max={220} className="mt-2 w-fit" />}
               {v === 'blank' && <p className="text-ink-muted">No answer.</p>}
-              {v === 'wrong' && it.correct.length > 0 && (
+              {(v === 'wrong' || v === 'partial') && it.correct.length > 0 && (
                 <p className="mt-1">
                   <span className="text-ink-muted">Correct answer: </span>
                   {it.type === 'short' ? it.correct.join(' / ') : it.correct.map((c) => choiceText(it, c)).join(', ')}
@@ -86,7 +82,8 @@ export function AnswerSheet({ exam, attempt }: { exam: Exam; attempt: Attempt })
 
             {scored && (
               <p className="tnum mt-2 text-[11.5px] text-ink-muted">
-                {v === 'right' ? it.points : 0} / {it.points} points
+                {earned(it, attempt) - penalty(it, attempt)} / {it.points} points
+                {penalty(it, attempt) > 0 && ' (wrong-answer penalty)'}
               </p>
             )}
           </li>

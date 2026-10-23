@@ -149,6 +149,15 @@ func validateItem(it *v1.Item, ids map[string]bool) error {
 	if it.GetPoints() < 0 || it.GetPoints() > 1000 {
 		return invalid("%s: points out of range", where)
 	}
+	if it.GetPenalty() < 0 || it.GetPenalty() > it.GetPoints() {
+		return invalid("%s: a penalty runs from 0 to the question's points", where)
+	}
+	if it.GetPenalty() > 0 && !AutoScored(it.GetType()) {
+		return invalid("%s: only machine-scored questions can carry a penalty", where)
+	}
+	if it.GetPartialCredit() && it.GetType() != v1.ItemType_ITEM_TYPE_MULTIPLE {
+		return invalid("%s: partial credit is for multiple-answer questions", where)
+	}
 	if err := validMedia(it.GetImage(), where); err != nil {
 		return err
 	}
@@ -234,8 +243,10 @@ func Score(e *v1.Exam, answers map[string]*v1.ItemAnswer, reviews map[string]Rev
 			continue
 		}
 		max += it.GetPoints()
-		raw += Earned(it, answers[it.GetId()])
+		raw += Earned(it, answers[it.GetId()]) - Penalty(it, answers[it.GetId()])
 	}
+	// Penalties can outweigh what was earned; the total stops at zero.
+	raw = max32(raw, 0)
 	var pct int32
 	if max > 0 {
 		pct = int32((float64(raw)/float64(max))*100 + 0.5)
@@ -252,6 +263,9 @@ func max32(a, b int32) int32 {
 
 // Earned is what a machine-scored item's answer earns: all or nothing.
 func Earned(it *v1.Item, a *v1.ItemAnswer) int32 {
+	if it.GetPartialCredit() && it.GetType() == v1.ItemType_ITEM_TYPE_MULTIPLE {
+		return partial(it, a)
+	}
 	if it.GetType() == v1.ItemType_ITEM_TYPE_SHORT {
 		given := strings.ToLower(strings.TrimSpace(a.GetText()))
 		if given != "" && slices.ContainsFunc(it.GetCorrect(), func(k string) bool {
@@ -267,6 +281,49 @@ func Earned(it *v1.Item, a *v1.ItemAnswer) int32 {
 		return it.GetPoints()
 	}
 	return 0
+}
+
+// partial is a multiple-answer item's share: each keyed option picked earns
+// points/len(correct), each wrong one picked takes that back, rounded down
+// and never below zero.
+func partial(it *v1.Item, a *v1.ItemAnswer) int32 {
+	keyed := it.GetCorrect()
+	if len(keyed) == 0 {
+		return 0
+	}
+	var net int32
+	for _, v := range slices.Compact(slices.Sorted(slices.Values(a.GetValues()))) {
+		if slices.Contains(keyed, v) {
+			net++
+		} else {
+			net--
+		}
+	}
+	if net <= 0 {
+		return 0
+	}
+	return it.GetPoints() * net / int32(len(keyed))
+}
+
+// Penalty is what a wrong answer takes off the total: the item's penalty when
+// something was answered and it earned nothing. A blank costs nothing.
+func Penalty(it *v1.Item, a *v1.ItemAnswer) int32 {
+	if it.GetPenalty() <= 0 || !AutoScored(it.GetType()) {
+		return 0
+	}
+	if len(a.GetValues()) == 0 && strings.TrimSpace(a.GetText()) == "" {
+		return 0
+	}
+	if Earned(it, a) > 0 {
+		return 0
+	}
+	return it.GetPenalty()
+}
+
+// AutoScored is whether the machine marks an item: everything but essays and
+// scales.
+func AutoScored(t v1.ItemType) bool {
+	return t != v1.ItemType_ITEM_TYPE_ESSAY && !IsScale(t)
 }
 
 // Unanswered lists required questions with no answer.
