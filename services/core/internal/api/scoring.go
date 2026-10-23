@@ -63,13 +63,8 @@ func storeScore(ctx context.Context, tx *db.Tx, att *attemptRow, e *v1.Exam, ans
 			TenantID: tx.Tenant(), AttemptID: attemptID, ExamID: examID, ExamVersion: att.ExamVersion,
 			ItemID: it.GetId(), MaxPoints: it.GetPoints(),
 		}
-		switch {
-		case it.GetType() == v1.ItemType_ITEM_TYPE_ESSAY:
-			if rv, ok := reviews[it.GetId()]; ok {
-				r.Points = some(min(max(rv.Points, 0), it.GetPoints()))
-			}
-		default:
-			r.Points = some(domain.Earned(it, a))
+		if p, ok := itemPoints(it, a, reviews); ok {
+			r.Points = some(p)
 		}
 		r.Choices = slices.Clone(a.GetValues())
 		if r.Choices == nil {
@@ -87,6 +82,35 @@ func storeScore(ctx context.Context, tx *db.Tx, att *attemptRow, e *v1.Exam, ans
 	q.SetRequestedAt(time.Now())
 	_, err = q.OnConflictTenantIDExamIDExamVersion().Insert(ctx, tx)
 	return err
+}
+
+// itemPoints is what one scored item earned. ok is false for an essay still
+// waiting for a person, which has no points yet.
+func itemPoints(it *v1.Item, a *v1.ItemAnswer, reviews map[string]domain.Review) (points int32, ok bool) {
+	if it.GetType() == v1.ItemType_ITEM_TYPE_ESSAY {
+		rv, ok := reviews[it.GetId()]
+		return min(max(rv.Points, 0), it.GetPoints()), ok
+	}
+	return domain.Earned(it, a), true
+}
+
+// itemsData is the per-question part of an attempt event: each scored
+// question's points out of its own maximum, in the instrument's order.
+// Points are null while an essay waits for review. Scales are left out.
+// Kept terse: 500 questions with long ids must fit in one event.
+func itemsData(e *v1.Exam, answers map[string]*v1.ItemAnswer, reviews map[string]domain.Review) []map[string]any {
+	out := []map[string]any{}
+	for _, it := range domain.AllItems(e) {
+		if domain.IsScale(it.GetType()) {
+			continue
+		}
+		d := map[string]any{"item_id": it.GetId(), "points": nil, "max": it.GetPoints()}
+		if p, ok := itemPoints(it, answers[it.GetId()], reviews); ok {
+			d["points"] = p
+		}
+		out = append(out, d)
+	}
+	return out
 }
 
 // maxItemScores bounds the read of an attempt's item index: well past the

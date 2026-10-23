@@ -106,26 +106,40 @@ attempt**, idempotency key on every payload, exponential backoff with a dead-let
 | `exam.published` | A version of an instrument is published |
 | `assignment.invited` | A link is mailed: first send, resend, or the candidate asked for a new one |
 | `attempt.started` | A candidate starts (resuming is not a second start) |
-| `attempt.submitted` · `attempt.expired` | Handed in, or closed by the server's clock; carries the score |
-| `attempt.scored` | A person scored an essay and the result changed |
+| `attempt.submitted` · `attempt.expired` | Handed in, or closed by the server's clock; carries the score and each question's points |
+| `attempt.scored` | A person scored an essay; carries the new score and each question's points |
 | `credential.issued` · `credential.revoked` | Open Badges credential issued, restored or revoked |
 | `webhook.ping` | "Send test event" on the screen |
 
 - Each request is `POST` JSON `{"id", "type", "created_at", "data"}`. `data` names records by id
   (`attempt_id`, `assignment_id`, `exam_id`, `person_id`) with versions, times and scores;
   never a name, email, answer or live link.
+- An attempt's `submitted`, `expired` and `scored` events carry `score` (`pct`, `points`,
+  `max`, `passed`, `pending_review`) and `items`: one `{"item_id", "points", "max"}` per scored
+  question, in the instrument's order, where `max` is what the author set the question to be
+  worth and `points` is `null` while an essay waits for a person. Scale questions are left out.
+  In the rare case the list would push the body past 64 KB it is dropped and
+  `"items_omitted": true` is sent instead.
 - `AssessMatrix-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t + "." + body)>`. Reject a
   `t` more than five minutes old. `webhook.Verify` is the reference implementation.
 - `AssessMatrix-Event-Id` is the same on every retry and redelivery: de-duplicate on it.
 - The event is written in the same transaction as the change, so a rolled-back change sends
-  nothing. Delivery is at least once, **not ordered**: order by `created_at`.
+  nothing. Delivery is at least once.
+- **Ordered per attempt.** An attempt's events and its credential's reach each endpoint in the
+  order they happened: a later one waits while an earlier one is still being retried, and
+  goes once that is delivered or out of tries. Events about different attempts, and the rest,
+  are not ordered against each other: order those by `created_at`.
 - Ten tries over about four hours, then the delivery is marked failed and can be sent again
   from the screen. The log is kept 30 days; erasing a person deletes the events about them.
 - Receivers must be `https` on a public address. Private, loopback, link-local and metadata
   addresses are refused when the URL is saved and again at connect time, after DNS;
   redirects are not followed. `AM_WEBHOOK_ALLOW_PRIVATE=1` (with `AM_DEV=1`) lifts this for a
   receiver on a developer's machine.
-- Strict per-attempt ordering and replay of a time window are still to come.
+- **Replay** ("Replay events" on the screen, `ReplayEvents`) sends one endpoint every logged
+  event about one attempt, or every event in a time window, again, in order, with the original
+  event ids and bodies. Only types the endpoint subscribes to are sent, including events from
+  before it subscribed; one already waiting to send is left as it is. Up to 1,000 events per
+  replay, within the 30-day log.
 
 **The differentiator — replay.** Since the log is the source of truth, a customer can replay
 any webhook window: "resend everything for attempt X," or "resend all events from 14:00 to

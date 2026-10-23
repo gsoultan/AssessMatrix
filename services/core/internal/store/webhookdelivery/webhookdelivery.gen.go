@@ -2436,7 +2436,7 @@ var joinLowering = func() runtime.Lowering {
 	return l
 }()
 
-// ForSendRow is the "ForSend" join: 8 column(s) from 3 table(s).
+// ForSendRow is the "ForSend" join: 10 column(s) from 3 table(s).
 //
 // A flat projection, not a graph. Any column taken through a LEFT join is
 // nullable whatever its own constraint says — that is what a LEFT join
@@ -2450,9 +2450,11 @@ type ForSendRow struct {
 	EventID    [16]byte
 	EventType  string
 	Body       string
+	SubjectID  runtime.Null[[16]byte]
+	Seq        int64
 }
 
-const forSendPrefix = `SELECT "webhook_deliveries"."state" AS "state", "webhook_endpoints"."id" AS "endpoint_id", "webhook_endpoints"."url" AS "url", "webhook_endpoints"."active" AS "active", "webhook_endpoints"."secret" AS "secret", "webhook_events"."id" AS "event_id", "webhook_events"."type" AS "event_type", "webhook_events"."body" AS "body" FROM "webhook_deliveries" JOIN "webhook_endpoints" ON "webhook_deliveries"."endpoint_id" = "webhook_endpoints"."id" JOIN "webhook_events" ON "webhook_deliveries"."event_id" = "webhook_events"."id"`
+const forSendPrefix = `SELECT "webhook_deliveries"."state" AS "state", "webhook_endpoints"."id" AS "endpoint_id", "webhook_endpoints"."url" AS "url", "webhook_endpoints"."active" AS "active", "webhook_endpoints"."secret" AS "secret", "webhook_events"."id" AS "event_id", "webhook_events"."type" AS "event_type", "webhook_events"."body" AS "body", "webhook_events"."subject_id" AS "subject_id", "webhook_events"."seq" AS "seq" FROM "webhook_deliveries" JOIN "webhook_endpoints" ON "webhook_deliveries"."endpoint_id" = "webhook_endpoints"."id" JOIN "webhook_events" ON "webhook_deliveries"."event_id" = "webhook_events"."id"`
 const forSendSuffix = ``
 
 var (
@@ -2480,6 +2482,8 @@ func scanForSend(rv [][]byte, r *ForSendRow, sl *runtime.Slab) error {
 	copy(r.EventID[:], rv[5])
 	r.EventType = sl.Str(rv[6])
 	r.Body = sl.Str(rv[7])
+	r.SubjectID = runtime.Nullable(rv[8], runtime.UUID)
+	r.Seq = runtime.Int8(rv[9])
 	return nil
 }
 

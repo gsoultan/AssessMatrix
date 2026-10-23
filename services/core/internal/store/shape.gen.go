@@ -408,6 +408,8 @@ func _assertWebhookEventShape(m m0.WebhookEvent) {
 		m.Tenant,
 		m.Type,
 		m.PersonID,
+		m.SubjectID,
+		m.Seq,
 		m.Body,
 		m.CreatedAt,
 		m.Deliveries,

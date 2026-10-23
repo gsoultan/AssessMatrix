@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -37,6 +38,8 @@ const (
 	defaultDeliveriesListed  = 50
 	webhookSecretHintChars   = 10
 	maxWebhookDescriptionLen = 200
+	maxReplayed              = 1000
+	maxEventBody             = 65536 // webhook_events_body_check
 )
 
 // EventTypes is every type an endpoint can subscribe to, in display order.
@@ -83,6 +86,14 @@ func (s *Server) recordEvent(ctx context.Context, tx *db.Tx, typ, person string,
 	id := newID()
 	now := s.now().UTC()
 	body, err := json.Marshal(envelope{ID: idText(id), Type: typ, CreatedAt: now.Format(time.RFC3339Nano), Data: data})
+	if err == nil && len(body) > maxEventBody && data["items"] != nil {
+		// Never fail the change for its webhook: the per-question detail
+		// goes, and the receiver is told so.
+		data = maps.Clone(data)
+		delete(data, "items")
+		data["items_omitted"] = true
+		body, err = json.Marshal(envelope{ID: idText(id), Type: typ, CreatedAt: now.Format(time.RFC3339Nano), Data: data})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("encode %s event: %w", typ, err)
 	}
@@ -92,6 +103,9 @@ func (s *Server) recordEvent(ctx context.Context, tx *db.Tx, typ, person string,
 	ev.SetType(typ)
 	if person != "" {
 		ev.SetPersonID(key(person))
+	}
+	if subject := subjectOf(data); subject != "" {
+		ev.SetSubjectID(key(subject))
 	}
 	ev.SetBody(string(body))
 	ev.SetCreatedAt(now)
@@ -118,6 +132,16 @@ func (s *Server) recordEvent(ctx context.Context, tx *db.Tx, typ, person string,
 	return out, nil
 }
 
+// subjectOf is the attempt an event is about, if any: its attempt.* and
+// credential.* events reach each endpoint in the order they happened, and a
+// replay of the attempt finds them by it.
+func subjectOf(data map[string]any) string {
+	if id, ok := data["attempt_id"].(string); ok && validUUID(id) {
+		return id
+	}
+	return ""
+}
+
 func (s *Server) queueDelivery(ctx context.Context, tx *db.Tx, id string) error {
 	if s.Jobs == nil {
 		return nil
@@ -129,7 +153,8 @@ func (s *Server) queueDelivery(ctx context.Context, tx *db.Tx, id string) error 
 // Event payloads, one shape per subject, so every event about an attempt
 // reads the same.
 
-func attemptData(att *attemptRow, score *v1.Score) map[string]any {
+// items is itemsData, given with the score.
+func attemptData(att *attemptRow, score *v1.Score, items []map[string]any) map[string]any {
 	d := map[string]any{
 		"attempt_id": att.ID, "assignment_id": att.AssignmentID, "exam_id": att.ExamID,
 		"exam_version": att.ExamVersion, "person_id": att.PersonID,
@@ -146,6 +171,7 @@ func attemptData(att *attemptRow, score *v1.Score) map[string]any {
 			"pct": score.GetPct(), "points": score.GetRaw(), "max": score.GetMax(),
 			"passed": score.GetPassed(), "pending_review": score.GetPendingHuman() > 0,
 		}
+		d["items"] = items
 	}
 	return d
 }
@@ -507,6 +533,98 @@ func (s *webhookService) PingWebhook(ctx context.Context, req *connect.Request[v
 	})
 	if err != nil {
 		return nil, s.internal(ctx, "PingWebhook", err)
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (s *webhookService) ReplayEvents(ctx context.Context, req *connect.Request[v1.ReplayEventsRequest]) (*connect.Response[v1.ReplayEventsResponse], error) {
+	m := req.Msg
+	byAttempt := m.GetAttemptId() != ""
+	if byAttempt && !validUUID(m.GetAttemptId()) {
+		return nil, notFound("attempt")
+	}
+	if !byAttempt && (m.GetFrom() <= 0 || m.GetTo() <= m.GetFrom()) {
+		return nil, invalidArg(errors.New("give an attempt, or a window that ends after it starts"))
+	}
+	out := &v1.ReplayEventsResponse{}
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		ep, err := endpointRow(ctx, tx, m.GetEndpointId())
+		if err != nil {
+			return err
+		}
+		if !ep.Active {
+			return failedPrecondition("this webhook is paused; resume it first")
+		}
+		q := webhookevent.New().Where(webhookevent.Type.In(ep.Events...))
+		if byAttempt {
+			q = q.Where(webhookevent.SubjectID.Eq(key(m.GetAttemptId())))
+		} else {
+			q = q.Where(webhookevent.CreatedAt.Gte(time.UnixMilli(m.GetFrom())), webhookevent.CreatedAt.Lt(time.UnixMilli(m.GetTo())))
+		}
+		events, err := q.Order(webhookevent.Seq.Asc()).Limit(maxReplayed+1).All(ctx, tx, nil)
+		if err != nil {
+			return err
+		}
+		if len(events) > maxReplayed {
+			return failedPrecondition(fmt.Sprintf("that is more than %d events; replay a shorter window", maxReplayed))
+		}
+		ids := make([][16]byte, len(events))
+		for i, ev := range events {
+			ids[i] = ev.ID
+		}
+		have := map[[16]byte]webhookdelivery.Row{}
+		if len(ids) > 0 {
+			rows, err := webhookdelivery.New().
+				Where(webhookdelivery.EndpointID.Eq(ep.ID), webhookdelivery.EventID.In(ids...)).
+				Limit(maxReplayed).All(ctx, tx, nil)
+			if err != nil {
+				return err
+			}
+			for _, r := range rows {
+				have[r.EventID] = r
+			}
+		}
+		// In event order, so ordered delivery sends them as they happened.
+		for _, ev := range events {
+			d, ok := have[ev.ID]
+			switch {
+			case ok && d.State == webhook.StatePending:
+				out.AlreadyPending++
+				continue
+			case ok:
+				// The same delivery again: same event id, same body.
+				mu := webhookdelivery.MutateKey(d.ID)
+				mu.SetState(webhook.StatePending)
+				mu.SetLastError("")
+				if err := mu.Update(ctx, tx); err != nil {
+					return err
+				}
+			default:
+				// An event from before this endpoint subscribed to it.
+				c := webhookdelivery.Create()
+				c.SetTenantID(tx.Tenant())
+				c.SetEndpointID(ep.ID)
+				c.SetEventID(ev.ID)
+				c.SetCreatedAt(s.now().UTC())
+				if d, err = c.Insert(ctx, tx); err != nil {
+					return err
+				}
+			}
+			if err := s.queueDelivery(ctx, tx, idText(d.ID)); err != nil {
+				return err
+			}
+			out.Queued++
+		}
+		detail := map[string]any{"queued": out.Queued, "already_pending": out.AlreadyPending}
+		if byAttempt {
+			detail["attempt"] = m.GetAttemptId()
+		} else {
+			detail["from"], detail["to"] = m.GetFrom(), m.GetTo()
+		}
+		return audit(ctx, tx, "webhook.replayed", idText(ep.ID), detail)
+	})
+	if err != nil {
+		return nil, s.internal(ctx, "ReplayEvents", err)
 	}
 	return connect.NewResponse(out), nil
 }

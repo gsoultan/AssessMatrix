@@ -147,6 +147,7 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.WebhookServiceListDeliveriesProcedure,
 		assessmatrixv1connect.WebhookServiceRedeliverProcedure,
 		assessmatrixv1connect.WebhookServicePingWebhookProcedure,
+		assessmatrixv1connect.WebhookServiceReplayEventsProcedure,
 		assessmatrixv1connect.TenantServiceListAccessProcedure,
 		assessmatrixv1connect.TenantServiceSetAccessProcedure,
 		assessmatrixv1connect.TenantServiceListExamCopiesProcedure,

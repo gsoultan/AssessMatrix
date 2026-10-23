@@ -553,7 +553,7 @@ func (s *candidateService) StartAttempt(ctx context.Context, req *connect.Reques
 		if err := m.Update(ctx, tx); err != nil {
 			return err
 		}
-		if err := s.emit(ctx, tx, EventAttemptStarted, att.PersonID, attemptData(att, nil)); err != nil {
+		if err := s.emit(ctx, tx, EventAttemptStarted, att.PersonID, attemptData(att, nil, nil)); err != nil {
 			return err
 		}
 		out, err = s.attemptProto(att, nil, false)
@@ -798,7 +798,11 @@ func (s *candidateService) SubmitAttempt(ctx context.Context, req *connect.Reque
 		if force {
 			typ = EventAttemptExpired
 		}
-		if err := s.emit(ctx, tx, typ, att.PersonID, attemptData(att, score)); err != nil {
+		var items []map[string]any
+		if score != nil {
+			items = itemsData(e, answers, reviews)
+		}
+		if err := s.emit(ctx, tx, typ, att.PersonID, attemptData(att, score, items)); err != nil {
 			return err
 		}
 		if score != nil {
