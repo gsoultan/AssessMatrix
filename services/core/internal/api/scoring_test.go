@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -55,5 +56,19 @@ func TestPartialCreditAndPenaltyReachTheScore(t *testing.T) {
 	}
 	if got["q1"] != 0 || got["q2"] != 1 || got["q3"] != 1 {
 		t.Fatalf("item index = %v, want q1 0, q2 1, q3 1", got)
+	}
+}
+
+// A webhook's items still add up to the score when a penalty applies: the
+// question that cost points says how many.
+func TestItemsDataNamesThePenalty(t *testing.T) {
+	e := &v1.Exam{Sections: []*v1.Section{{Id: "s", Items: []*v1.Item{
+		{Id: "a", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 2, Penalty: 1, Correct: []string{"y"}},
+		{Id: "b", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 2, Penalty: 1, Correct: []string{"y"}},
+	}}}}
+	answers := map[string]*v1.ItemAnswer{"a": {Values: []string{"x"}}}
+	got, _ := json.Marshal(itemsData(e, answers, nil))
+	if string(got) != `[{"item_id":"a","max":2,"penalty":1,"points":0},{"item_id":"b","max":2,"points":0}]` {
+		t.Fatalf("items = %s", got)
 	}
 }

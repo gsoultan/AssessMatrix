@@ -117,7 +117,9 @@ attempt**, idempotency key on every payload, exponential backoff with a dead-let
 - An attempt's `submitted`, `expired` and `scored` events carry `score` (`pct`, `points`,
   `max`, `passed`, `pending_review`) and `items`: one `{"item_id", "points", "max"}` per scored
   question, in the instrument's order, where `max` is what the author set the question to be
-  worth and `points` is `null` while an essay waits for a person. Scale questions are left out.
+  worth and `points` is `null` while an essay waits for a person. A wrong answer to a question
+  with a penalty also carries `penalty`, the points it took off the total, which never goes
+  below zero. Scale questions are left out.
   In the rare case the list would push the body past 64 KB it is dropped and
   `"items_omitted": true` is sent instead.
 - `AssessMatrix-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, t + "." + body)>`. Reject a
