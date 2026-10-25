@@ -44,6 +44,9 @@ type harness struct {
 	clock *clock
 	// lastTenant is the id of the tenant most recently made by tenant().
 	lastTenant string
+	// tenants is every tenant this harness made, so a test acts on its own
+	// rows in the shared database.
+	tenants []string
 }
 
 type clock struct {
@@ -178,6 +181,7 @@ func (h *harness) newTenant(name, email string) string {
 		h.t.Fatal(err)
 	}
 	h.lastTenant = tenant
+	h.tenants = append(h.tenants, tenant)
 	return tenant
 }
 

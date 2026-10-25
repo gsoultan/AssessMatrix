@@ -67,7 +67,11 @@ type WebhookEvent struct {
 	Type   string
 	// PersonID is the person the event is about, if any. No foreign key:
 	// the event outlives nothing, and erasure deletes it by this column.
-	PersonID  *[16]byte
+	PersonID *[16]byte
+	// SubjectID is the attempt an attempt.* event is about. Deliveries of
+	// one subject to one endpoint go in Seq order (migration 0011).
+	SubjectID *[16]byte
+	Seq       int64
 	Body      string
 	CreatedAt time.Time
 
@@ -80,11 +84,13 @@ func (e *WebhookEvent) Schema(t *storm.Table) {
 	t.UniqueNamed("webhook_events_tenant_id_key", &e.Tenant, &e.ID)
 	t.Col(&e.Tenant).ConstraintName("webhook_events_tenant_id_fkey")
 	t.Col(&e.CreatedAt).Default("now()")
+	t.Col(&e.Seq).Identity()
 	t.CheckNamed("webhook_events_body_check", "length(body) <= 65536")
 	t.CheckNamed("webhook_events_type_check", "length(type) <= 64")
 	t.Index(&e.PersonID).Where("person_id IS NOT NULL").Named("webhook_events_person_idx")
 	t.Index(&e.Tenant, &e.CreatedAt).Named("webhook_events_tenant_idx")
 	t.Index(&e.CreatedAt).Named("webhook_events_created_idx")
+	t.Index(&e.SubjectID, &e.Seq).Where("subject_id IS NOT NULL").Named("webhook_events_subject_idx")
 }
 
 // WebhookDelivery is one event on its way to one endpoint.
@@ -139,5 +145,7 @@ func (d *WebhookDelivery) Joins(j *storm.Joins) {
 		Take(&e.Secret, "Secret").
 		Take(&v.ID, "EventID").
 		Take(&v.Type, "EventType").
-		Take(&v.Body, "Body")
+		Take(&v.Body, "Body").
+		Take(&v.SubjectID, "SubjectID").
+		Take(&v.Seq, "Seq")
 }

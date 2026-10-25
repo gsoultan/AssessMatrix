@@ -393,6 +393,10 @@ func checkIsolation(t *testing.T, memberOfA bool) {
 			_, err := b.hooks.PingWebhook(ctx, connect.NewRequest(&v1.PingWebhookRequest{Id: hookA.GetId()}))
 			denied("PingWebhook", err)
 		},
+		"/assessmatrix.v1.WebhookService/ReplayEvents": func() {
+			_, err := b.hooks.ReplayEvents(ctx, connect.NewRequest(&v1.ReplayEventsRequest{EndpointId: hookA.GetId(), From: 1, To: 1 << 50}))
+			denied("ReplayEvents", err)
+		},
 		"/assessmatrix.v1.CandidateService/GetRecord": func() {
 			// B's own attempt, or none yet; never A's.
 			r, err := candB.candidate.GetRecord(ctx, connect.NewRequest(&v1.GetRecordRequest{}))
