@@ -9159,6 +9159,11 @@ func init() {
 	storm.RegisterScanner(scanMembership)
 	storm.RegisterScanner(scanEmailRow)
 	storm.RegisterStatement(`
+	SELECT count(*) AS n FROM (
+	  SELECT 1 FROM webhook_deliveries d JOIN webhook_events e ON e.id = d.event_id
+	  WHERE d.endpoint_id = $1 AND d.state = 1 AND e.subject_id = $2 AND e.seq < $3
+	  LIMIT 1) earlier`)
+	storm.RegisterStatement(`
 	SELECT r.rolsuper AS super, r.rolbypassrls AS bypass,
 	       (SELECT count(*) FROM pg_tables t WHERE t.schemaname = 'public' AND t.tableowner = current_user) AS owns_tables
 	FROM pg_roles r WHERE r.rolname = current_user`)
