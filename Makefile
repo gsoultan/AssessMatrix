@@ -1,6 +1,6 @@
 # AssessMatrix — run `make` to see everything available.
 .DEFAULT_GOAL := help
-.PHONY: help up down dev check build preview e2e e2e-core e2e-setup load clean core-test proto
+.PHONY: help up down dev check build preview e2e e2e-core e2e-setup load backup clean core-test proto
 
 help: ## Show this help
 	@echo "AssessMatrix"
@@ -39,6 +39,9 @@ e2e-setup: ## First run on a fresh install through /setup (needs AM_E2E_SETUP_* 
 
 load: ## Cohort load test against a local core: N candidates, nothing lost (needs AM_E2E_* URLs)
 	@./scripts/load.sh
+
+backup: ## Compose install: base backup, keep the newest AM_BACKUP_KEEP (7), prune older WAL. Run nightly
+	@docker compose exec -T -u postgres postgres /backup.sh
 
 clean: ## Remove build output and node_modules
 	@./scripts/clean.sh

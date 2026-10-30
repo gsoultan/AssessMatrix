@@ -9144,6 +9144,7 @@ func init() {
 	storm.RegisterScanner(scanTenantSummary)
 	storm.RegisterScanner(scanSessionAssignment)
 	storm.RegisterScanner(scanTokenAssignment)
+	storm.RegisterScanner(scanKindRow)
 	storm.RegisterScanner(scanStaffTenant)
 	storm.RegisterScanner(scanRoleRow)
 	storm.RegisterScanner(scanCountRow)
@@ -9167,6 +9168,7 @@ func init() {
 	SELECT r.rolsuper AS super, r.rolbypassrls AS bypass,
 	       (SELECT count(*) FROM pg_tables t WHERE t.schemaname = 'public' AND t.tableowner = current_user) AS owns_tables
 	FROM pg_roles r WHERE r.rolname = current_user`)
+	storm.RegisterStatement(`SELECT DISTINCT kind FROM attempt_events WHERE attempt_id = $1 AND kind LIKE 'consent.%'`)
 	storm.RegisterStatement(`SELECT am_outbox_sweep($1) AS n`)
 	storm.RegisterStatement(`SELECT am_outbox_tenant($1) AS tenant_id`)
 	storm.RegisterStatement(`SELECT am_purge_attempt($1) AS n`)
@@ -9208,6 +9210,11 @@ func scanTokenAssignment(rv [][]byte, r *queries.TokenAssignment, sl *runtime.Sl
 	copy(r.TenantID[:], rv[0])
 	copy(r.AssignmentID[:], rv[1])
 	r.Current = runtime.Bool(rv[2])
+	return nil
+}
+
+func scanKindRow(rv [][]byte, r *queries.KindRow, sl *runtime.Slab) error {
+	r.Kind = sl.Str(rv[0])
 	return nil
 }
 

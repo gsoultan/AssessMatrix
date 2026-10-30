@@ -6,3 +6,5 @@ dist/
 .vite/
 .env
 .dev/
+__pycache__/
+.storm-bootstrap-*/

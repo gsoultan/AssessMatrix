@@ -65,9 +65,14 @@ func (f FS) Put(_ context.Context, key, _ string, body []byte) error {
 	// Write then rename, so a reader never sees half a file.
 	tmp := p + ".part"
 	if err := os.WriteFile(tmp, body, 0o640); err != nil {
+		os.Remove(tmp) // a disk that filled up mid-write keeps no half file
 		return err
 	}
-	return os.Rename(tmp, p)
+	if err := os.Rename(tmp, p); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func (f FS) Get(_ context.Context, key string) (io.ReadCloser, error) {

@@ -63,10 +63,14 @@ attempt log verifies: keep it in two separate secret stores.
 
 - **Managed Postgres:** turn on point-in-time recovery with at least 7 days, daily snapshots
   kept 35 days, in the same region.
-- **Compose:** WAL is archived each minute to the `walarchive` volume. Take a base backup
-  nightly (`docker compose exec -u postgres postgres pg_basebackup -D /archive/base-$(date +%F)
-  -Ft -z -X none`) and copy the volume to object storage in the same region, encrypted, with a
-  35-day lifecycle rule.
+- **Compose:** WAL is archived each minute, gzipped, to the `walarchive` volume. Run
+  `make backup` nightly (cron: `0 2 * * * cd /srv/assessmatrix && make backup`). It takes a
+  base backup into `/archive/base-<time>`, keeps the newest `AM_BACKUP_KEEP` (default 7), and
+  deletes archived WAL that no kept backup needs, so the volume stays at about a week of
+  history instead of growing until the disk is full. Copy the volume to object storage in the
+  same region, encrypted, with a 35-day lifecycle rule. To restore, unpack a
+  `base-*/base.tar.gz` and use `restore_command = 'gunzip -c /archive/wal/%f.gz > %p'`, as
+  `scripts/restore-drill.sh` does.
 - **Images:** the media bucket replicates to a second bucket in the same region. Turn bucket
   versioning off, or expire old versions after 35 days: a deleted image must actually go (§5).
 
