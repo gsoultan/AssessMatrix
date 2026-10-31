@@ -10,22 +10,28 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       AM_OWNER_PASSWORD: ${AM_OWNER_PASSWORD:?set AM_OWNER_PASSWORD in .env}
       AM_APP_PASSWORD: ${AM_APP_PASSWORD:?set AM_APP_PASSWORD in .env}
+      # Base backups `make backup` keeps on the machine (one a night: days).
+      AM_BACKUP_KEEP: ${AM_BACKUP_KEEP:-7}
     # Every WAL segment is copied to the archive volume as it fills (or each
-    # minute), so with a base backup the database can be restored to any
-    # moment (docs/13 §3, scripts/restore-drill.sh). Copy that volume off
-    # the machine: a backup on the same disk is not a backup.
+    # minute), gzipped, so with a base backup the database can be restored to
+    # any moment (docs/13 §3, scripts/restore-drill.sh). A segment closed by
+    # the minute's timeout is mostly empty and gzips to a few KB instead of
+    # 16 MB. `make backup` (nightly) takes the base backup and prunes what no
+    # backup needs any more. Copy that volume off the machine: a backup on
+    # the same disk is not a backup.
     command:
       - bash
       - -c
       - >-
         mkdir -p /archive/wal && chown -R postgres /archive &&
         exec docker-entrypoint.sh postgres
-        -c wal_level=replica -c archive_mode=on -c archive_timeout=60
-        -c archive_command='test ! -f /archive/wal/%f && cp %p /archive/wal/%f'
+        -c wal_level=replica -c archive_mode=on -c archive_timeout=60 -c wal_compression=lz4
+        -c archive_command='test ! -f /archive/wal/%f.gz && gzip -c %p > /archive/wal/%f.gz.part && mv /archive/wal/%f.gz.part /archive/wal/%f.gz'
     volumes:
       - pgdata:/var/lib/postgresql/data
       - walarchive:/archive
       - ./deploy/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./deploy/postgres/backup.sh:/backup.sh:ro
     # AM_PG_PORT in .env when 5432 is taken (a Homebrew Postgres, say).
     ports: ["127.0.0.1:${AM_PG_PORT:-5432}:5432"]
     healthcheck:

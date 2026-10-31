@@ -1,7 +1,9 @@
 // Package limit is a fixed-window rate limiter keyed by caller-supplied
 // values (an IP, an email). Those keys are attacker input, so the map is
 // bounded: when it is full and nothing has expired, a new key is refused
-// rather than letting memory grow.
+// rather than letting memory grow. Expired windows are swept at most once a
+// second, so a flood of new keys against a full map costs a map lookup each,
+// not a walk over every key.
 package limit
 
 import (
@@ -21,7 +23,12 @@ type Limiter struct {
 	keys map[string]*window
 	cap  int
 	now  func() time.Time
+	// swept is when the map was last walked for expired windows.
+	swept time.Time
 }
+
+// sweepEvery bounds how often a full map is walked.
+const sweepEvery = time.Second
 
 // New allows max events per key in each window of length per, tracking at
 // most capacity keys.
@@ -37,7 +44,9 @@ func (l *Limiter) Allow(key string) bool {
 	w, ok := l.keys[key]
 	if !ok || now.Sub(w.start) >= l.per {
 		if !ok && len(l.keys) >= l.cap {
-			l.sweep(now)
+			if now.Sub(l.swept) >= min(sweepEvery, l.per) {
+				l.sweep(now)
+			}
 			if len(l.keys) >= l.cap {
 				return false
 			}
@@ -53,6 +62,7 @@ func (l *Limiter) Allow(key string) bool {
 }
 
 func (l *Limiter) sweep(now time.Time) {
+	l.swept = now
 	for k, w := range l.keys {
 		if now.Sub(w.start) >= l.per {
 			delete(l.keys, k)

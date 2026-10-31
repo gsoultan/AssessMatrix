@@ -48,9 +48,10 @@ docker run -d --name "$PRIMARY" --network "$NET" \
   -e POSTGRES_PASSWORD="$PW" -e AM_OWNER_PASSWORD="$PW" -e AM_APP_PASSWORD="$PW" \
   -v "$RUN-data:/var/lib/postgresql/data" -v "$RUN-archive:/archive" \
   -v "$ROOT/deploy/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro" \
+  -v "$ROOT/deploy/postgres/backup.sh:/backup.sh:ro" \
   "$PG_IMAGE" bash -c "mkdir -p /archive/wal && chown -R postgres /archive && exec docker-entrypoint.sh postgres \
-    -c wal_level=replica -c archive_mode=on -c archive_timeout=60 \
-    -c archive_command='test ! -f /archive/wal/%f && cp %p /archive/wal/%f'" >/dev/null
+    -c wal_level=replica -c archive_mode=on -c archive_timeout=60 -c wal_compression=lz4 \
+    -c archive_command='test ! -f /archive/wal/%f.gz && gzip -c %p > /archive/wal/%f.gz.part && mv /archive/wal/%f.gz.part /archive/wal/%f.gz'" >/dev/null
 wait_pg "$PRIMARY"
 ok "primary up"
 
@@ -61,7 +62,13 @@ migrations=$(psql_in "$PRIMARY" "SELECT count(*) FROM schema_migrations")
 ok "migrated: $migrations migrations"
 
 bold "3 · base backup, then writes either side of T"
-docker exec -u postgres "$PRIMARY" pg_basebackup -D /archive/base -Ft -z -X none -c fast
+# The same script the nightly backup runs, twice with one kept, so its
+# pruning runs too and the restore below uses what pruning left.
+docker exec -u postgres -e AM_BACKUP_KEEP=1 "$PRIMARY" /backup.sh >/dev/null
+sleep 1 # backups are named by the second
+docker exec -u postgres -e AM_BACKUP_KEEP=1 "$PRIMARY" /backup.sh >/dev/null
+[ "$(docker exec "$PRIMARY" bash -c 'ls -d /archive/base-* | wc -l')" = 1 ] || die "backup.sh kept more than AM_BACKUP_KEEP"
+ok "base backup taken; older backup and WAL pruned"
 psql_in "$PRIMARY" "CREATE TABLE drill (what text, at timestamptz DEFAULT clock_timestamp()); INSERT INTO drill (what) VALUES ('before')"
 sleep 1
 T=$(psql_in "$PRIMARY" "SELECT clock_timestamp()")
@@ -81,9 +88,9 @@ docker run -d --name "$RESTORED" --network "$NET" \
   -v "$RUN-restore:/var/lib/postgresql/data" -v "$RUN-archive:/archive:ro" \
   "$PG_IMAGE" bash -c "set -e
     D=/var/lib/postgresql/data/pgdata; mkdir -p \$D
-    tar -xzf /archive/base/base.tar.gz -C \$D
+    tar -xzf /archive/base-*/base.tar.gz -C \$D
     touch \$D/recovery.signal
-    printf \"restore_command = 'cp /archive/wal/%%f %%p'\nrecovery_target_time = '$T'\nrecovery_target_action = 'promote'\n\" >> \$D/postgresql.auto.conf
+    printf \"restore_command = 'gunzip -c /archive/wal/%%f.gz > %%p'\nrecovery_target_time = '$T'\nrecovery_target_action = 'promote'\n\" >> \$D/postgresql.auto.conf
     chown -R postgres \$D && chmod 700 \$D
     exec gosu postgres postgres -D \$D" >/dev/null
 for _ in $(seq 1 60); do

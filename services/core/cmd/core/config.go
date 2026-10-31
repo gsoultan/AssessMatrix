@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
+	netmail "net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -137,6 +139,10 @@ func loadConfig(serving bool) (*config, error) {
 			User: os.Getenv("AM_SMTP_USER"), Pass: os.Getenv("AM_SMTP_PASS")}
 		if c.SMTP.Addr == "" || c.SMTP.From == "" {
 			errs = append(errs, errors.New("AM_SMTP_ADDR and AM_SMTP_FROM are required for AM_MAILER=smtp"))
+		} else if _, err := netmail.ParseAddress(c.SMTP.From); err != nil {
+			errs = append(errs, fmt.Errorf("AM_SMTP_FROM %q is not an address: %w", c.SMTP.From, err))
+		} else if _, _, err := net.SplitHostPort(c.SMTP.Addr); err != nil {
+			errs = append(errs, fmt.Errorf("AM_SMTP_ADDR %q needs a host and port, such as smtp.example.id:587", c.SMTP.Addr))
 		}
 	default:
 		errs = append(errs, fmt.Errorf("unknown AM_MAILER %q", c.Mailer))

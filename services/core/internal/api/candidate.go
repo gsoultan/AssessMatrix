@@ -22,7 +22,6 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/attempt"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/attemptbatch"
-	"github.com/gsoultan/assessmatrix/services/core/internal/store/attemptevent"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/credential"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/exam"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/person"
@@ -32,13 +31,15 @@ import (
 type candidateService struct{ *Server }
 
 // TrustProxy makes the limiter key on X-Forwarded-For. Only set it behind a
-// proxy that overwrites the header.
+// proxy that sets the header. The last entry is the one that proxy wrote; the
+// ones before it are whatever the client sent, so a proxy that appends rather
+// than overwrites cannot be talked into keying on a forged address.
 var TrustProxy bool
 
 func clientIP(peer connect.Peer, h interface{ Get(string) string }) string {
 	if TrustProxy {
 		if xff := h.Get("X-Forwarded-For"); xff != "" {
-			return strings.TrimSpace(strings.Split(xff, ",")[0])
+			return strings.TrimSpace(xff[strings.LastIndexByte(xff, ',')+1:])
 		}
 	}
 	host, _, err := net.SplitHostPort(peer.Addr)
@@ -694,17 +695,13 @@ func (s *candidateService) consented(ctx context.Context, tx *db.Tx, attemptID s
 	if !slices.ContainsFunc(evs, func(ev *v1.AttemptEvent) bool { return domain.PurposeOf(ev.GetKind()) != "" }) {
 		return all, nil
 	}
-	rows, err := attemptevent.New().
-		Where(attemptevent.AttemptID.Eq(key(attemptID)), attemptevent.Kind.Like(domain.KindConsentPrefix+"%")).
-		Limit(MaxEventsPerTry).All(ctx, tx, nil)
+	rows, err := queries.ConsentKinds.Query(ctx, tx, key(attemptID))
 	if err != nil {
 		return nil, err
 	}
-	var kinds []string
-	for _, r := range rows {
-		if !slices.Contains(kinds, r.Kind) {
-			kinds = append(kinds, r.Kind)
-		}
+	kinds := make([]string, len(rows))
+	for i, r := range rows {
+		kinds[i] = r.Kind
 	}
 	inForce := map[string]bool{}
 	for _, k := range kinds {

@@ -127,13 +127,18 @@ func runBatch(ctx context.Context, tx *db.Tx, ops []runtime.BatchOp) error {
 // PurgeDue applies retention to every tenant: records past their period are
 // deleted, and so is mail older than OutboxKeep. Safe to run concurrently and
 // repeatedly: each record is locked and checked again in its own transaction.
+//
+// One record that cannot be purged does not hold back the rest, nor the
+// sweeps: it is logged, the run goes on, and the next run tries it again.
 func (s *Server) PurgeDue(ctx context.Context) (purged int, err error) {
 	now := s.now()
+	var failed []error
 	for {
 		batch, err := queries.RetentionDue.Query(ctx, s.DB.Executor(), now, purgeBatch)
 		if err != nil {
-			return purged, err
+			return purged, errors.Join(append(failed, err)...)
 		}
+		stuck := 0
 		for _, d := range batch {
 			attemptID := idText(d.AttemptID)
 			err := s.DB.InTenant(ctx, db.TenantID(idText(d.TenantID)), func(tx *db.Tx) error {
@@ -145,21 +150,29 @@ func (s *Server) PurgeDue(ctx context.Context) (purged int, err error) {
 				return err
 			})
 			if err != nil {
-				return purged, fmt.Errorf("purge %s: %w", attemptID, err)
+				if ctx.Err() != nil {
+					return purged, ctx.Err()
+				}
+				s.Log.Error("retention: purge failed; retried next run", "attempt", attemptID, "err", err)
+				failed = append(failed, fmt.Errorf("purge %s: %w", attemptID, err))
+				stuck++
+				continue
 			}
 			purged++
 		}
-		if len(batch) < purgeBatch {
+		// The query returns the oldest due first, so a batch with a record
+		// that failed would come back the same: stop rather than spin.
+		if len(batch) < purgeBatch || stuck > 0 {
 			break
 		}
 	}
 	if _, _, err := queries.OutboxSweep.One(ctx, s.DB.Executor(), now.Add(-OutboxKeep)); err != nil {
-		return purged, err
+		failed = append(failed, err)
 	}
 	if _, _, err := queries.WebhookSweep.One(ctx, s.DB.Executor(), now.Add(-WebhookKeep)); err != nil {
-		return purged, err
+		failed = append(failed, err)
 	}
-	return purged, nil
+	return purged, errors.Join(failed...)
 }
 
 // RetentionArgs is the periodic retention job (cmd/core schedules it hourly).

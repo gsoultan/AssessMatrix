@@ -177,3 +177,13 @@ var WebhookEarlierPending = storm.SQL[CountRow](`
 	  SELECT 1 FROM webhook_deliveries d JOIN webhook_events e ON e.id = d.event_id
 	  WHERE d.endpoint_id = $1 AND d.state = 1 AND e.subject_id = $2 AND e.seq < $3
 	  LIMIT 1) earlier`)
+
+// KindRow is one distinct event kind.
+type KindRow struct {
+	Kind string
+}
+
+// ConsentKinds is every consent kind in one attempt's log: what was agreed
+// to and what was withdrawn. The literal pattern is what lets Postgres use
+// attempt_events_consent_idx, whatever plan it caches.
+var ConsentKinds = storm.SQL[KindRow](`SELECT DISTINCT kind FROM attempt_events WHERE attempt_id = $1 AND kind LIKE 'consent.%'`)

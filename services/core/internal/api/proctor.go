@@ -88,6 +88,8 @@ func (s *proctorService) WatchExam(ctx context.Context, req *connect.Request[v1.
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-s.Stopping:
+			return nil // the monitor reconnects to another replica
 		case <-tick.C:
 		}
 	}

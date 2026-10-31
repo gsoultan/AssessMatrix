@@ -79,6 +79,7 @@ func (e *AttemptEvent) Schema(t *storm.Table) {
 	t.Col(&e.Hash).NotNull()
 	t.CheckNamed("attempt_events_seq_check", "seq >= 1")
 	t.Index(&e.Tenant).Named("attempt_events_tenant_idx")
+	t.Index(&e.Attempt).Where("kind LIKE 'consent.%'").Named("attempt_events_consent_idx")
 }
 
 // AttemptBatch records a batch of events already stored, so a retried batch

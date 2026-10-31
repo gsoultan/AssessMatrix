@@ -50,6 +50,10 @@ type Server struct {
 	Media media.Regional
 	// WebhookPolicy says which receiver URLs staff may register.
 	WebhookPolicy webhook.Policy
+	// Stopping is closed when the process starts shutting down, so a live
+	// monitor stream ends at once instead of holding shutdown for minutes.
+	// Nil: never.
+	Stopping <-chan struct{}
 
 	// PerIPPerMinute and PerTenantPerMinute size the limits below; zero means
 	// 60 and 600. An exam hall behind one NAT address needs a higher per-IP

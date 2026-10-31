@@ -275,9 +275,10 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	stopping := make(chan struct{})
 	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
 		Media: media.Regional{Store: store, Region: cfg.Media.Region}, WebhookPolicy: hooks,
-		PerIPPerMinute: cfg.PerIP, PerTenantPerMinute: cfg.PerTenant}
+		PerIPPerMinute: cfg.PerIP, PerTenantPerMinute: cfg.PerTenant, Stopping: stopping}
 	retention.Server = srv
 	if err := jobs.Start(ctx); err != nil {
 		return err
@@ -335,6 +336,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
+	server.RegisterOnShutdown(func() { close(stopping) })
 	errc := make(chan error, 2)
 	if cfg.MetricsListen != "off" {
 		// Its own port, so the public proxy never exposes it.

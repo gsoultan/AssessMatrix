@@ -90,6 +90,12 @@ func Open(ctx context.Context, url string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
+	// A transaction left open by a bug or a stalled client would hold its
+	// row locks and its connection until restart; Postgres ends it instead.
+	// The URL can set its own value.
+	if _, set := cfg.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"]; !set {
+		cfg.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = "60000"
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)

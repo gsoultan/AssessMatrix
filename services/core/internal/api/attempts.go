@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/gsoultan/storm/runtime"
+
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -106,6 +108,8 @@ func eventBody(ev *v1.AttemptEvent) ([]byte, error) {
 func (s *Server) appendEvents(ctx context.Context, tx *db.Tx, a *attemptRow, evs []*v1.AttemptEvent) error {
 	now := s.now()
 	id := key(a.ID)
+	// One round trip for the batch, not one per event.
+	ops := make([]runtime.BatchOp, 0, len(evs))
 	for _, ev := range evs {
 		a.LastSeq++
 		ev.Seq = a.LastSeq
@@ -115,18 +119,14 @@ func (s *Server) appendEvents(ctx context.Context, tx *db.Tx, a *attemptRow, evs
 			return err
 		}
 		hash := s.Keys.ChainHash(a.LastHash, body)
-		n := attemptevent.Create()
-		n.SetTenantID(tx.Tenant())
-		n.SetAttemptID(id)
-		n.SetSeq(ev.Seq)
-		n.SetServerTime(now)
-		n.SetKind(ev.GetKind())
-		n.SetBody(body)
-		n.SetHash(hash)
-		if _, err := n.Insert(ctx, tx); err != nil {
-			return err
-		}
+		ops = append(ops, attemptevent.InsertOp(attemptevent.Row{
+			TenantID: tx.Tenant(), AttemptID: id, Seq: ev.Seq, ServerTime: now,
+			Kind: ev.GetKind(), Body: body, Hash: hash,
+		}))
 		a.LastHash = hash
+	}
+	if err := runBatch(ctx, tx, ops); err != nil {
+		return err
 	}
 	a.Seal = s.seal(a)
 	m := attempt.MutateKey(id)
