@@ -165,3 +165,80 @@ func TestReviewedEssayCounts(t *testing.T) {
 		t.Fatalf("the latest review must win, got %+v", r)
 	}
 }
+
+// With partial credit on, each keyed option picked earns its share and each
+// wrong one takes a share back, rounded down and never below zero. Off, the
+// same answers earn nothing, as before.
+func TestPartialCredit(t *testing.T) {
+	it := &v1.Item{Id: "m", Type: v1.ItemType_ITEM_TYPE_MULTIPLE, Points: 4, PartialCredit: true,
+		Choices: []*v1.Choice{{Id: "w"}, {Id: "x"}, {Id: "y"}, {Id: "z"}}, Correct: []string{"x", "z"}}
+	cases := []struct {
+		picked []string
+		want   int32
+	}{
+		{nil, 0},
+		{[]string{"x"}, 2},
+		{[]string{"z", "x"}, 4},
+		{[]string{"x", "y"}, 0},
+		{[]string{"x", "z", "y"}, 2},
+		{[]string{"w", "y"}, 0},
+		{[]string{"x", "x"}, 2},
+	}
+	for _, c := range cases {
+		if got := Earned(it, &v1.ItemAnswer{Values: c.picked}); got != c.want {
+			t.Errorf("picked %v: earned %d, want %d", c.picked, got, c.want)
+		}
+	}
+	it.Points = 3
+	if got := Earned(it, &v1.ItemAnswer{Values: []string{"x"}}); got != 1 {
+		t.Errorf("half of 3 must round down to 1, got %d", got)
+	}
+	it.PartialCredit = false
+	if got := Earned(it, &v1.ItemAnswer{Values: []string{"x"}}); got != 0 {
+		t.Errorf("without partial credit half right earns nothing, got %d", got)
+	}
+}
+
+// A wrong answer costs the penalty, a blank costs nothing, and the total
+// never goes below zero.
+func TestPenalty(t *testing.T) {
+	e := &v1.Exam{PassPct: 50, Sections: []*v1.Section{{Id: "s", Minutes: 10, Items: []*v1.Item{
+		{Id: "a", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 4, Penalty: 1, Choices: []*v1.Choice{{Id: "x"}, {Id: "y"}}, Correct: []string{"y"}},
+		{Id: "b", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 4, Penalty: 1, Choices: []*v1.Choice{{Id: "x"}, {Id: "y"}}, Correct: []string{"y"}},
+		{Id: "c", Type: v1.ItemType_ITEM_TYPE_SHORT, Points: 2, Penalty: 2, Correct: []string{"bdg"}},
+	}}}}
+	if err := ValidateSections(e); err != nil {
+		t.Fatalf("a valid instrument was refused: %v", err)
+	}
+	cases := []struct {
+		name    string
+		answers map[string]*v1.ItemAnswer
+		raw     int32
+	}{
+		{"blank costs nothing", nil, 0},
+		{"one right, one wrong", map[string]*v1.ItemAnswer{"a": {Values: []string{"y"}}, "b": {Values: []string{"x"}}}, 3},
+		{"wrong short answer", map[string]*v1.ItemAnswer{"a": {Values: []string{"y"}}, "c": {Text: "jakarta"}}, 2},
+		{"blank short answer", map[string]*v1.ItemAnswer{"a": {Values: []string{"y"}}, "c": {Text: "  "}}, 4},
+		{"all wrong stops at zero", map[string]*v1.ItemAnswer{"a": {Values: []string{"x"}}, "b": {Values: []string{"x"}}, "c": {Text: "no"}}, 0},
+	}
+	for _, c := range cases {
+		if s := Score(e, c.answers, nil); s.GetRaw() != c.raw || s.GetMax() != 10 {
+			t.Errorf("%s: got %+v, want raw %d of 10", c.name, s, c.raw)
+		}
+	}
+}
+
+func TestValidateRejectsBadScoringRules(t *testing.T) {
+	bad := []*v1.Item{
+		{Id: "a", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 1, Penalty: 2, Choices: []*v1.Choice{{Id: "x"}}, Correct: []string{"x"}},
+		{Id: "a", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 1, Penalty: -1, Choices: []*v1.Choice{{Id: "x"}}, Correct: []string{"x"}},
+		{Id: "a", Type: v1.ItemType_ITEM_TYPE_ESSAY, Points: 4, Penalty: 1},
+		{Id: "a", Type: v1.ItemType_ITEM_TYPE_SINGLE, Points: 1, PartialCredit: true, Choices: []*v1.Choice{{Id: "x"}}, Correct: []string{"x"}},
+	}
+	for i, it := range bad {
+		e := &v1.Exam{Sections: []*v1.Section{{Id: "s", Minutes: 10, Items: []*v1.Item{it}}}}
+		if err := ValidateSections(e); err == nil {
+			t.Errorf("case %d: must be refused", i)
+		}
+	}
+}

@@ -108,6 +108,11 @@ func itemsData(e *v1.Exam, answers map[string]*v1.ItemAnswer, reviews map[string
 		if p, ok := itemPoints(it, answers[it.GetId()], reviews); ok {
 			d["points"] = p
 		}
+		// Only when a wrong answer cost something, so the items still add up
+		// to the score's points.
+		if pen := domain.Penalty(it, answers[it.GetId()]); pen > 0 {
+			d["penalty"] = pen
+		}
 		out = append(out, d)
 	}
 	return out

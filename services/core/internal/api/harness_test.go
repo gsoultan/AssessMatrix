@@ -286,9 +286,18 @@ func sampleExam(e *v1.Exam) *v1.Exam {
 
 func (h *harness) publishedFixture(staff *client) *fixture {
 	h.t.Helper()
+	return h.publishedFixtureWith(staff, func(*v1.Exam) {})
+}
+
+// publishedFixtureWith is publishedFixture with the sample exam changed by
+// edit before it is saved.
+func (h *harness) publishedFixtureWith(staff *client, edit func(*v1.Exam)) *fixture {
+	h.t.Helper()
 	ctx := context.Background()
 	e := get(staff.exams.CreateExam(ctx, connect.NewRequest(&v1.CreateExamRequest{Kind: v1.Kind_KIND_EXAM}))).Msg.GetExam()
-	e = get(staff.exams.SaveExam(ctx, connect.NewRequest(&v1.SaveExamRequest{Exam: sampleExam(e), Mode: v1.SaveMode_SAVE_MODE_DRAFT}))).Msg.GetExam()
+	e = sampleExam(e)
+	edit(e)
+	e = get(staff.exams.SaveExam(ctx, connect.NewRequest(&v1.SaveExamRequest{Exam: e, Mode: v1.SaveMode_SAVE_MODE_DRAFT}))).Msg.GetExam()
 	e = get(staff.exams.SetExamStatus(ctx, connect.NewRequest(&v1.SetExamStatusRequest{Id: e.GetId(), Status: v1.Status_STATUS_PUBLISHED}))).Msg.GetExam()
 	email := "cand-" + secure.Token()[:8] + "@example.test"
 	p := get(staff.people.AddPerson(ctx, connect.NewRequest(&v1.AddPersonRequest{Person: &v1.PersonDraft{Name: "Budi", Email: email}}))).Msg.GetPerson()

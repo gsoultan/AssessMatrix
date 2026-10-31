@@ -61,6 +61,10 @@ export type Item = {
   choices: Choice[]
   correct: string[]
   points: number
+  /** multiple only: each keyed option picked earns its share, each wrong one takes a share back. */
+  partialCredit?: boolean
+  /** Points taken off the total for a wrong answer. A blank costs nothing. */
+  penalty?: number
   skill: string
   /** Let the participant attach an image to a short/essay answer. */
   allowAnswerImage?: boolean
@@ -911,6 +915,30 @@ export const append = (a: Attempt, kind: string, detail?: string): AttemptEvent[
   { seq: a.events.length + 1, t: Date.now(), kind, detail },
 ]
 
+/** Points a machine-scored item earns, as the core's domain.Earned: the full points for the exact
+ *  answer, or with partial credit a multiple answer's share, rounded down and never below zero. */
+export function earned(it: Item, a: Attempt): number {
+  if (it.type === 'short') {
+    const given = (a.text[it.id] ?? '').trim().toLowerCase()
+    return given && it.correct.some((k) => k.trim().toLowerCase() === given) ? it.points : 0
+  }
+  const given = [...new Set(a.answers[it.id] ?? [])].sort()
+  if (it.type === 'multiple' && it.partialCredit) {
+    if (it.correct.length === 0) return 0
+    const net = given.reduce((n, g) => n + (it.correct.includes(g) ? 1 : -1), 0)
+    return net <= 0 ? 0 : Math.floor((it.points * net) / it.correct.length)
+  }
+  const want = [...it.correct].sort()
+  return given.length > 0 && given.length === want.length && given.every((g, i) => g === want[i]) ? it.points : 0
+}
+
+/** What a wrong answer takes off the total, as the core's domain.Penalty. A blank costs nothing. */
+export function penalty(it: Item, a: Attempt): number {
+  if (!it.penalty || it.type === 'essay' || isScale(it.type)) return 0
+  const answered = (a.answers[it.id] ?? []).length > 0 || (a.text[it.id] ?? '').trim() !== ''
+  return answered && earned(it, a) === 0 ? it.penalty : 0
+}
+
 /** Auto-scoring. Essays are never auto-scored — they are excluded from the machine total. */
 export function score(exam: Exam, a: Attempt) {
   let raw = 0
@@ -924,16 +952,10 @@ export function score(exam: Exam, a: Attempt) {
       continue
     }
     max += it.points
-    if (it.type === 'short') {
-      const given = (a.text[it.id] ?? '').trim().toLowerCase()
-      if (given && it.correct.some((k) => k.trim().toLowerCase() === given)) raw += it.points
-      continue
-    }
-    const given = [...(a.answers[it.id] ?? [])].sort()
-    const want = [...it.correct].sort()
-    if (given.length > 0 && given.length === want.length && given.every((g, i) => g === want[i]))
-      raw += it.points
+    raw += earned(it, a) - penalty(it, a)
   }
+  // Penalties can outweigh what was earned; the total stops at zero.
+  raw = Math.max(raw, 0)
 
   const pct = max === 0 ? 0 : Math.round((raw / max) * 100)
   return { raw, max, pct, passed: pendingHuman === 0 && pct >= exam.passPct, pendingHuman }
