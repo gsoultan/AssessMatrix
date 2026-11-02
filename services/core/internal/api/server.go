@@ -136,6 +136,7 @@ func Policy() map[string]auth.Access {
 		assessmatrixv1connect.ResultServiceScoreAnswerProcedure,
 		assessmatrixv1connect.ResultServiceGetItemAnalysisProcedure,
 		assessmatrixv1connect.ProctorServiceWatchExamProcedure,
+		assessmatrixv1connect.ProctorServiceAddTimeProcedure,
 		assessmatrixv1connect.TenantServiceListMyTenantsProcedure,
 		assessmatrixv1connect.TenantServiceSwitchTenantProcedure,
 	)

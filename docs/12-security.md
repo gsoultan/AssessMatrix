@@ -68,4 +68,8 @@ same day.
 - The content policy allows inline styles (the component library injects them). Moving to
   nonces needs the library's nonce support; until then script is the strict part.
 - `AM_SECRET` rotation re-seals the issuer keys; the procedure is not written yet.
-- A candidate-facing view of their own record (DPIA §5) is not built.
+- Staff can give sittings in progress more time (`ProctorService.AddTime`), up to 240 minutes a
+  call, which moves the deadline the server scores by. It is any staff member's, like the
+  monitor; every use is sealed into each candidate's log with its reason and written to the
+  audit log with the staff member, so misuse is visible but not prevented. Restrict it to
+  administrators if the partner asks.

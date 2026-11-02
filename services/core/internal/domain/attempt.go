@@ -26,12 +26,16 @@ const (
 	// note to the candidate, text the reviewer ("staff:<id>"). The latest for
 	// an item wins, so a second look is a new event, never an edit.
 	KindReviewScored = "review.scored"
+	// Staff gave a sitting in progress more time: values[0] the minutes,
+	// values[1] the new deadline (Unix ms), detail the reason the candidate
+	// is shown, text who gave it ("staff:<id>").
+	KindTimeAdded = "time.added"
 )
 
 // ServerOnly kinds are refused in AppendEvents.
 var ServerOnly = map[string]bool{
 	KindAttemptStarted: true, KindIdentityVerified: true, KindAttemptSubmitted: true, KindAttemptExpired: true,
-	KindReviewScored: true,
+	KindReviewScored: true, KindTimeAdded: true,
 }
 
 // Review is a person's score for one essay.

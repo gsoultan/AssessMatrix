@@ -897,7 +897,8 @@ func (s *candidateService) GetRecord(ctx context.Context, _ *connect.Request[v1.
 			return err
 		}
 		for _, ev := range events {
-			if ev.GetKind() == domain.KindReviewScored {
+			// Who reviewed or gave time is for staff; the candidate sees what and why.
+			if k := ev.GetKind(); k == domain.KindReviewScored || k == domain.KindTimeAdded {
 				ev.Text = ""
 			}
 		}

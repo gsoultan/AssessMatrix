@@ -245,6 +245,13 @@ func checkIsolation(t *testing.T, memberOfA bool) {
 			}
 			denied("WatchExam", err)
 		},
+		"/assessmatrix.v1.ProctorService/AddTime": func() {
+			_, err := b.proctor.AddTime(ctx, connect.NewRequest(&v1.AddTimeRequest{ExamId: fa.exam.GetId(), Minutes: 60, Reason: "x"}))
+			denied("AddTime (A's exam)", err)
+			_, err = b.proctor.AddTime(ctx, connect.NewRequest(&v1.AddTimeRequest{ExamId: fb.exam.GetId(),
+				AssignmentIds: []string{fa.assign.GetId()}, Minutes: 60, Reason: "x"}))
+			denied("AddTime (A's sitting)", err)
+		},
 		"/assessmatrix.v1.AuthService/WhoAmI": func() {
 			r := get(b.auth.WhoAmI(ctx, connect.NewRequest(&v1.WhoAmIRequest{})))
 			if r.Msg.GetStaff().GetTenantName() != "Beta" {

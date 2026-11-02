@@ -819,8 +819,9 @@ export const GetRecordRequestSchema: GenMessage<GetRecordRequest> = /*@__PURE__*
  */
 export type GetRecordResponse = Message<"assessmatrix.v1.GetRecordResponse"> & {
   /**
-   * With every event. Who scored an essay is left out: the score and the
-   * note are the candidate's; the reviewer's identity is not.
+   * With every event. Who scored an essay or gave more time is left out:
+   * the score, the note and the reason are the candidate's; the staff
+   * member's identity is not.
    *
    * @generated from field: assessmatrix.v1.Attempt attempt = 1;
    */

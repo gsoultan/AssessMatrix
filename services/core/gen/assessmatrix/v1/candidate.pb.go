@@ -1742,8 +1742,9 @@ func (*GetRecordRequest) Descriptor() ([]byte, []int) {
 
 type GetRecordResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// With every event. Who scored an essay is left out: the score and the
-	// note are the candidate's; the reviewer's identity is not.
+	// With every event. Who scored an essay or gave more time is left out:
+	// the score, the note and the reason are the candidate's; the staff
+	// member's identity is not.
 	Attempt *Attempt `protobuf:"bytes,1,opt,name=attempt,proto3" json:"attempt,omitempty"`
 	// False if any stored event no longer matches its seal.
 	ChainIntact   bool  `protobuf:"varint,2,opt,name=chain_intact,json=chainIntact,proto3" json:"chain_intact,omitempty"`

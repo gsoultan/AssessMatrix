@@ -48,6 +48,9 @@ func TestWatchExamShowsSittingsLive(t *testing.T) {
 		if s.GetFlags()[0].GetType() != domain.FlagFacesMultiple || s.GetFlags()[0].GetReason() == "" || s.GetLastSeenAt() == 0 {
 			t.Fatalf("the flag arrived without its reason: %+v", s.GetFlags())
 		}
+		if s.GetDeadlineAt() != att.GetDeadlineAt() {
+			t.Fatalf("the monitor shows deadline %d, the attempt has %d", s.GetDeadlineAt(), att.GetDeadlineAt())
+		}
 		return
 	}
 	t.Fatalf("the monitor never showed the started sitting with its flag: %v", st.Err())

@@ -4,8 +4,8 @@
  * flags it raised and the reason for each, in words the candidate could check.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Badge, Select } from '@mantine/core'
-import { IconAlertTriangle, IconShieldCheck, IconShieldX } from '@tabler/icons-react'
+import { Badge, Modal, NumberInput, Select, Textarea } from '@mantine/core'
+import { IconAlertTriangle, IconClockPlus, IconShieldCheck, IconShieldX } from '@tabler/icons-react'
 import type { Sitting } from '@assessmatrix/proto/proctor_pb'
 import { AssignStatus } from '@assessmatrix/proto/assignment_pb'
 import type { Flag, GetAttemptLogResponse } from '@assessmatrix/proto/result_pb'
@@ -79,6 +79,9 @@ export function LiveMonitor() {
     [sittings],
   )
   const inProgress = sorted.filter((s) => s.attemptId && !s.submittedAt).length
+  const timed = sorted.filter((s) => s.attemptId && !s.submittedAt && s.deadlineAt > 0n)
+  // Who the add-time dialog is for: everyone timed in progress, or one sitting.
+  const [adding, setAdding] = useState<'all' | Sitting | null>(null)
   const handedIn = sorted.filter((s) => s.submittedAt).length
   const flagged = sorted.filter((s) => rank(s) >= 2).length
 
@@ -128,6 +131,16 @@ export function LiveMonitor() {
             <p role="status" className="mb-3 text-[12.5px]" style={{ color: 'var(--color-serious)' }}>
               {error}
             </p>
+          )}
+          {timed.length > 0 && (
+            <div className="mb-4">
+              <button
+                onClick={() => setAdding('all')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-hair px-3 py-1.5 text-[12.5px] font-medium text-ink hover:bg-wash"
+              >
+                <IconClockPlus size={15} stroke={1.9} /> Add time for everyone in progress ({timed.length})
+              </button>
+            </div>
           )}
           <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
             <StatTile label="In progress" value={String(inProgress)} />
@@ -179,16 +192,111 @@ export function LiveMonitor() {
               )}
             </Panel>
             {open?.attemptId ? (
-              <AttemptRecord key={open.attemptId} sitting={open} />
+              <AttemptRecord
+                key={open.attemptId}
+                sitting={sorted.find((s) => s.assignmentId === open.assignmentId) ?? open}
+                onAddTime={(s) => setAdding(s)}
+              />
             ) : (
               <Panel title="Attempt record">
                 <p className="text-[12.5px] text-ink-muted">Choose a sitting to see its flags, their reasons and the full record.</p>
               </Panel>
             )}
           </div>
+          <AddTime examId={examId} target={adding} everyone={timed.length} onClose={() => setAdding(null)} />
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * Give time back after an outage or for an agreed accommodation. The server
+ * moves each deadline and writes the reason into the sitting's sealed record,
+ * where the candidate reads it; their runner picks up the new time on its
+ * next save, or when its own clock runs out.
+ */
+function AddTime({ examId, target, everyone, onClose }: { examId: string; target: 'all' | Sitting | null; everyone: number; onClose: () => void }) {
+  const [minutes, setMinutes] = useState<number | string>(10)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState('')
+  useEffect(() => {
+    if (target) {
+      setError('')
+      setDone('')
+    }
+  }, [target])
+  const one = target && target !== 'all' ? target : null
+  const n = Number(minutes)
+  const valid = Number.isInteger(n) && n >= 1 && n <= 240 && reason.trim().length > 0 && reason.length <= 500
+  const submit = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const r = await api.proctor.addTime({ examId, assignmentIds: one ? [one.assignmentId] : [], minutes: n, reason: reason.trim() })
+      setDone(
+        r.added.length === 0
+          ? 'No sitting was given time: none was still in progress with a time limit.'
+          : `${r.added.length} ${r.added.length === 1 ? 'sitting ends' : 'sittings end'} ${n} minutes later.`,
+      )
+      setReason('')
+    } catch (err) {
+      setError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal opened={target !== null} onClose={onClose} centered title={one ? `Add time for ${one.personName}` : `Add time for everyone in progress (${everyone})`} size="md">
+      {done ? (
+        <>
+          <p role="status" className="text-[13px] text-ink-2">
+            {done}
+          </p>
+          <button onClick={onClose} className="mt-4 w-full rounded-lg py-2 text-[13px] font-medium text-ink-2 hover:bg-wash">
+            Close
+          </button>
+        </>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-[12.5px] leading-snug text-ink-2">
+            Each deadline moves by the same minutes. Use it to give back time lost to an outage, or for an agreed
+            accommodation. Sittings already handed in are not reopened.
+          </p>
+          <NumberInput label="Minutes to add" min={1} max={240} value={minutes} onChange={setMinutes} allowDecimal={false} />
+          <Textarea
+            label="Reason"
+            description="The candidate sees this in their record, and it is kept in the audit log."
+            placeholder="Server outage from 10:20 to 10:45"
+            value={reason}
+            onChange={(e) => setReason(e.currentTarget.value)}
+            maxLength={500}
+            autosize
+            minRows={2}
+          />
+          {error && (
+            <p role="alert" className="text-[12.5px]" style={{ color: 'var(--color-critical)' }}>
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button onClick={onClose} className="flex-1 rounded-lg py-2 text-[13px] font-medium text-ink-2 hover:bg-wash">
+              Cancel
+            </button>
+            <button
+              onClick={() => void submit()}
+              disabled={!valid || busy}
+              className="flex-1 rounded-lg py-2 text-[13px] font-semibold text-white disabled:opacity-50"
+              style={{ background: 'var(--color-s1)' }}
+            >
+              {busy ? 'Adding…' : `Add ${Number.isInteger(n) && n > 0 ? n : ''} minutes`}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   )
 }
 
@@ -198,7 +306,8 @@ function describe(s: Sitting, now: number) {
   if (!s.attemptId) return 'Not started'
   const seen = Number(s.lastSeenAt)
   const quiet = seen ? Math.round((now - seen) / 60000) : 0
-  return `Started ${clock(Number(s.startedAt))}${quiet >= 2 ? ` · last heard from ${quiet} min ago (answers keep on the device)` : ''}`
+  const ends = s.deadlineAt ? ` · ends ${clock(Number(s.deadlineAt))}` : ''
+  return `Started ${clock(Number(s.startedAt))}${ends}${quiet >= 2 ? ` · last heard from ${quiet} min ago (answers keep on the device)` : ''}`
 }
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -206,7 +315,7 @@ const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-dig
 const label = (f: Flag) => f.type.replaceAll('_', ' ')
 
 /** One attempt's record: is it intact, what did the rules find and why, and every event in order. */
-function AttemptRecord({ sitting }: { sitting: Sitting }) {
+function AttemptRecord({ sitting, onAddTime }: { sitting: Sitting; onAddTime: (s: Sitting) => void }) {
   const [log, setLog] = useState<GetAttemptLogResponse | null>(null)
   const [error, setError] = useState('')
   // Refetch whenever the live view says this attempt changed.
@@ -241,6 +350,14 @@ function AttemptRecord({ sitting }: { sitting: Sitting }) {
               {log.chainIntact ? <IconShieldCheck size={15} stroke={1.9} /> : <IconShieldX size={15} stroke={1.9} />}
               {log.chainIntact ? 'Record intact: every event matches its seal.' : `Record altered from event ${log.brokenAtSeq}.`}
             </p>
+          )}
+          {!sitting.submittedAt && sitting.deadlineAt > 0n && (
+            <button
+              onClick={() => onAddTime(sitting)}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-hair px-3 py-1.5 text-[12.5px] font-medium text-ink hover:bg-wash"
+            >
+              <IconClockPlus size={15} stroke={1.9} /> Add time · ends {clock(Number(sitting.deadlineAt))}
+            </button>
           )}
           {log.flags.length > 0 ? (
             <ul aria-label="Flags" className="mb-4 flex flex-col gap-2">
@@ -324,6 +441,8 @@ function say(e: AttemptEvent): string {
       return `Answered ${e.itemId}`
     case 'response.typed':
       return `Typed an answer to ${e.itemId}`
+    case 'time.added':
+      return `Given ${v[0]} more minutes, to ${clock(Number(v[1]))}: ${e.detail}`
     default:
       if (e.kind.startsWith('consent.') && e.kind.endsWith('.withdrawn'))
         return `Withdrew consent: ${e.kind.slice('consent.'.length, -'.withdrawn'.length)}`
