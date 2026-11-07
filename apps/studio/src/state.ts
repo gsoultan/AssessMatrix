@@ -195,7 +195,12 @@ export type Invited = { invited: number; created: number; sent: number }
  * - offline: answers have not all reached the server; nothing is lost, try again.
  * - session: the invitation was revoked or opened elsewhere.
  */
-export type Finalized = { ok: true } | { ok: false; missing: string[] } | { ok: false; why: 'offline' | 'session' }
+export type Finalized =
+  | { ok: true }
+  | { ok: false; missing: string[] }
+  | { ok: false; why: 'offline' | 'session' }
+  /** The clock ran out here, but staff added time on the server: the sitting goes on. */
+  | { ok: false; why: 'extended'; minutes: number }
 
 /** Where a candidate's tab sits once their link is redeemed. Carries no secret. */
 export const SESSION_HASH = '#/session'
@@ -743,6 +748,21 @@ export const useApp = create<AppState>((set, get) => {
         const r = await drain(a.id)
         if (!r.ok && r.why !== 'closed') return { ok: false, why: r.why }
         try {
+          // The clock ran out on this device. Staff may have added time (after
+          // an outage, say) since we last heard: hand in only if the server's
+          // deadline has passed too, or the rest of the candidate's time is lost.
+          if (force && r.ok) {
+            const now = await api.candidate.getSession({})
+            const deadlineAt = Number(now.attempt?.deadlineAt) || 0
+            const serverNow = Number(now.serverNow)
+            const cur = get().attempt
+            if (deadlineAt > serverNow && cur?.id === a.id && !now.attempt?.submittedAt) {
+              const seat = get().seat
+              if (seat) set({ seat: { ...seat, skew: serverNow - Date.now() } })
+              set({ attempt: { ...cur, deadlineAt, secondsLeft: Math.ceil((deadlineAt - serverNow) / 1000) } })
+              return { ok: false, why: 'extended', minutes: Math.ceil((deadlineAt - serverNow) / 60_000) }
+            }
+          }
           const s = await api.candidate.submitAttempt({ attemptId: a.id, force })
           if (!s.ok) return { ok: false, missing: s.missingItemIds }
           const done = attemptIn(s.attempt!, Date.now() + (get().seat?.skew ?? 0))

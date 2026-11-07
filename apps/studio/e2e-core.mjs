@@ -384,6 +384,28 @@ try {
     ? ok('the monitor streams the sitting live, in progress')
     : (await page.screenshot({ path: process.env.SHOT ?? '/dev/null' }), bad(`the monitor did not show the sitting in progress: ${await page.locator('body').innerText()}`))
 
+  // An outage in the hall: staff give the time back, with a reason the candidate will read.
+  await sitting.click()
+  const addBtn = page.getByRole('button', { name: /^Add time · ends/ })
+  await addBtn.waitFor({ timeout: 8000 }).catch(() => {})
+  const endsBefore = (await addBtn.innerText().catch(() => '')).replace(/.*ends /, '')
+  await addBtn.click()
+  await page.getByLabel('Minutes to add').fill('15')
+  await page.getByLabel('Reason').fill('Listrik padam di ruang ujian')
+  await page.getByRole('button', { name: 'Add 15 minutes' }).click()
+  await page.getByText('1 sitting ends 15 minutes later.').waitFor({ timeout: 5000 }).then(
+    () => ok('staff add time to a sitting in progress'),
+    async () => bad(`adding time failed: ${await page.getByRole('dialog').innerText().catch(() => '')}`),
+  )
+  await page.getByRole('button', { name: 'Close' }).click()
+  await page.getByText(/Given 15 more minutes, to .*: Listrik padam di ruang ujian/).waitFor({ timeout: 8000 }).then(
+    async () =>
+      (await addBtn.innerText().catch(() => '')).replace(/.*ends /, '') !== endsBefore
+        ? ok('the sealed record and the monitor show the new deadline')
+        : bad('the monitor still shows the old deadline'),
+    () => bad('the added time is not in the attempt record'),
+  )
+
   // The fake camera shows no face: give the face check a stretch long enough to report.
   await cand.getByText(/^Kamera aktif/).waitFor({ timeout: 20000 }).catch(() => {})
   await cand.waitForTimeout(4500)
@@ -413,8 +435,9 @@ try {
   ;(await cand.getByText(/Catatan ini utuh/).count()) &&
   /Persetujuan diberikan: pemeriksaan wajah/.test(own) &&
   /Persetujuan ditarik: pemeriksaan wajah/.test(own) &&
+  /Waktu ditambah 15 menit oleh panitia: Listrik padam di ruang ujian/.test(own) &&
   /Diserahkan/.test(own)
-    ? ok('the candidate reads their whole record, sealed, with the consent they gave and took back')
+    ? ok('the candidate reads their whole record, sealed, with the consent they gave and took back and the time they were given')
     : bad(`the candidate's record is incomplete: ${own.slice(0, 1200)}`)
 
   /* ---------------- the credential, checked by a stranger ---------------- */

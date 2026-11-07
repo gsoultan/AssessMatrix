@@ -610,7 +610,10 @@ export function CandidateApp({ standalone = false }: { standalone?: boolean }) {
           if (first >= 0) setIdx(first)
           setStage('attempt')
         } else if (r.why === 'session') endedView()
-        else {
+        else if (r.why === 'extended') {
+          setConfirming(false)
+          setSubmitNote(`Panitia menambah waktu Anda. Sisa waktu sekitar ${r.minutes} menit; jawaban Anda tetap tersimpan.`)
+        } else {
           setConfirming(false)
           setSubmitNote('Belum terkirim: koneksi terputus. Jawaban Anda aman di perangkat ini. Coba kumpulkan lagi saat tersambung.')
         }

@@ -9,6 +9,12 @@ import "assessmatrix/v1/result.proto";
 // watcher; each message is the whole picture, sent when something changed.
 service ProctorService {
   rpc WatchExam(WatchExamRequest) returns (stream WatchExamResponse);
+  // More time for timed sittings still in progress: after an outage, a power
+  // cut in the hall, or an agreed accommodation. Each deadline moves by the
+  // same minutes, and each attempt's sealed log records the addition with
+  // the reason, which the candidate sees in their record. Handed-in, untimed
+  // and purged sittings are left as they are.
+  rpc AddTime(AddTimeRequest) returns (AddTimeResponse);
 }
 
 message WatchExamRequest {
@@ -35,4 +41,29 @@ message Sitting {
   int64 last_seen_at = 9;
   int32 score_pct = 10;
   repeated Flag flags = 11;
+  // When a timed sitting in progress ends, by the server's clock; 0 when
+  // untimed or not started.
+  int64 deadline_at = 12;
+}
+
+message AddTimeRequest {
+  string exam_id = 1;
+  // The sittings to extend, all of this exam. Empty: every timed sitting of
+  // the exam still in progress.
+  repeated string assignment_ids = 2;
+  // 1 to 240.
+  int32 minutes = 3;
+  // Why, in words for the candidate: it is shown in their record. Required,
+  // up to 500 characters.
+  string reason = 4;
+}
+
+message AddTimeResponse {
+  // The sittings that were given the time, with their new deadlines.
+  repeated TimeAdded added = 1;
+}
+
+message TimeAdded {
+  string assignment_id = 1;
+  int64 deadline_at = 2;
 }

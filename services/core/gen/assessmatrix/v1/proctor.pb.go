@@ -130,9 +130,12 @@ type Sitting struct {
 	StartedAt   int64  `protobuf:"varint,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
 	SubmittedAt int64  `protobuf:"varint,8,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
 	// When the server last heard from their device.
-	LastSeenAt    int64   `protobuf:"varint,9,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
-	ScorePct      int32   `protobuf:"varint,10,opt,name=score_pct,json=scorePct,proto3" json:"score_pct,omitempty"`
-	Flags         []*Flag `protobuf:"bytes,11,rep,name=flags,proto3" json:"flags,omitempty"`
+	LastSeenAt int64   `protobuf:"varint,9,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
+	ScorePct   int32   `protobuf:"varint,10,opt,name=score_pct,json=scorePct,proto3" json:"score_pct,omitempty"`
+	Flags      []*Flag `protobuf:"bytes,11,rep,name=flags,proto3" json:"flags,omitempty"`
+	// When a timed sitting in progress ends, by the server's clock; 0 when
+	// untimed or not started.
+	DeadlineAt    int64 `protobuf:"varint,12,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -244,6 +247,183 @@ func (x *Sitting) GetFlags() []*Flag {
 	return nil
 }
 
+func (x *Sitting) GetDeadlineAt() int64 {
+	if x != nil {
+		return x.DeadlineAt
+	}
+	return 0
+}
+
+type AddTimeRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ExamId string                 `protobuf:"bytes,1,opt,name=exam_id,json=examId,proto3" json:"exam_id,omitempty"`
+	// The sittings to extend, all of this exam. Empty: every timed sitting of
+	// the exam still in progress.
+	AssignmentIds []string `protobuf:"bytes,2,rep,name=assignment_ids,json=assignmentIds,proto3" json:"assignment_ids,omitempty"`
+	// 1 to 240.
+	Minutes int32 `protobuf:"varint,3,opt,name=minutes,proto3" json:"minutes,omitempty"`
+	// Why, in words for the candidate: it is shown in their record. Required,
+	// up to 500 characters.
+	Reason        string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddTimeRequest) Reset() {
+	*x = AddTimeRequest{}
+	mi := &file_assessmatrix_v1_proctor_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTimeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTimeRequest) ProtoMessage() {}
+
+func (x *AddTimeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_proctor_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTimeRequest.ProtoReflect.Descriptor instead.
+func (*AddTimeRequest) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_proctor_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AddTimeRequest) GetExamId() string {
+	if x != nil {
+		return x.ExamId
+	}
+	return ""
+}
+
+func (x *AddTimeRequest) GetAssignmentIds() []string {
+	if x != nil {
+		return x.AssignmentIds
+	}
+	return nil
+}
+
+func (x *AddTimeRequest) GetMinutes() int32 {
+	if x != nil {
+		return x.Minutes
+	}
+	return 0
+}
+
+func (x *AddTimeRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AddTimeResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The sittings that were given the time, with their new deadlines.
+	Added         []*TimeAdded `protobuf:"bytes,1,rep,name=added,proto3" json:"added,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddTimeResponse) Reset() {
+	*x = AddTimeResponse{}
+	mi := &file_assessmatrix_v1_proctor_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTimeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTimeResponse) ProtoMessage() {}
+
+func (x *AddTimeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_proctor_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTimeResponse.ProtoReflect.Descriptor instead.
+func (*AddTimeResponse) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_proctor_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AddTimeResponse) GetAdded() []*TimeAdded {
+	if x != nil {
+		return x.Added
+	}
+	return nil
+}
+
+type TimeAdded struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssignmentId  string                 `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
+	DeadlineAt    int64                  `protobuf:"varint,2,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimeAdded) Reset() {
+	*x = TimeAdded{}
+	mi := &file_assessmatrix_v1_proctor_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimeAdded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimeAdded) ProtoMessage() {}
+
+func (x *TimeAdded) ProtoReflect() protoreflect.Message {
+	mi := &file_assessmatrix_v1_proctor_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimeAdded.ProtoReflect.Descriptor instead.
+func (*TimeAdded) Descriptor() ([]byte, []int) {
+	return file_assessmatrix_v1_proctor_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *TimeAdded) GetAssignmentId() string {
+	if x != nil {
+		return x.AssignmentId
+	}
+	return ""
+}
+
+func (x *TimeAdded) GetDeadlineAt() int64 {
+	if x != nil {
+		return x.DeadlineAt
+	}
+	return 0
+}
+
 var File_assessmatrix_v1_proctor_proto protoreflect.FileDescriptor
 
 const file_assessmatrix_v1_proctor_proto_rawDesc = "" +
@@ -254,7 +434,7 @@ const file_assessmatrix_v1_proctor_proto_rawDesc = "" +
 	"\x11WatchExamResponse\x12\x1d\n" +
 	"\n" +
 	"server_now\x18\x01 \x01(\x03R\tserverNow\x124\n" +
-	"\bsittings\x18\x02 \x03(\v2\x18.assessmatrix.v1.SittingR\bsittings\"\x85\x03\n" +
+	"\bsittings\x18\x02 \x03(\v2\x18.assessmatrix.v1.SittingR\bsittings\"\xa6\x03\n" +
 	"\aSitting\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1f\n" +
 	"\vperson_name\x18\x02 \x01(\tR\n" +
@@ -271,9 +451,23 @@ const file_assessmatrix_v1_proctor_proto_rawDesc = "" +
 	"lastSeenAt\x12\x1b\n" +
 	"\tscore_pct\x18\n" +
 	" \x01(\x05R\bscorePct\x12+\n" +
-	"\x05flags\x18\v \x03(\v2\x15.assessmatrix.v1.FlagR\x05flags2f\n" +
+	"\x05flags\x18\v \x03(\v2\x15.assessmatrix.v1.FlagR\x05flags\x12\x1f\n" +
+	"\vdeadline_at\x18\f \x01(\x03R\n" +
+	"deadlineAt\"\x82\x01\n" +
+	"\x0eAddTimeRequest\x12\x17\n" +
+	"\aexam_id\x18\x01 \x01(\tR\x06examId\x12%\n" +
+	"\x0eassignment_ids\x18\x02 \x03(\tR\rassignmentIds\x12\x18\n" +
+	"\aminutes\x18\x03 \x01(\x05R\aminutes\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\"C\n" +
+	"\x0fAddTimeResponse\x120\n" +
+	"\x05added\x18\x01 \x03(\v2\x1a.assessmatrix.v1.TimeAddedR\x05added\"Q\n" +
+	"\tTimeAdded\x12#\n" +
+	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1f\n" +
+	"\vdeadline_at\x18\x02 \x01(\x03R\n" +
+	"deadlineAt2\xb4\x01\n" +
 	"\x0eProctorService\x12T\n" +
-	"\tWatchExam\x12!.assessmatrix.v1.WatchExamRequest\x1a\".assessmatrix.v1.WatchExamResponse0\x01B\xd3\x01\n" +
+	"\tWatchExam\x12!.assessmatrix.v1.WatchExamRequest\x1a\".assessmatrix.v1.WatchExamResponse0\x01\x12L\n" +
+	"\aAddTime\x12\x1f.assessmatrix.v1.AddTimeRequest\x1a .assessmatrix.v1.AddTimeResponseB\xd3\x01\n" +
 	"\x13com.assessmatrix.v1B\fProctorProtoP\x01ZQgithub.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1;assessmatrixv1\xa2\x02\x03AXX\xaa\x02\x0fAssessmatrix.V1\xca\x02\x0fAssessmatrix\\V1\xe2\x02\x1bAssessmatrix\\V1\\GPBMetadata\xea\x02\x10Assessmatrix::V1b\x06proto3"
 
 var (
@@ -288,25 +482,31 @@ func file_assessmatrix_v1_proctor_proto_rawDescGZIP() []byte {
 	return file_assessmatrix_v1_proctor_proto_rawDescData
 }
 
-var file_assessmatrix_v1_proctor_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_assessmatrix_v1_proctor_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_assessmatrix_v1_proctor_proto_goTypes = []any{
 	(*WatchExamRequest)(nil),  // 0: assessmatrix.v1.WatchExamRequest
 	(*WatchExamResponse)(nil), // 1: assessmatrix.v1.WatchExamResponse
 	(*Sitting)(nil),           // 2: assessmatrix.v1.Sitting
-	(AssignStatus)(0),         // 3: assessmatrix.v1.AssignStatus
-	(*Flag)(nil),              // 4: assessmatrix.v1.Flag
+	(*AddTimeRequest)(nil),    // 3: assessmatrix.v1.AddTimeRequest
+	(*AddTimeResponse)(nil),   // 4: assessmatrix.v1.AddTimeResponse
+	(*TimeAdded)(nil),         // 5: assessmatrix.v1.TimeAdded
+	(AssignStatus)(0),         // 6: assessmatrix.v1.AssignStatus
+	(*Flag)(nil),              // 7: assessmatrix.v1.Flag
 }
 var file_assessmatrix_v1_proctor_proto_depIdxs = []int32{
 	2, // 0: assessmatrix.v1.WatchExamResponse.sittings:type_name -> assessmatrix.v1.Sitting
-	3, // 1: assessmatrix.v1.Sitting.status:type_name -> assessmatrix.v1.AssignStatus
-	4, // 2: assessmatrix.v1.Sitting.flags:type_name -> assessmatrix.v1.Flag
-	0, // 3: assessmatrix.v1.ProctorService.WatchExam:input_type -> assessmatrix.v1.WatchExamRequest
-	1, // 4: assessmatrix.v1.ProctorService.WatchExam:output_type -> assessmatrix.v1.WatchExamResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 1: assessmatrix.v1.Sitting.status:type_name -> assessmatrix.v1.AssignStatus
+	7, // 2: assessmatrix.v1.Sitting.flags:type_name -> assessmatrix.v1.Flag
+	5, // 3: assessmatrix.v1.AddTimeResponse.added:type_name -> assessmatrix.v1.TimeAdded
+	0, // 4: assessmatrix.v1.ProctorService.WatchExam:input_type -> assessmatrix.v1.WatchExamRequest
+	3, // 5: assessmatrix.v1.ProctorService.AddTime:input_type -> assessmatrix.v1.AddTimeRequest
+	1, // 6: assessmatrix.v1.ProctorService.WatchExam:output_type -> assessmatrix.v1.WatchExamResponse
+	4, // 7: assessmatrix.v1.ProctorService.AddTime:output_type -> assessmatrix.v1.AddTimeResponse
+	6, // [6:8] is the sub-list for method output_type
+	4, // [4:6] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_assessmatrix_v1_proctor_proto_init() }
@@ -322,7 +522,7 @@ func file_assessmatrix_v1_proctor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_assessmatrix_v1_proctor_proto_rawDesc), len(file_assessmatrix_v1_proctor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

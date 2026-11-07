@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file assessmatrix/v1/proctor.proto.
  */
 export const file_assessmatrix_v1_proctor: GenFile = /*@__PURE__*/
-  fileDesc("Ch1hc3Nlc3NtYXRyaXgvdjEvcHJvY3Rvci5wcm90bxIPYXNzZXNzbWF0cml4LnYxIiMKEFdhdGNoRXhhbVJlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCSJTChFXYXRjaEV4YW1SZXNwb25zZRISCgpzZXJ2ZXJfbm93GAEgASgDEioKCHNpdHRpbmdzGAIgAygLMhguYXNzZXNzbWF0cml4LnYxLlNpdHRpbmcikgIKB1NpdHRpbmcSFQoNYXNzaWdubWVudF9pZBgBIAEoCRITCgtwZXJzb25fbmFtZRgCIAEoCRItCgZzdGF0dXMYAyABKA4yHS5hc3Nlc3NtYXRyaXgudjEuQXNzaWduU3RhdHVzEhIKCmF0dGVtcHRfaWQYBCABKAkSEAoIYW5zd2VyZWQYBSABKAUSDQoFdG90YWwYBiABKAUSEgoKc3RhcnRlZF9hdBgHIAEoAxIUCgxzdWJtaXR0ZWRfYXQYCCABKAMSFAoMbGFzdF9zZWVuX2F0GAkgASgDEhEKCXNjb3JlX3BjdBgKIAEoBRIkCgVmbGFncxgLIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnMmYKDlByb2N0b3JTZXJ2aWNlElQKCVdhdGNoRXhhbRIhLmFzc2Vzc21hdHJpeC52MS5XYXRjaEV4YW1SZXF1ZXN0GiIuYXNzZXNzbWF0cml4LnYxLldhdGNoRXhhbVJlc3BvbnNlMAFC0wEKE2NvbS5hc3Nlc3NtYXRyaXgudjFCDFByb2N0b3JQcm90b1ABWlFnaXRodWIuY29tL2dzb3VsdGFuL2Fzc2Vzc21hdHJpeC9zZXJ2aWNlcy9jb3JlL2dlbi9hc3Nlc3NtYXRyaXgvdjE7YXNzZXNzbWF0cml4djGiAgNBWFiqAg9Bc3Nlc3NtYXRyaXguVjHKAg9Bc3Nlc3NtYXRyaXhcVjHiAhtBc3Nlc3NtYXRyaXhcVjFcR1BCTWV0YWRhdGHqAhBBc3Nlc3NtYXRyaXg6OlYxYgZwcm90bzM", [file_assessmatrix_v1_assignment, file_assessmatrix_v1_result]);
+  fileDesc("Ch1hc3Nlc3NtYXRyaXgvdjEvcHJvY3Rvci5wcm90bxIPYXNzZXNzbWF0cml4LnYxIiMKEFdhdGNoRXhhbVJlcXVlc3QSDwoHZXhhbV9pZBgBIAEoCSJTChFXYXRjaEV4YW1SZXNwb25zZRISCgpzZXJ2ZXJfbm93GAEgASgDEioKCHNpdHRpbmdzGAIgAygLMhguYXNzZXNzbWF0cml4LnYxLlNpdHRpbmcipwIKB1NpdHRpbmcSFQoNYXNzaWdubWVudF9pZBgBIAEoCRITCgtwZXJzb25fbmFtZRgCIAEoCRItCgZzdGF0dXMYAyABKA4yHS5hc3Nlc3NtYXRyaXgudjEuQXNzaWduU3RhdHVzEhIKCmF0dGVtcHRfaWQYBCABKAkSEAoIYW5zd2VyZWQYBSABKAUSDQoFdG90YWwYBiABKAUSEgoKc3RhcnRlZF9hdBgHIAEoAxIUCgxzdWJtaXR0ZWRfYXQYCCABKAMSFAoMbGFzdF9zZWVuX2F0GAkgASgDEhEKCXNjb3JlX3BjdBgKIAEoBRIkCgVmbGFncxgLIAMoCzIVLmFzc2Vzc21hdHJpeC52MS5GbGFnEhMKC2RlYWRsaW5lX2F0GAwgASgDIloKDkFkZFRpbWVSZXF1ZXN0Eg8KB2V4YW1faWQYASABKAkSFgoOYXNzaWdubWVudF9pZHMYAiADKAkSDwoHbWludXRlcxgDIAEoBRIOCgZyZWFzb24YBCABKAkiPAoPQWRkVGltZVJlc3BvbnNlEikKBWFkZGVkGAEgAygLMhouYXNzZXNzbWF0cml4LnYxLlRpbWVBZGRlZCI3CglUaW1lQWRkZWQSFQoNYXNzaWdubWVudF9pZBgBIAEoCRITCgtkZWFkbGluZV9hdBgCIAEoAzK0AQoOUHJvY3RvclNlcnZpY2USVAoJV2F0Y2hFeGFtEiEuYXNzZXNzbWF0cml4LnYxLldhdGNoRXhhbVJlcXVlc3QaIi5hc3Nlc3NtYXRyaXgudjEuV2F0Y2hFeGFtUmVzcG9uc2UwARJMCgdBZGRUaW1lEh8uYXNzZXNzbWF0cml4LnYxLkFkZFRpbWVSZXF1ZXN0GiAuYXNzZXNzbWF0cml4LnYxLkFkZFRpbWVSZXNwb25zZULTAQoTY29tLmFzc2Vzc21hdHJpeC52MUIMUHJvY3RvclByb3RvUAFaUWdpdGh1Yi5jb20vZ3NvdWx0YW4vYXNzZXNzbWF0cml4L3NlcnZpY2VzL2NvcmUvZ2VuL2Fzc2Vzc21hdHJpeC92MTthc3Nlc3NtYXRyaXh2MaICA0FYWKoCD0Fzc2Vzc21hdHJpeC5WMcoCD0Fzc2Vzc21hdHJpeFxWMeICG0Fzc2Vzc21hdHJpeFxWMVxHUEJNZXRhZGF0YeoCEEFzc2Vzc21hdHJpeDo6VjFiBnByb3RvMw", [file_assessmatrix_v1_assignment, file_assessmatrix_v1_result]);
 
 /**
  * @generated from message assessmatrix.v1.WatchExamRequest
@@ -119,6 +119,14 @@ export type Sitting = Message<"assessmatrix.v1.Sitting"> & {
    * @generated from field: repeated assessmatrix.v1.Flag flags = 11;
    */
   flags: Flag[];
+
+  /**
+   * When a timed sitting in progress ends, by the server's clock; 0 when
+   * untimed or not started.
+   *
+   * @generated from field: int64 deadline_at = 12;
+   */
+  deadlineAt: bigint;
 };
 
 /**
@@ -127,6 +135,87 @@ export type Sitting = Message<"assessmatrix.v1.Sitting"> & {
  */
 export const SittingSchema: GenMessage<Sitting> = /*@__PURE__*/
   messageDesc(file_assessmatrix_v1_proctor, 2);
+
+/**
+ * @generated from message assessmatrix.v1.AddTimeRequest
+ */
+export type AddTimeRequest = Message<"assessmatrix.v1.AddTimeRequest"> & {
+  /**
+   * @generated from field: string exam_id = 1;
+   */
+  examId: string;
+
+  /**
+   * The sittings to extend, all of this exam. Empty: every timed sitting of
+   * the exam still in progress.
+   *
+   * @generated from field: repeated string assignment_ids = 2;
+   */
+  assignmentIds: string[];
+
+  /**
+   * 1 to 240.
+   *
+   * @generated from field: int32 minutes = 3;
+   */
+  minutes: number;
+
+  /**
+   * Why, in words for the candidate: it is shown in their record. Required,
+   * up to 500 characters.
+   *
+   * @generated from field: string reason = 4;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message assessmatrix.v1.AddTimeRequest.
+ * Use `create(AddTimeRequestSchema)` to create a new message.
+ */
+export const AddTimeRequestSchema: GenMessage<AddTimeRequest> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_proctor, 3);
+
+/**
+ * @generated from message assessmatrix.v1.AddTimeResponse
+ */
+export type AddTimeResponse = Message<"assessmatrix.v1.AddTimeResponse"> & {
+  /**
+   * The sittings that were given the time, with their new deadlines.
+   *
+   * @generated from field: repeated assessmatrix.v1.TimeAdded added = 1;
+   */
+  added: TimeAdded[];
+};
+
+/**
+ * Describes the message assessmatrix.v1.AddTimeResponse.
+ * Use `create(AddTimeResponseSchema)` to create a new message.
+ */
+export const AddTimeResponseSchema: GenMessage<AddTimeResponse> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_proctor, 4);
+
+/**
+ * @generated from message assessmatrix.v1.TimeAdded
+ */
+export type TimeAdded = Message<"assessmatrix.v1.TimeAdded"> & {
+  /**
+   * @generated from field: string assignment_id = 1;
+   */
+  assignmentId: string;
+
+  /**
+   * @generated from field: int64 deadline_at = 2;
+   */
+  deadlineAt: bigint;
+};
+
+/**
+ * Describes the message assessmatrix.v1.TimeAdded.
+ * Use `create(TimeAddedSchema)` to create a new message.
+ */
+export const TimeAddedSchema: GenMessage<TimeAdded> = /*@__PURE__*/
+  messageDesc(file_assessmatrix_v1_proctor, 5);
 
 /**
  * Live monitoring of an exam's sittings, for staff. One server stream per
@@ -142,6 +231,20 @@ export const ProctorService: GenService<{
     methodKind: "server_streaming";
     input: typeof WatchExamRequestSchema;
     output: typeof WatchExamResponseSchema;
+  },
+  /**
+   * More time for timed sittings still in progress: after an outage, a power
+   * cut in the hall, or an agreed accommodation. Each deadline moves by the
+   * same minutes, and each attempt's sealed log records the addition with
+   * the reason, which the candidate sees in their record. Handed-in, untimed
+   * and purged sittings are left as they are.
+   *
+   * @generated from rpc assessmatrix.v1.ProctorService.AddTime
+   */
+  addTime: {
+    methodKind: "unary";
+    input: typeof AddTimeRequestSchema;
+    output: typeof AddTimeResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_assessmatrix_v1_proctor, 0);

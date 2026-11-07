@@ -82,6 +82,8 @@ function say(e: AttemptEvent, numberOf: (id: string) => number): string {
       return 'Diserahkan'
     case 'attempt.expired':
       return 'Waktu habis; diserahkan otomatis'
+    case 'time.added':
+      return `Waktu ditambah ${v[0] ?? '?'} menit oleh panitia: ${e.detail}`
     case 'review.scored':
       return `Dinilai penilai: ${q()}, ${v[0] ?? '?'} poin`
   }

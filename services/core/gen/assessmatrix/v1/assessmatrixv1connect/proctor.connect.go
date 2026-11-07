@@ -36,11 +36,19 @@ const (
 	// ProctorServiceWatchExamProcedure is the fully-qualified name of the ProctorService's WatchExam
 	// RPC.
 	ProctorServiceWatchExamProcedure = "/assessmatrix.v1.ProctorService/WatchExam"
+	// ProctorServiceAddTimeProcedure is the fully-qualified name of the ProctorService's AddTime RPC.
+	ProctorServiceAddTimeProcedure = "/assessmatrix.v1.ProctorService/AddTime"
 )
 
 // ProctorServiceClient is a client for the assessmatrix.v1.ProctorService service.
 type ProctorServiceClient interface {
 	WatchExam(context.Context, *connect.Request[v1.WatchExamRequest]) (*connect.ServerStreamForClient[v1.WatchExamResponse], error)
+	// More time for timed sittings still in progress: after an outage, a power
+	// cut in the hall, or an agreed accommodation. Each deadline moves by the
+	// same minutes, and each attempt's sealed log records the addition with
+	// the reason, which the candidate sees in their record. Handed-in, untimed
+	// and purged sittings are left as they are.
+	AddTime(context.Context, *connect.Request[v1.AddTimeRequest]) (*connect.Response[v1.AddTimeResponse], error)
 }
 
 // NewProctorServiceClient constructs a client for the assessmatrix.v1.ProctorService service. By
@@ -60,12 +68,19 @@ func NewProctorServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(proctorServiceMethods.ByName("WatchExam")),
 			connect.WithClientOptions(opts...),
 		),
+		addTime: connect.NewClient[v1.AddTimeRequest, v1.AddTimeResponse](
+			httpClient,
+			baseURL+ProctorServiceAddTimeProcedure,
+			connect.WithSchema(proctorServiceMethods.ByName("AddTime")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // proctorServiceClient implements ProctorServiceClient.
 type proctorServiceClient struct {
 	watchExam *connect.Client[v1.WatchExamRequest, v1.WatchExamResponse]
+	addTime   *connect.Client[v1.AddTimeRequest, v1.AddTimeResponse]
 }
 
 // WatchExam calls assessmatrix.v1.ProctorService.WatchExam.
@@ -73,9 +88,20 @@ func (c *proctorServiceClient) WatchExam(ctx context.Context, req *connect.Reque
 	return c.watchExam.CallServerStream(ctx, req)
 }
 
+// AddTime calls assessmatrix.v1.ProctorService.AddTime.
+func (c *proctorServiceClient) AddTime(ctx context.Context, req *connect.Request[v1.AddTimeRequest]) (*connect.Response[v1.AddTimeResponse], error) {
+	return c.addTime.CallUnary(ctx, req)
+}
+
 // ProctorServiceHandler is an implementation of the assessmatrix.v1.ProctorService service.
 type ProctorServiceHandler interface {
 	WatchExam(context.Context, *connect.Request[v1.WatchExamRequest], *connect.ServerStream[v1.WatchExamResponse]) error
+	// More time for timed sittings still in progress: after an outage, a power
+	// cut in the hall, or an agreed accommodation. Each deadline moves by the
+	// same minutes, and each attempt's sealed log records the addition with
+	// the reason, which the candidate sees in their record. Handed-in, untimed
+	// and purged sittings are left as they are.
+	AddTime(context.Context, *connect.Request[v1.AddTimeRequest]) (*connect.Response[v1.AddTimeResponse], error)
 }
 
 // NewProctorServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -91,10 +117,18 @@ func NewProctorServiceHandler(svc ProctorServiceHandler, opts ...connect.Handler
 		connect.WithSchema(proctorServiceMethods.ByName("WatchExam")),
 		connect.WithHandlerOptions(opts...),
 	)
+	proctorServiceAddTimeHandler := connect.NewUnaryHandler(
+		ProctorServiceAddTimeProcedure,
+		svc.AddTime,
+		connect.WithSchema(proctorServiceMethods.ByName("AddTime")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/assessmatrix.v1.ProctorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProctorServiceWatchExamProcedure:
 			proctorServiceWatchExamHandler.ServeHTTP(w, r)
+		case ProctorServiceAddTimeProcedure:
+			proctorServiceAddTimeHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -106,4 +140,8 @@ type UnimplementedProctorServiceHandler struct{}
 
 func (UnimplementedProctorServiceHandler) WatchExam(context.Context, *connect.Request[v1.WatchExamRequest], *connect.ServerStream[v1.WatchExamResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.ProctorService.WatchExam is not implemented"))
+}
+
+func (UnimplementedProctorServiceHandler) AddTime(context.Context, *connect.Request[v1.AddTimeRequest]) (*connect.Response[v1.AddTimeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("assessmatrix.v1.ProctorService.AddTime is not implemented"))
 }

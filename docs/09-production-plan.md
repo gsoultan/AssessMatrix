@@ -187,16 +187,22 @@ Where the tracks stand:
 
 - [x] Tenant-isolation test covers every RPC and is green.
 - [ ] Kill-the-browser and network-partition tests pass against production-like infrastructure.
+      (They pass in CI, `make e2e-core`, against Postgres on the CI runner; not yet against
+      staging, which does not exist.)
 - [x] Invite tests from `08` §4 pass, and the kill-the-browser test runs with the real session cookie.
-- [ ] Tampered-attempt replay is detected.
-- [ ] axe clean; keyboard path through every item type.
+- [x] Tampered-attempt replay is detected (`TestTamperedAttemptIsDetected` in `flow_test.go`,
+      every PR).
+- [x] axe clean; keyboard path through every item type (`a11y.mjs` in `make e2e`, every PR).
 - [ ] Backup restore drill done on the production database size.
 - [ ] Load test at the cohort size plus headroom.
 - [ ] Pentest findings closed or accepted in writing.
 - [ ] DPIA, consent text, retention rules and DPO contact published.
 - [ ] Incident runbook: who is paged, how an in-progress exam is paused and resumed, how a
-      candidate's attempt is recovered from the log.
-- [ ] Mock and fixture screens absent from the production build.
+      candidate's attempt is recovered from the log. (Written: `13-operations.md` §8, with
+      *Add time* in the proctor monitor to give back time lost to an outage or a pause. Left:
+      the names of who is paged, per window.)
+- [x] Mock and fixture screens absent from the production build (`make e2e-core` checks the
+      core build hides them).
 
 ## 5. Decisions this plan picks by default
 

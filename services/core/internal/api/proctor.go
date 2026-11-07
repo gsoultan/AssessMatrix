@@ -4,13 +4,17 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/gsoultan/assessmatrix/services/core/gen/assessmatrix/v1"
+	"github.com/gsoultan/assessmatrix/services/core/internal/auth"
 	"github.com/gsoultan/assessmatrix/services/core/internal/db"
 	"github.com/gsoultan/assessmatrix/services/core/internal/domain"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/assignment"
@@ -215,6 +219,9 @@ func sittingRows(ctx context.Context, tx *db.Tx, examID string) ([]sittingRow, e
 		if t, ok := byAssignment[a.ID]; ok {
 			r.sit.AttemptId = idText(t.ID)
 			r.attemptV, r.lastSeq, r.started, r.submitted = &t.ExamVersion, t.LastSeq, &t.StartedAt, optTime(t.SubmittedAt)
+			if d, ok := t.DeadlineAt.Get(); ok && !t.SubmittedAt.Valid {
+				r.sit.DeadlineAt = d.UnixMilli()
+			}
 		}
 		all = append(all, r)
 	}
@@ -232,4 +239,92 @@ func sittingRows(ctx context.Context, tx *db.Tx, examID string) ([]sittingRow, e
 		return cmp.Or(cmp.Compare(x.name, y.name), cmp.Compare(x.email, y.email))
 	})
 	return all[:min(len(all), MaxSittings)], nil
+}
+
+// Bounds on AddTime.
+const MaxAddMinutes = 240
+
+func (s *proctorService) AddTime(ctx context.Context, req *connect.Request[v1.AddTimeRequest]) (*connect.Response[v1.AddTimeResponse], error) {
+	m := req.Msg
+	examID := m.GetExamId()
+	if !validUUID(examID) {
+		return nil, notFound("instrument")
+	}
+	if n := m.GetMinutes(); n < 1 || n > MaxAddMinutes {
+		return nil, invalidArg(fmt.Errorf("minutes must be from 1 to %d", MaxAddMinutes))
+	}
+	reason := strings.TrimSpace(m.GetReason())
+	if reason == "" || len(reason) > MaxDetailLen {
+		return nil, invalidArg(fmt.Errorf("a reason is required, up to %d characters: the candidate sees it", MaxDetailLen))
+	}
+	if len(m.GetAssignmentIds()) > MaxSittings {
+		return nil, invalidArg(fmt.Errorf("at most %d sittings at once", MaxSittings))
+	}
+	named := make([][16]byte, 0, len(m.GetAssignmentIds()))
+	for _, id := range m.GetAssignmentIds() {
+		if !validUUID(id) {
+			return nil, notFound("assignment")
+		}
+		if k := key(id); !slices.Contains(named, k) {
+			named = append(named, k)
+		}
+	}
+	by := "staff:" + auth.From(ctx).StaffID
+	add := time.Duration(m.GetMinutes()) * time.Minute
+	out := &v1.AddTimeResponse{}
+	err := s.tx(ctx, func(tx *db.Tx) error {
+		if _, err := getExam(ctx, tx, examID, false); err != nil {
+			return err
+		}
+		q := attempt.New().Where(attempt.ExamID.Eq(key(examID)), attempt.SubmittedAt.IsNull(),
+			attempt.DeadlineAt.IsNotNull(), attempt.PurgedAt.IsNull())
+		if len(named) > 0 {
+			// Every sitting named must be one of this exam's, so a wrong id is
+			// an error rather than a silent no-op.
+			found, err := assignment.New().Where(assignment.ID.In(named...), assignment.ExamID.Eq(key(examID))).
+				Limit(int64(len(named))).All(ctx, tx, nil)
+			if err != nil {
+				return err
+			}
+			if len(found) != len(named) {
+				return notFound("assignment")
+			}
+			q = q.Where(attempt.AssignmentID.In(named...))
+		}
+		// Locked in id order, so two of these at once queue rather than deadlock.
+		rows, err := q.Order(attempt.ID.Asc()).ForUpdate().Limit(MaxSittings).All(ctx, tx, nil)
+		if err != nil {
+			return err
+		}
+		now := s.now()
+		ids := make([]string, 0, len(rows))
+		for _, r := range rows {
+			att := attemptOf(r)
+			d := att.DeadlineAt.Add(add)
+			// In the sealed log first, so the candidate's record says when,
+			// how much and why; the row's deadline is what the clock reads.
+			if err := s.appendEvents(ctx, tx, att, []*v1.AttemptEvent{{
+				Kind: domain.KindTimeAdded, ClientTime: now.UnixMilli(), Text: by, Detail: reason,
+				Values: []string{strconv.Itoa(int(m.GetMinutes())), strconv.FormatInt(d.UnixMilli(), 10)},
+			}}); err != nil {
+				return err
+			}
+			mu := attempt.MutateKey(r.ID)
+			mu.SetDeadlineAt(d)
+			if err := mu.Update(ctx, tx); err != nil {
+				return err
+			}
+			out.Added = append(out.Added, &v1.TimeAdded{AssignmentId: att.AssignmentID, DeadlineAt: d.UnixMilli()})
+			ids = append(ids, att.AssignmentID)
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		return audit(ctx, tx, "attempt.time_added", examID, map[string]any{
+			"minutes": m.GetMinutes(), "reason": reason, "assignments": ids})
+	})
+	if err != nil {
+		return nil, s.internal(ctx, "AddTime", err)
+	}
+	return connect.NewResponse(out), nil
 }

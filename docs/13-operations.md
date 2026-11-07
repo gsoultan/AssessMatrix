@@ -137,3 +137,66 @@ fails the run.
 Before the pilot, run it against staging at the partner's cohort size with 2× headroom
 (the core must run with `AM_DEV=1 AM_MAILER=mailbox AM_TRUST_PROXY=1` for the run; reset
 those afterwards).
+
+## 8. Incident runbook (live exam)
+
+Have this open, with the proctor monitor, for every live exam window (docs/11 §3).
+
+**Who is paged.** `deploy/prometheus/alerts.yml` pages on `CoreDown`, `AnswersNotSaving` and
+`ServerErrors`; everything else opens a ticket. Name both people before each window and write
+them here; the first acknowledges within 5 minutes, the second if not.
+
+| Window | On call (pages) | Second | Partner's contact |
+| :--- | :--- | :--- | :--- |
+| | | | |
+
+**First rule.** A candidate's device keeps every answer (OPFS, sealed batches) and sends it
+when it can; answers made before the deadline count for up to 30 minutes after it
+(`domain.OfflineGrace`). So an outage loses no work by itself. What it loses is **time**, and
+that is given back afterwards, never by restarting anything. Do not restart Postgres, roll back
+or deploy during a window unless the core cannot come back otherwise.
+
+**The core or the database is down.**
+
+1. Note the time it went down. Check `docker compose ps` / `kubectl get pods`, then the
+   core's log (`level":"ERROR"`) and `/readyz` (it checks Postgres).
+2. Bring it back: restart the core; if Postgres is gone, see §3 (point-in-time restore to just
+   before the failure). Tell the hall: "keep working, your answers are saved on this device".
+3. Once `/readyz` answers, watch `am_events_stored_total` climb as devices send what they
+   queued, and the monitor's sittings come back from "last heard from N min ago".
+4. Note the time it came back. **Give the time back:** Proctor monitor, choose the exam,
+   *Add time for everyone in progress*, the outage's minutes rounded up, with the reason in
+   words for the candidate ("Server outage from 10:20 to 10:45"). Each deadline moves by
+   those minutes; each candidate sees the reason in their record. A device learns the new
+   deadline on its next save, or when its own clock runs out.
+
+**"Pausing" an exam.** There is no pause button, on purpose: a paused clock on thousands of
+devices is one more thing that can disagree with the server. To pause (fire alarm, power cut in
+the hall), tell candidates to stop, and when they resume, add the minutes they stopped for, as
+above. Sittings already handed in are not reopened.
+
+**One candidate's device died, or their browser will not reopen.** Assignments, their row,
+*Resend*. They get a new link and code on any device; it opens the same attempt with every
+answer the server already holds, and their old device sends anything it still holds if it
+comes back. If time was lost, open their sitting in the monitor and *Add time* for them
+alone, with the reason.
+
+**A candidate says an answer is missing.** Open their sitting in the monitor: the attempt
+record lists every event the server holds, in order, with the server's time, and says whether
+the chain is intact. An answer that never reached the server is still on their device: do not
+clear the browser, reopen the sitting there and let it send. Their own copy of the same
+record is under *Apa yang kami catat* once they hand in.
+
+**A sitting ran out of time while its device was offline.** The device cannot hand in until it
+reaches the server, so the sitting stays in progress. When the device is back it sends its
+answers and hands in; answers made before the deadline count. If the device is never coming
+back, resend the link (above) and let the candidate hand in from another device; if the 30
+minutes of offline grace have passed and the candidate lost time to the outage, add it first.
+
+**The record says "altered".** A serious `record_altered` flag naming an event means a row was
+changed outside the core. Do not score or issue anything from that attempt; preserve the
+database (snapshot) and the core logs, and treat it as a security incident (docs/12).
+
+**After the window.** Write down what happened, when, which sittings were given time and how
+much (the audit log's `attempt.time_added` rows have the list), and anything the runbook did
+not cover. That goes to the partner with the results (docs/11 §4).
