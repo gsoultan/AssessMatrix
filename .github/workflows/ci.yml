@@ -227,3 +227,51 @@ jobs:
         run: make e2e-setup
       - name: A small cohort, all at once, nothing lost
         run: N=40 MINUTES=0.25 RAMP=10s ./scripts/load.sh
+
+  upgrade:
+    name: Upgrade · previous release to this commit, and back
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      AM_E2E_SETUP_DATABASE_URL: postgres://am_app:app@localhost:5432/assessmatrix_upgrade
+      AM_E2E_SETUP_MIGRATE_DATABASE_URL: postgres://am_owner:owner@localhost:5432/assessmatrix_upgrade
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.3
+          cache-dependency-path: services/core/go.sum
+      # An installation has run every migration already shipped. Changing,
+      # removing or reordering one would leave it on a schema no fresh
+      # install has (docs/13 §2, "Backward compatibility").
+      - name: Shipped migrations are never changed, removed or put before another
+        run: |
+          dir=services/core/internal/db/migrations
+          changed=$(git diff --name-only --diff-filter=MDR origin/main -- "$dir")
+          [ -z "$changed" ] || { echo "::error::a shipped migration was changed or removed: $changed"; exit 1; }
+          last=$(git ls-tree --name-only origin/main "$dir/" | sort | tail -n 1)
+          for f in $(git diff --name-only --diff-filter=A origin/main -- "$dir"); do
+            [[ "$f" > "$last" ]] || { echo "::error::$f sorts before $last, which installations have already run"; exit 1; }
+          done
+      - name: Create the owner and the unprivileged application role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE am_owner LOGIN PASSWORD 'owner'" \
+            -c "CREATE ROLE am_app LOGIN PASSWORD 'app'" \
+            -c "CREATE DATABASE assessmatrix_upgrade OWNER am_owner"
+      - name: The previous release migrates to this commit, and still serves on it
+        run: make upgrade-check
+      - name: The host updater script parses
+        run: bash -n deploy/updater/update.sh

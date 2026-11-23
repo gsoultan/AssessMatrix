@@ -8,8 +8,10 @@ import (
 	"net"
 	netmail "net/mail"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gsoultan/assessmatrix/services/core/internal/mail"
 )
@@ -40,6 +42,17 @@ type config struct {
 	// address. AM_LIMIT_PER_TENANT: codes mailed or guessed and links reissued
 	// a minute across all of one tenant's invitations (default 600).
 	PerIP, PerTenant int
+	Update           updateConfig
+}
+
+// updateConfig is how the core looks for newer releases. It only looks and
+// tells super administrators; the updater on the host installs (docs/13 §2).
+type updateConfig struct {
+	Check       bool          // AM_UPDATE_CHECK: on (default) | off, for an installation that must not call out
+	Repo        string        // AM_UPDATE_REPO: GitHub owner/name whose Releases to read (default gsoultan/assessmatrix)
+	API         string        // AM_UPDATE_API: the GitHub API, or a mirror of it (default https://api.github.com)
+	Interval    time.Duration // AM_UPDATE_INTERVAL: between checks (default 12h, at least 1h)
+	PreReleases bool          // AM_UPDATE_PRERELEASES=1: offer release candidates too
 }
 
 // mediaConfig picks where uploaded images go. One store serves one region;
@@ -88,6 +101,8 @@ func loadConfig(serving bool) (*config, error) {
 		},
 	}
 	c.SecureCookies = !c.Dev
+	c.Update = updateConfig{Repo: env("AM_UPDATE_REPO", "gsoultan/assessmatrix"), API: env("AM_UPDATE_API", "https://api.github.com"), Interval: 12 * time.Hour,
+		PreReleases: os.Getenv("AM_UPDATE_PRERELEASES") == "1"}
 	if !serving {
 		if c.MigrateURL == "" {
 			return nil, errors.New("AM_MIGRATE_DATABASE_URL is required")
@@ -119,6 +134,26 @@ func loadConfig(serving bool) (*config, error) {
 			}
 			*l.to = n
 		}
+	}
+	switch v := env("AM_UPDATE_CHECK", "on"); v {
+	case "on":
+		c.Update.Check = true
+	case "off":
+	default:
+		errs = append(errs, fmt.Errorf("AM_UPDATE_CHECK must be on or off, got %q", v))
+	}
+	if !repoRe.MatchString(c.Update.Repo) {
+		errs = append(errs, fmt.Errorf("AM_UPDATE_REPO must be owner/name, got %q", c.Update.Repo))
+	}
+	if !strings.HasPrefix(c.Update.API, "https://") && !c.Dev {
+		errs = append(errs, fmt.Errorf("AM_UPDATE_API must be https outside development, got %q", c.Update.API))
+	}
+	if v := os.Getenv("AM_UPDATE_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d < time.Hour {
+			errs = append(errs, fmt.Errorf("AM_UPDATE_INTERVAL must be a duration of at least 1h, got %q", v))
+		}
+		c.Update.Interval = d
 	}
 	secret, err := decodeSecret(os.Getenv("AM_SECRET"))
 	if err != nil {
@@ -168,6 +203,8 @@ func loadConfig(serving bool) (*config, error) {
 	}
 	return c, nil
 }
+
+var repoRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 func decodeSecret(s string) ([]byte, error) {
 	if s == "" {

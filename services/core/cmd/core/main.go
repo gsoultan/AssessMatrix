@@ -5,6 +5,11 @@
 //	core tenant <name> <staff-email>   create a tenant and its first staff member
 //	core super-admin <staff-email>     let someone who already works here run the installation
 //	core setup-code                    print the code first-run setup at /setup asks for
+//	core version                       print this build's version
+//	core probe                         exit 0 once the server on AM_LISTEN is ready (no curl in the image)
+//	core update claim [host]           the host's updater: take the update to run now, if any (JSON)
+//	core update report <id> <state> <message>
+//	                                   the host's updater: record progress or the outcome
 //
 // Configuration is environment only; see config.go.
 package main
@@ -43,6 +48,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/queries"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/staff"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/superadmin"
+	"github.com/gsoultan/assessmatrix/services/core/internal/update"
 	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
@@ -70,8 +76,14 @@ func main() {
 		err = addSuperAdmin(ctx, log, os.Args[2:])
 	case "setup-code":
 		err = printSetupCode()
+	case "version":
+		fmt.Println(version)
+	case "probe":
+		err = probe(ctx)
+	case "update":
+		err = updaterCommand(ctx, os.Args[2:], os.Stdout)
 	default:
-		err = fmt.Errorf("unknown command %q (want migrate, serve, tenant, super-admin or setup-code)", cmd)
+		err = fmt.Errorf("unknown command %q (want migrate, serve, tenant, super-admin, setup-code, version, probe or update)", cmd)
 	}
 	if err != nil {
 		log.Error("exit", "cmd", cmd, "err", err)
@@ -232,7 +244,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 	if err := database.CheckRole(ctx); err != nil {
 		return err
 	}
-	if err := checkSchema(ctx, database); err != nil {
+	if err := checkSchema(ctx, log, database); err != nil {
 		return err
 	}
 
@@ -276,7 +288,14 @@ func serve(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	stopping := make(chan struct{})
-	srv := &api.Server{DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
+	var feed update.Feed
+	if cfg.Update.Check {
+		feed = update.GitHub{Repo: cfg.Update.Repo, BaseURL: cfg.Update.API, PreReleases: cfg.Update.PreReleases}
+	}
+	updates := update.NewChecker(feed, version, log)
+	updates.Interval = cfg.Update.Interval
+	go updates.Run(ctx)
+	srv := &api.Server{Version: version, Updates: updates, DB: database, Keys: keys, Auth: authn, Jobs: jobs, Log: log, PublicURL: cfg.PublicURL, RunnerURL: cfg.RunnerURL,
 		Media: media.Regional{Store: store, Region: cfg.Media.Region}, WebhookPolicy: hooks,
 		PerIPPerMinute: cfg.PerIP, PerTenantPerMinute: cfg.PerTenant, Stopping: stopping}
 	retention.Server = srv
@@ -365,7 +384,7 @@ func serve(ctx context.Context, log *slog.Logger) error {
 
 // checkSchema stops a server whose database is older than its code, with
 // the command that fixes it, instead of failing on the first request.
-func checkSchema(ctx context.Context, d *db.DB) error {
+func checkSchema(ctx context.Context, log *slog.Logger, d *db.DB) error {
 	v, _, err := queries.SchemaVersion.One(ctx, d.Executor())
 	have, want := v.Version, db.LatestMigration()
 	if err != nil {
@@ -375,6 +394,12 @@ func checkSchema(ctx context.Context, d *db.DB) error {
 	if have < want {
 		return fmt.Errorf("the database schema is at %s but this build needs %s: run `core migrate`, "+
 			"or set AM_MIGRATE_DATABASE_URL so serve applies it", have, want)
+	}
+	if have > want {
+		// A rollback: the previous build on a schema a newer one migrated.
+		// Migrations only add (TestMigrationsOnlyAdd), so this is safe.
+		log.Warn("the database schema is newer than this build: running on it, as after a rollback",
+			"schema", have, "build_schema", want, "version", version)
 	}
 	return nil
 }

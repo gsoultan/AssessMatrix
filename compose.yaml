@@ -43,7 +43,9 @@ services:
     build: &image
       context: .
       dockerfile: deploy/Dockerfile
-    image: assessmatrix:local
+    # Unset: built from this checkout. The updater (deploy/updater) sets it
+    # to a release's image, pinned by digest, in .env.
+    image: ${AM_IMAGE:-assessmatrix:local}
     command: ["migrate"]
     environment:
       AM_MIGRATE_DATABASE_URL: postgres://am_owner:${AM_OWNER_PASSWORD}@postgres:5432/assessmatrix
@@ -55,7 +57,7 @@ services:
 
   core:
     build: *image
-    image: assessmatrix:local
+    image: ${AM_IMAGE:-assessmatrix:local}
     command: ["serve"]
     environment:
       AM_DATABASE_URL: postgres://am_app:${AM_APP_PASSWORD}@postgres:5432/assessmatrix
@@ -86,6 +88,10 @@ services:
       AM_S3_BUCKET: ${AM_S3_BUCKET:-}
       AM_S3_ACCESS_KEY: ${AM_S3_ACCESS_KEY:-}
       AM_S3_SECRET_KEY: ${AM_S3_SECRET_KEY:-}
+      # Looks for newer releases and shows super administrators (Updates).
+      # off for an installation that must make no outbound calls.
+      AM_UPDATE_CHECK: ${AM_UPDATE_CHECK:-on}
+      AM_UPDATE_REPO: ${AM_UPDATE_REPO:-gsoultan/assessmatrix}
     volumes:
       - media:/data/media
     ports: ["127.0.0.1:8080:8080"]
@@ -109,6 +115,7 @@ services:
 
   psychometrics:
     build: ./services/psychometrics
+    image: ${AM_PSYCHOMETRICS_IMAGE:-assessmatrix-psychometrics:local}
     environment:
       AM_DATABASE_URL: postgres://am_app:${AM_APP_PASSWORD}@postgres:5432/assessmatrix
     depends_on:

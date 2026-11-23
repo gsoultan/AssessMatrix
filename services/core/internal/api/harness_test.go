@@ -139,6 +139,7 @@ type client struct {
 	hooks     assessmatrixv1connect.WebhookServiceClient
 	tenants   assessmatrixv1connect.TenantServiceClient
 	setup     assessmatrixv1connect.SetupServiceClient
+	system    assessmatrixv1connect.SystemServiceClient
 }
 
 func (h *harness) browser() *client {
@@ -158,6 +159,7 @@ func (h *harness) browser() *client {
 		hooks:     assessmatrixv1connect.NewWebhookServiceClient(hc, u),
 		tenants:   assessmatrixv1connect.NewTenantServiceClient(hc, u),
 		setup:     assessmatrixv1connect.NewSetupServiceClient(hc, u),
+		system:    assessmatrixv1connect.NewSystemServiceClient(hc, u),
 	}
 }
 

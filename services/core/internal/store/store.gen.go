@@ -9144,6 +9144,7 @@ func init() {
 	storm.RegisterScanner(scanTenantSummary)
 	storm.RegisterScanner(scanSessionAssignment)
 	storm.RegisterScanner(scanTokenAssignment)
+	storm.RegisterScanner(scanFlagRow)
 	storm.RegisterScanner(scanKindRow)
 	storm.RegisterScanner(scanStaffTenant)
 	storm.RegisterScanner(scanRoleRow)
@@ -9151,14 +9152,17 @@ func init() {
 	storm.RegisterScanner(scanTenantOf)
 	storm.RegisterScanner(scanPublicCredentialRow)
 	storm.RegisterScanner(scanPublicIssuerRow)
+	storm.RegisterScanner(scanIDRow)
 	storm.RegisterScanner(scanDueAttempt)
 	storm.RegisterScanner(scanVersionRow)
 	storm.RegisterScanner(scanTenantRow)
-	storm.RegisterScanner(scanFlagRow)
 	storm.RegisterScanner(scanSetupState)
 	storm.RegisterScanner(scanStaffSessionRow)
 	storm.RegisterScanner(scanMembership)
 	storm.RegisterScanner(scanEmailRow)
+	storm.RegisterScanner(scanClaimedUpdate)
+	storm.RegisterScanner(scanSeenRow)
+	storm.RegisterScanner(scanUpdateRunRow)
 	storm.RegisterStatement(`
 	SELECT count(*) AS n FROM (
 	  SELECT 1 FROM webhook_deliveries d JOIN webhook_events e ON e.id = d.event_id
@@ -9169,16 +9173,24 @@ func init() {
 	       (SELECT count(*) FROM pg_tables t WHERE t.schemaname = 'public' AND t.tableowner = current_user) AS owns_tables
 	FROM pg_roles r WHERE r.rolname = current_user`)
 	storm.RegisterStatement(`SELECT DISTINCT kind FROM attempt_events WHERE attempt_id = $1 AND kind LIKE 'consent.%'`)
+	storm.RegisterStatement(`SELECT am_cancel_update($1) AS yes`)
 	storm.RegisterStatement(`SELECT am_outbox_sweep($1) AS n`)
 	storm.RegisterStatement(`SELECT am_outbox_tenant($1) AS tenant_id`)
 	storm.RegisterStatement(`SELECT am_purge_attempt($1) AS n`)
+	storm.RegisterStatement(`SELECT am_request_update($1, $2, $3, $4, $5, $6) AS id`)
 	storm.RegisterStatement(`SELECT am_schema_version() AS version`)
 	storm.RegisterStatement(`SELECT am_setup_needed() AS needed, am_schema_version() AS version`)
 	storm.RegisterStatement(`SELECT am_setup_needed() AS yes`)
+	storm.RegisterStatement(`SELECT am_sittings_in_progress() AS n`)
 	storm.RegisterStatement(`SELECT am_super_admin($1) AS yes`)
+	storm.RegisterStatement(`SELECT am_update_report($1, $2, $3) AS yes`)
+	storm.RegisterStatement(`SELECT am_updater_seen() AS seen_at`)
 	storm.RegisterStatement(`SELECT am_webhook_delivery_tenant($1) AS tenant_id`)
 	storm.RegisterStatement(`SELECT am_webhook_sweep($1) AS n`)
 	storm.RegisterStatement(`SELECT e AS email FROM unnest($1::text[]) AS e WHERE am_super_admin(e)`)
+	storm.RegisterStatement(`SELECT id, from_version, target_version, image, psychometrics_image FROM am_update_claim($1)`)
+	storm.RegisterStatement(`SELECT id, from_version, target_version, requested_by, requested_at,
+	wait_for_idle, state, message, started_at, finished_at FROM am_updates($1)`)
 	storm.RegisterStatement(`SELECT jwt, revoked_at, revoked_why FROM am_public_credential($1)`)
 	storm.RegisterStatement(`SELECT name, keys FROM am_public_issuer($1)`)
 	storm.RegisterStatement(`SELECT set_config('app.tenant_id', $1, true) AS tenant`)
@@ -9210,6 +9222,11 @@ func scanTokenAssignment(rv [][]byte, r *queries.TokenAssignment, sl *runtime.Sl
 	copy(r.TenantID[:], rv[0])
 	copy(r.AssignmentID[:], rv[1])
 	r.Current = runtime.Bool(rv[2])
+	return nil
+}
+
+func scanFlagRow(rv [][]byte, r *queries.FlagRow, sl *runtime.Slab) error {
+	r.Yes = runtime.Bool(rv[0])
 	return nil
 }
 
@@ -9254,6 +9271,11 @@ func scanPublicIssuerRow(rv [][]byte, r *queries.PublicIssuerRow, sl *runtime.Sl
 	return nil
 }
 
+func scanIDRow(rv [][]byte, r *queries.IDRow, sl *runtime.Slab) error {
+	copy(r.ID[:], rv[0])
+	return nil
+}
+
 func scanDueAttempt(rv [][]byte, r *queries.DueAttempt, sl *runtime.Slab) error {
 	copy(r.TenantID[:], rv[0])
 	copy(r.AttemptID[:], rv[1])
@@ -9267,11 +9289,6 @@ func scanVersionRow(rv [][]byte, r *queries.VersionRow, sl *runtime.Slab) error 
 
 func scanTenantRow(rv [][]byte, r *queries.TenantRow, sl *runtime.Slab) error {
 	r.Tenant = sl.Str(rv[0])
-	return nil
-}
-
-func scanFlagRow(rv [][]byte, r *queries.FlagRow, sl *runtime.Slab) error {
-	r.Yes = runtime.Bool(rv[0])
 	return nil
 }
 
@@ -9300,5 +9317,33 @@ func scanMembership(rv [][]byte, r *queries.Membership, sl *runtime.Slab) error 
 
 func scanEmailRow(rv [][]byte, r *queries.EmailRow, sl *runtime.Slab) error {
 	r.Email = sl.Str(rv[0])
+	return nil
+}
+
+func scanClaimedUpdate(rv [][]byte, r *queries.ClaimedUpdate, sl *runtime.Slab) error {
+	copy(r.ID[:], rv[0])
+	r.FromVersion = sl.Str(rv[1])
+	r.TargetVersion = sl.Str(rv[2])
+	r.Image = sl.Str(rv[3])
+	r.PsychometricsImage = sl.Str(rv[4])
+	return nil
+}
+
+func scanSeenRow(rv [][]byte, r *queries.SeenRow, sl *runtime.Slab) error {
+	r.SeenAt = runtime.Nullable(rv[0], runtime.Timestamptz)
+	return nil
+}
+
+func scanUpdateRunRow(rv [][]byte, r *queries.UpdateRunRow, sl *runtime.Slab) error {
+	copy(r.ID[:], rv[0])
+	r.FromVersion = sl.Str(rv[1])
+	r.TargetVersion = sl.Str(rv[2])
+	r.RequestedBy = sl.Str(rv[3])
+	r.RequestedAt = runtime.Timestamptz(rv[4])
+	r.WaitForIdle = runtime.Bool(rv[5])
+	r.State = sl.Str(rv[6])
+	r.Message = sl.Str(rv[7])
+	r.StartedAt = runtime.Nullable(rv[8], runtime.Timestamptz)
+	r.FinishedAt = runtime.Nullable(rv[9], runtime.Timestamptz)
 	return nil
 }

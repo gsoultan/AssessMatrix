@@ -15,6 +15,7 @@ import { ResultService } from '@assessmatrix/proto/result_pb'
 import { SetupService } from '@assessmatrix/proto/setup_pb'
 import { WebhookService } from '@assessmatrix/proto/webhook_pb'
 import { TenantService } from '@assessmatrix/proto/tenant_pb'
+import { SystemService } from '@assessmatrix/proto/system_pb'
 
 const transport = createConnectTransport({
   baseUrl: '/',
@@ -33,4 +34,5 @@ export const api = {
   setup: createClient(SetupService, transport),
   webhooks: createClient(WebhookService, transport),
   tenants: createClient(TenantService, transport),
+  system: createClient(SystemService, transport),
 }

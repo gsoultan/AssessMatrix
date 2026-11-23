@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package assessmatrix.v1;
+
+// The installation itself: which version runs, whether a newer release
+// exists, and updating to it. Super administrators only.
+//
+// The server never replaces itself. RequestUpdate records which release to
+// install; the updater on the host (deploy/updater) backs the database up,
+// pulls that release's image by digest, migrates, restarts the server,
+// checks it is ready, and goes back to the previous image if it is not. By
+// default it waits until no sitting is in progress.
+service SystemService {
+  // This build, the newest release, and recent updates.
+  rpc GetUpdateStatus(GetUpdateStatusRequest) returns (GetUpdateStatusResponse);
+  // Asks for the update to `version`, which must be the release
+  // GetUpdateStatus offers next.
+  rpc RequestUpdate(RequestUpdateRequest) returns (RequestUpdateResponse);
+  // Withdraws an update the updater has not started.
+  rpc CancelUpdate(CancelUpdateRequest) returns (CancelUpdateResponse);
+}
+
+message Release {
+  string version = 1;
+  int64 published_at = 2;
+  // The release page, and its notes (cut to a few thousand characters).
+  string notes_url = 3;
+  string notes = 4;
+  // It fixes a security problem.
+  bool security = 5;
+  // "major", "minor" or "patch", from the running version.
+  string kind = 6;
+}
+
+enum UpdateState {
+  UPDATE_STATE_UNSPECIFIED = 0;
+  // Asked for; the updater has not started it (it may be waiting for
+  // sittings to end).
+  UPDATE_STATE_REQUESTED = 1;
+  UPDATE_STATE_RUNNING = 2;
+  UPDATE_STATE_SUCCEEDED = 3;
+  // Stopped before anything changed (a backup or a download failed).
+  UPDATE_STATE_FAILED = 4;
+  // The new version did not come up, and the previous one was put back.
+  UPDATE_STATE_ROLLED_BACK = 5;
+  UPDATE_STATE_CANCELLED = 6;
+}
+
+message UpdateRun {
+  string id = 1;
+  string from_version = 2;
+  string target_version = 3;
+  UpdateState state = 4;
+  string requested_by = 5;
+  int64 requested_at = 6;
+  int64 started_at = 7;
+  int64 finished_at = 8;
+  // The updater's last word on it, in plain language.
+  string message = 9;
+  bool wait_for_idle = 10;
+}
+
+message GetUpdateStatusRequest {
+  // Ask the release feed now instead of using the last scheduled check.
+  bool refresh = 1;
+}
+
+message GetUpdateStatusResponse {
+  // This build. "dev" for a development build, which is never offered updates.
+  string current_version = 1;
+  // The newest migration the database has applied.
+  string schema_version = 2;
+  // False when checks are turned off (AM_UPDATE_CHECK=off) or the build
+  // has no version.
+  bool checks_enabled = 3;
+  int64 checked_at = 4;
+  // Why the last check failed; empty if it did not.
+  string check_error = 5;
+  // The release this installation can update to now. Unset when it is up to date.
+  Release next = 6;
+  // The newest release. Differs from next when an older one must come first.
+  Release latest = 7;
+  // When the updater on the host last looked for work; 0 if never. With
+  // none in the last few minutes, the studio shows the commands instead of
+  // an Update button.
+  int64 updater_seen_at = 8;
+  bool updater_connected = 9;
+  // Sittings an update now would interrupt.
+  int64 sittings_in_progress = 10;
+  // Newest first: the one asked for or running (if any), then past ones.
+  repeated UpdateRun runs = 11;
+}
+
+message RequestUpdateRequest {
+  string version = 1;
+  // Start without waiting for sittings in progress to end. For an urgent
+  // fix: candidates keep their answers through the restart, but lose the
+  // seconds it takes.
+  bool now = 2;
+}
+
+message RequestUpdateResponse {
+  UpdateRun run = 1;
+}
+
+message CancelUpdateRequest {}
+
+message CancelUpdateResponse {
+  bool cancelled = 1;
+}

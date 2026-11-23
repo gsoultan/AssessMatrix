@@ -8,7 +8,7 @@ docs/12.
 
 | Piece | Image | Notes |
 | :--- | :--- | :--- |
-| core | `assessmatrix` (`deploy/Dockerfile`) | Go binary plus the three web apps it serves: studio at `/`, runner at `/take/`, credential check at `/verify/`. Distroless, non-root. Commands: `migrate`, `serve`, `tenant`, `super-admin`, `setup-code` |
+| core | `assessmatrix` (`deploy/Dockerfile`) | Go binary plus the three web apps it serves: studio at `/`, runner at `/take/`, credential check at `/verify/`. Distroless, non-root. Commands: `migrate`, `serve`, `tenant`, `super-admin`, `setup-code`, `version`, `probe`, `update` |
 | psychometrics | `assessmatrix-psychometrics` | Python worker; item statistics only |
 | Postgres 17 | managed, or `postgres:17` in compose | All state. In the tenants' region (Indonesia for `id`) |
 | Object storage | S3-compatible bucket in the same region | Images; required with more than one core replica |
@@ -41,8 +41,12 @@ point-in-time recovery in the same region.
 
 ### Releasing
 
-1. Tag `vX.Y.Z` on `main`. `.github/workflows/release.yml` builds both images, pushes them to
-   GHCR with an SBOM and signed build provenance. Nothing else publishes.
+1. Tag `vX.Y.Z` on `main` (annotated; a message starting `security:` marks a security fix).
+   `.github/workflows/release.yml` builds both images, pushes them to GHCR with an SBOM and
+   signed build provenance, then publishes a GitHub Release with generated notes and
+   `assessmatrix-release.json`: the version, both images **by digest**, the newest migration,
+   and `min_upgrade_from` (from `deploy/min-upgrade-from`). Nothing else publishes, and the core
+   offers no release without that manifest.
 2. `kustomize edit set image assessmatrix=ghcr.io/…/assessmatrix:X.Y.Z` (and psychometrics).
 3. Apply the `migrate` Job; wait for it to complete. Migrations are forward-only and safe to run
    twice (advisory lock).
@@ -52,6 +56,71 @@ point-in-time recovery in the same region.
 
 Rollback: deploy the previous tag. Schema changes are additive, so the previous core runs on
 the newer schema; a migration that is not additive needs its own plan, written before it ships.
+
+### Updates
+
+**Checking.** Every core asks GitHub Releases (`AM_UPDATE_REPO`, default
+`gsoultan/assessmatrix`) a minute or two after it starts and every 12 hours after
+(`AM_UPDATE_INTERVAL`). The request carries nothing about the installation: no host, tenant
+or count. `AM_UPDATE_CHECK=off` turns it off for an installation that must make no outbound
+calls. A development build (`version` "dev") is never offered anything. Super administrators
+see the result on **Updates** in the studio, with the release notes; nobody else does.
+
+**Which release.** The newest release this version may move to directly: a release whose
+`min_upgrade_from` is newer than the running version is reached through the one before it,
+so an installation several releases behind is offered each required step in turn.
+
+**Applying, on one machine (compose).** Install the updater once:
+
+```sh
+sudo cp deploy/updater/assessmatrix-update.{service,timer} /etc/systemd/system/
+# set WorkingDirectory and ExecStart to this checkout, then
+sudo systemctl enable --now assessmatrix-update.timer      # or cron: * * * * * cd /opt/assessmatrix && make update
+```
+
+Each minute it tells the core it is alive (the studio shows the **Update** button only then)
+and asks whether an update was requested. When a super administrator presses **Update**, it
+waits until no sitting is in progress (or starts at once, if they chose *Update now* for an
+urgent fix), then:
+
+| Step | If it fails |
+| :--- | :--- |
+| Base backup (`/backup.sh`) | Stops. Nothing changed |
+| Pull the release's images by digest; they must be in `AM_UPDATE_IMAGE_REPO` (optionally `AM_UPDATE_VERIFY=1` checks build provenance with `gh`) | Stops. Nothing changed |
+| Point `AM_IMAGE` in `.env` at them (the old `.env` is kept as `.env.before-update`) and migrate | Puts `.env` back. The running core never stopped, and runs on whatever was applied |
+| Restart core and psychometrics; wait for `core probe` to report the new version ready (`AM_UPDATE_READY_TIMEOUT`, 180 s) | Puts the previous images back and restarts: **rolled back**. The database keeps the additions, which the previous version ignores |
+
+Every step is reported to the core, so **Updates** shows what the host's log shows, and each
+request is in the audit log. The core never pulls or restarts anything itself, and nothing it
+serves can make the updater install an image the release's manifest did not pin. A candidate
+sitting through the restart (an urgent update) keeps every answer (docs/09 phase 4) and loses
+the seconds it takes; the deadline is the server's, so add time if it mattered (§8).
+
+**Applying, on Kubernetes.** Nothing in the cluster has the rights to change itself; the
+**Updates** screen shows the release, its notes and these steps instead of a button: the
+*Releasing* steps 2 to 4 above with the version it names, through your usual GitOps change.
+
+### Backward compatibility
+
+An update migrates first and restarts second, and a rollback starts the previous version on
+the newer schema. So at every moment an older core may be running on a newer database, and
+every change has to keep it working:
+
+- **Migrations only add** (expand): new tables, new nullable or defaulted columns, new indexes
+  and functions. `TestMigrationsOnlyAdd` refuses a drop, rename, type change, `SET NOT NULL`,
+  `TRUNCATE` or a `NOT NULL` column with no default, unless the migration carries a
+  `-- contract: <plan>` line. A contraction ships at least one release after the release that
+  stopped using what it removes, and that release goes in `deploy/min-upgrade-from`.
+- **Shipped migrations never change**: CI refuses an edited, removed or out-of-order one.
+- **The previous release keeps working on the new schema**: `make upgrade-check` (CI job
+  *Upgrade*) migrates a database set up by the previous release, starts both cores on it, and
+  runs the previous release's whole API test suite against it.
+- **The API only grows**: `buf breaking` against `main` in CI, so studios, runners still open
+  in a candidate's browser, webhooks receivers and SDK clients built for an older version keep
+  working.
+- **Configuration only grows**: a new setting has a default that keeps the old behaviour, so
+  an image update never needs `compose.yaml` or `.env` edited. `core update` prints a versioned
+  protocol, and the updater refuses one it does not know instead of guessing.
 
 ## 3. Backups and restore
 

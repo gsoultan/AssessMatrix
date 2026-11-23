@@ -1,0 +1,12 @@
+# Copy both units to /etc/systemd/system, set WorkingDirectory to the
+# directory holding compose.yaml and .env, then:
+#   systemctl enable --now assessmatrix-update.timer
+[Unit]
+Description=AssessMatrix updater: apply an update a super administrator asked for
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/assessmatrix
+ExecStart=/opt/assessmatrix/deploy/updater/update.sh

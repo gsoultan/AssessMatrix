@@ -24,6 +24,7 @@ import {
   IconChevronDown,
   IconDeviceLaptop,
   IconShieldLock,
+  IconRefresh,
 } from '@tabler/icons-react'
 
 import { CandidateApp } from './screens/CandidateApp'
@@ -45,10 +46,12 @@ import { Webhooks } from './screens/Webhooks'
 import { SignIn } from './screens/SignIn'
 import { Setup } from './screens/Setup'
 import { Access } from './screens/Access'
+import { Updates } from './screens/Updates'
 import { TenantSwitcher } from './components/TenantSwitcher'
 import { useApp } from './state'
 import { CORE, SHOW_MOCKS } from './backend/mode'
 import { administers } from './backend/staff'
+import { api } from './api/client'
 
 /** Design mock-ups with canned data. Shown in a local build; hidden against the core unless asked for. */
 // The monitor is real against the core (LiveMonitor); only the local build's is a mock.
@@ -75,6 +78,8 @@ const ALL_SCREENS = [
   { key: 'player', name: 'Candidate preview', sub: 'See it as a candidate does', Icon: IconDeviceLaptop, El: CandidateApp },
   // Tenants exist only on the core, and only an administrator manages them.
   ...(CORE ? [{ key: 'access', admin: true, name: 'Access', sub: 'Studio users · which tenants', Icon: IconShieldLock, El: Access } as const] : []),
+  // The installation itself: only whoever runs it.
+  ...(CORE ? [{ key: 'updates', super: true, name: 'Updates', sub: 'Version · new releases', Icon: IconRefresh, El: Updates } as const] : []),
   { key: 'author', more: true, name: 'Item studio', sub: 'Generative items', Icon: IconWand, El: AuthorStudio },
   { key: 'aitask', more: true, name: 'AI-in-the-loop task', sub: 'Score the collaboration', Icon: IconSparkles, El: AiTask },
   { key: 'profile', more: true, name: 'Evidence profile', sub: 'Skill graph · credentials', Icon: IconCertificate, El: EvidenceProfile },
@@ -126,6 +131,19 @@ export function App() {
   return <Shell />
 }
 
+/** A super administrator sees a dot on Updates when a new version is available. */
+function useUpdateReady(superAdmin: boolean) {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    if (!CORE || !superAdmin) return
+    api.system.getUpdateStatus({}).then(
+      (r) => setReady(!!r.next),
+      () => setReady(false),
+    )
+  }, [superAdmin])
+  return ready
+}
+
 const atSetup = () => window.location.pathname.replace(/\/+$/, '') === '/setup'
 
 function Shell() {
@@ -141,8 +159,11 @@ function Shell() {
   const dark = colorScheme === 'dark'
   const [opened, { toggle, close }] = useDisclosure(false)
   const isDesktop = useMediaQuery('(min-width: 1024px)')
-  // Administrators' screens are not shown to members (the core refuses them anyway).
-  const allowed = (s: (typeof SCREENS)[number]) => !('admin' in s) || administers(staff)
+  // Administrators' screens are not shown to members, nor the installation's
+  // to anyone but a super administrator (the core refuses them anyway).
+  const allowed = (s: (typeof SCREENS)[number]) =>
+    'super' in s ? !!staff?.superAdmin : !('admin' in s) || administers(staff)
+  const updateReady = useUpdateReady(!!staff?.superAdmin)
   const current = SCREENS.filter(allowed).find((s) => s.key === active) ?? SCREENS[0]!
   const Screen = current.El as React.ComponentType<{ isDesktop: boolean }>
 
@@ -194,6 +215,9 @@ function Shell() {
       >
         <s.Icon size={17} stroke={1.7} className="shrink-0" color={on ? 'var(--color-s1)' : 'var(--color-ink-muted)'} />
         <span className="min-w-0 truncate">{s.name}</span>
+        {s.key === 'updates' && updateReady && (
+          <span className="ml-auto h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--color-s1)' }} aria-label="A new version is available" />
+        )}
       </button>
     )
   }

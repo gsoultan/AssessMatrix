@@ -29,6 +29,7 @@ import (
 	"github.com/gsoultan/assessmatrix/services/core/internal/metrics"
 	"github.com/gsoultan/assessmatrix/services/core/internal/secure"
 	"github.com/gsoultan/assessmatrix/services/core/internal/store/auditlog"
+	"github.com/gsoultan/assessmatrix/services/core/internal/update"
 	"github.com/gsoultan/assessmatrix/services/core/internal/webhook"
 )
 
@@ -54,6 +55,10 @@ type Server struct {
 	// monitor stream ends at once instead of holding shutdown for minutes.
 	// Nil: never.
 	Stopping <-chan struct{}
+	// Version is this build's; Updates checks the release feed for newer
+	// ones. Nil Updates: checks are off.
+	Version string
+	Updates *update.Checker
 
 	// PerIPPerMinute and PerTenantPerMinute size the limits below; zero means
 	// 60 and 600. An exam hall behind one NAT address needs a higher per-IP
@@ -162,6 +167,10 @@ func Policy() map[string]auth.Access {
 	// an administrator may also call for their members.
 	set(auth.SuperAdmin,
 		assessmatrixv1connect.TenantServiceCreateTenantProcedure,
+		// The installation's version and its updates.
+		assessmatrixv1connect.SystemServiceGetUpdateStatusProcedure,
+		assessmatrixv1connect.SystemServiceRequestUpdateProcedure,
+		assessmatrixv1connect.SystemServiceCancelUpdateProcedure,
 	)
 	return p
 }
@@ -186,6 +195,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle(assessmatrixv1connect.NewSetupServiceHandler(&setupService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewWebhookServiceHandler(&webhookService{s}, opts...))
 	mux.Handle(assessmatrixv1connect.NewTenantServiceHandler(&tenantService{s}, opts...))
+	mux.Handle(assessmatrixv1connect.NewSystemServiceHandler(&systemService{s}, opts...))
 	return mux
 }
 
