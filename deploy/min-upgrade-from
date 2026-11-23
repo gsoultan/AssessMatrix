@@ -1,0 +1,6 @@
+# The oldest release that may update straight to the next one, read by
+# .github/workflows/release.yml into the release's manifest. Leave it empty
+# while every migration is additive. When a release must contract the
+# schema (drop what an older build reads), set this to the release that
+# stopped reading it, so older installations update through that one first
+# (docs/13 §2, "Backward compatibility").

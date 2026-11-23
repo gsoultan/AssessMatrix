@@ -187,3 +187,62 @@ type KindRow struct {
 // to and what was withdrawn. The literal pattern is what lets Postgres use
 // attempt_events_consent_idx, whatever plan it caches.
 var ConsentKinds = storm.SQL[KindRow](`SELECT DISTINCT kind FROM attempt_events WHERE attempt_id = $1 AND kind LIKE 'consent.%'`)
+
+// Updates to the installation (migration 0013). The first four are called
+// only for a super administrator; UpdateClaim and UpdateReport only by
+// `core update`, as the owner.
+
+// SittingsInProgress is how many sittings an update now would interrupt.
+var SittingsInProgress = storm.SQL[CountRow](`SELECT am_sittings_in_progress() AS n`)
+
+// UpdateRunRow is one update asked for.
+type UpdateRunRow struct {
+	ID            [16]byte
+	FromVersion   string
+	TargetVersion string
+	RequestedBy   string
+	RequestedAt   time.Time
+	WaitForIdle   bool
+	State         string
+	Message       string
+	StartedAt     runtime.Null[time.Time]
+	FinishedAt    runtime.Null[time.Time]
+}
+
+// Updates is the newest updates, newest first.
+var Updates = storm.SQL[UpdateRunRow](`SELECT id, from_version, target_version, requested_by, requested_at,
+	wait_for_idle, state, message, started_at, finished_at FROM am_updates($1)`)
+
+// SeenRow is when something was last seen, if ever.
+type SeenRow struct {
+	SeenAt runtime.Null[time.Time]
+}
+
+// UpdaterSeen is when the updater on the host last looked for work.
+var UpdaterSeen = storm.SQL[SeenRow](`SELECT am_updater_seen() AS seen_at`)
+
+// IDRow is a new row's id.
+type IDRow struct {
+	ID [16]byte
+}
+
+// RequestUpdate records an update a super administrator asked for.
+var RequestUpdate = storm.SQL[IDRow](`SELECT am_request_update($1, $2, $3, $4, $5, $6) AS id`)
+
+// CancelUpdate withdraws an update not yet started.
+var CancelUpdate = storm.SQL[FlagRow](`SELECT am_cancel_update($1) AS yes`)
+
+// ClaimedUpdate is the update the updater is to run now.
+type ClaimedUpdate struct {
+	ID                 [16]byte
+	FromVersion        string
+	TargetVersion      string
+	Image              string
+	PsychometricsImage string
+}
+
+// UpdateClaim records that the updater is alive and hands it an update to run, if any.
+var UpdateClaim = storm.SQL[ClaimedUpdate](`SELECT id, from_version, target_version, image, psychometrics_image FROM am_update_claim($1)`)
+
+// UpdateReport records the updater's progress or outcome.
+var UpdateReport = storm.SQL[FlagRow](`SELECT am_update_report($1, $2, $3) AS yes`)

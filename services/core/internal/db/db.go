@@ -256,6 +256,10 @@ func Migrate(ctx context.Context, ownerURL, appRole string) ([]string, error) {
 		`REVOKE ALL ON super_admins FROM ` + role,
 		// Tenants are made by the owner (`core tenant`), or once by setup.
 		`REVOKE EXECUTE ON FUNCTION am_create_tenant(text, text, text, text) FROM ` + role,
+		// Installation updates: the app records requests through its
+		// functions; only the updater, as the owner, claims and closes them.
+		`REVOKE ALL ON system_updates, system_updater FROM ` + role,
+		`REVOKE EXECUTE ON FUNCTION am_update_claim(text), am_update_report(uuid, text, text) FROM ` + role,
 	}
 	for _, g := range grants {
 		if _, err := conn.Exec(ctx, g); err != nil {

@@ -1,6 +1,6 @@
 # AssessMatrix — run `make` to see everything available.
 .DEFAULT_GOAL := help
-.PHONY: help up down dev check build preview e2e e2e-core e2e-setup load backup clean core-test proto
+.PHONY: help up down dev check build preview e2e e2e-core e2e-setup load backup update upgrade-check clean core-test proto
 
 help: ## Show this help
 	@echo "AssessMatrix"
@@ -42,6 +42,12 @@ load: ## Cohort load test against a local core: N candidates, nothing lost (need
 
 backup: ## Compose install: base backup, keep the newest AM_BACKUP_KEEP (7), prune older WAL. Run nightly
 	@docker compose exec -T -u postgres postgres /backup.sh
+
+update: ## Compose install: apply an update a super administrator asked for (run every minute; docs/13 §2)
+	@./deploy/updater/update.sh
+
+upgrade-check: ## Previous release → this commit: migrate, then both cores serve on the new schema (needs AM_E2E_* URLs)
+	@./scripts/upgrade-check.sh
 
 clean: ## Remove build output and node_modules
 	@./scripts/clean.sh

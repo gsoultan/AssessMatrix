@@ -6,13 +6,16 @@ on:
     tags: ['v*.*.*']
 
 permissions:
-  contents: read
+  contents: write # the GitHub Release the core's update check reads
   packages: write
   id-token: write
   attestations: write
 
 jobs:
   images:
+    outputs:
+      assessmatrix: ${{ steps.digests.outputs.assessmatrix }}
+      assessmatrix-psychometrics: ${{ steps.digests.outputs.assessmatrix-psychometrics }}
     name: Images · build, push, attest
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -49,8 +52,52 @@ jobs:
           build-args: VERSION=${{ github.ref_name }}
           provenance: mode=max
           sbom: true
+      - id: digests
+        run: echo "${{ matrix.name }}=${{ steps.push.outputs.digest }}" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v2
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  # The release installations see (Updates screen) and install from. Its
+  # manifest pins both images by digest, so moving a tag later cannot change
+  # what an updater pulls; the core offers no release without one.
+  release:
+    name: GitHub Release · notes and update manifest
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write the manifest
+        env:
+          TAG: ${{ github.ref_name }}
+          OWNER: ${{ github.repository_owner }}
+          CORE_DIGEST: ${{ needs.images.outputs.assessmatrix }}
+          PSY_DIGEST: ${{ needs.images.outputs.assessmatrix-psychometrics }}
+        run: |
+          set -euo pipefail
+          owner=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          [[ "$CORE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ && "$PSY_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::missing image digests"; exit 1; }
+          schema=$(ls services/core/internal/db/migrations/*.sql | sort | tail -n 1 | xargs basename)
+          min=$(grep -v '^#' deploy/min-upgrade-from | tr -d '[:space:]' || true)
+          # An annotated tag whose message starts "security:" marks a
+          # security fix; the studio says so beside the update.
+          git fetch -q --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          security=false
+          git tag -l --format='%(contents)' "$TAG" | grep -qi '^security:' && security=true
+          jq -n --arg v "$TAG" --arg img "ghcr.io/$owner/assessmatrix@$CORE_DIGEST" \
+                --arg psy "ghcr.io/$owner/assessmatrix-psychometrics@$PSY_DIGEST" \
+                --arg schema "$schema" --arg min "$min" --argjson security "$security" \
+            '{version: $v, image: $img, psychometrics_image: $psy, schema: $schema, min_upgrade_from: $min, security: $security}' \
+            > assessmatrix-release.json
+          cat assessmatrix-release.json
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=""
+          [[ "$TAG" == *-* ]] && prerelease="--prerelease"
+          gh release create "$TAG" assessmatrix-release.json --verify-tag --generate-notes $prerelease

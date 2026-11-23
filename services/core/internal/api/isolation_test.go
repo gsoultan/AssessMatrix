@@ -479,6 +479,26 @@ func checkIsolation(t *testing.T, memberOfA bool) {
 				t.Error("EndSession: A's candidate lost their session")
 			}
 		},
+		// The installation's updates belong to no tenant: a tenant's
+		// administrator reaches none of them.
+		"/assessmatrix.v1.SystemService/GetUpdateStatus": func() {
+			_, err := b.system.GetUpdateStatus(ctx, connect.NewRequest(&v1.GetUpdateStatusRequest{Refresh: true}))
+			if code(err) != connect.CodePermissionDenied {
+				t.Errorf("GetUpdateStatus by a tenant's administrator: %v, want permission denied", err)
+			}
+		},
+		"/assessmatrix.v1.SystemService/RequestUpdate": func() {
+			_, err := b.system.RequestUpdate(ctx, connect.NewRequest(&v1.RequestUpdateRequest{Version: "v99.0.0", Now: true}))
+			if code(err) != connect.CodePermissionDenied {
+				t.Errorf("RequestUpdate by a tenant's administrator: %v, want permission denied", err)
+			}
+		},
+		"/assessmatrix.v1.SystemService/CancelUpdate": func() {
+			_, err := b.system.CancelUpdate(ctx, connect.NewRequest(&v1.CancelUpdateRequest{}))
+			if code(err) != connect.CodePermissionDenied {
+				t.Errorf("CancelUpdate by a tenant's administrator: %v, want permission denied", err)
+			}
+		},
 		"/assessmatrix.v1.SetupService/GetSetupStatus": func() {
 			r := get(h.browser().setup.GetSetupStatus(ctx, connect.NewRequest(&v1.GetSetupStatusRequest{})))
 			if r.Msg.GetNeeded() || r.Msg.GetSchemaVersion() != "" || r.Msg.GetRegion() != "" {
@@ -552,6 +572,11 @@ var unscopedTables = map[string]string{
 	// RLS is on with no policy and the application role has no grant; it is
 	// read only through am_super_admin and am_staff_session.
 	"super_admins": "installation-wide; the application role has no grant on it",
+	// The installation's own updates (migration 0013). RLS on with no
+	// policy and no grant; read and written only through am_updates,
+	// am_request_update and am_cancel_update, for a super administrator.
+	"system_updates": "installation-wide; the application role has no grant on it",
+	"system_updater": "installation-wide; the application role has no grant on it",
 	// River's own tables. Job arguments carry ids only (mail.SendArgs,
 	// webhook.DeliverArgs, RetentionArgs); each worker looks the row up with
 	// a SECURITY DEFINER function and then works inside that row's tenant.
@@ -690,6 +715,11 @@ func TestForeignKeysStayInsideATenant(t *testing.T) {
 // one fails this test until someone has looked at it.
 var definerFunctions = map[string]string{
 	"am_all_tenants":             "every tenant's id, name and region; called only for a super administrator",
+	"am_cancel_update":           "withdraws the installation's waiting update; called only for a super administrator",
+	"am_request_update":          "records an update to the installation; called only for a super administrator, with a release from the feed",
+	"am_sittings_in_progress":    "a count across tenants, nothing else",
+	"am_updater_seen":            "when the host's updater last looked for work",
+	"am_updates":                 "the installation's recent updates; called only for a super administrator",
 	"am_assignment_by_session":   "candidate cookie hash to its one assignment",
 	"am_assignment_by_token":     "invitation link hash to its one assignment",
 	"am_outbox_sweep":            "deletes sent mail past its keep; returns a count",
